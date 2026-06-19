@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://dakshyaminnovations.vercel.app/sitemap.xml
