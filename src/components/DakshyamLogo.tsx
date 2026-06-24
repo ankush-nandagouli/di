@@ -7,6 +7,7 @@ interface DakshyamLogoProps {
   showText?: boolean;
   interactive?: boolean;
   pulseGlow?: boolean;
+  theme?: 'light' | 'dark';
 }
 
 export default function DakshyamLogo({
@@ -14,6 +15,7 @@ export default function DakshyamLogo({
   showText = true,
   interactive = true,
   pulseGlow = true,
+  theme = 'dark',
 }: DakshyamLogoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<SVGGElement>(null);
@@ -162,7 +164,9 @@ export default function DakshyamLogo({
     >
       {/* 1. Pulse glowing background elements if prompted */}
       {pulseGlow && (
-        <div className="absolute -inset-10 bg-radial from-cyan-500/20 via-transparent to-transparent opacity-80 blur-3xl animate-[pulse_6s_infinite_ease-in-out] -z-10" />
+        <div className={`absolute -inset-10 bg-radial via-transparent to-transparent opacity-80 blur-3xl animate-[pulse_6s_infinite_ease-in-out] -z-10 ${
+          theme === 'light' ? 'from-amber-500/15' : 'from-cyan-500/20'
+        }`} />
       )}
       
       {/* 2. Main High-Fidelity SVG Vector Logo */}
@@ -308,8 +312,14 @@ export default function DakshyamLogo({
           {/* Main heading DAKSHYAM in elegant modern geometric style */}
           <motion.h1 
             variants={textLettersEntrance}
-            className="text-4xl md:text-5xl font-black tracking-[0.24em] text-white font-sans text-center"
-            style={{ textShadow: '0 0 25px rgba(34,211,238,0.22)' }}
+            className={`text-4xl md:text-5xl font-black tracking-[0.24em] font-sans text-center transition-all duration-300 ${
+              theme === 'light' ? 'text-amber-950' : 'text-white'
+            }`}
+            style={{ 
+              textShadow: theme === 'light' 
+                ? '0 0 25px rgba(217,119,6,0.15)' 
+                : '0 0 25px rgba(34,211,238,0.22)' 
+            }}
           >
             DAKSHYAM
           </motion.h1>
@@ -317,7 +327,9 @@ export default function DakshyamLogo({
           {/* Slogan spacing mono for INNOVATION */}
           <motion.p 
             variants={textLettersEntrance}
-            className="mt-2 text-xs md:text-sm font-mono text-cyan-400 tracking-[0.62em] font-medium uppercase translate-x-[0.31em]"
+            className={`mt-2 text-xs md:text-sm font-mono tracking-[0.62em] font-black uppercase translate-x-[0.31em] transition-all duration-300 ${
+              theme === 'light' ? 'text-[#b45309]' : 'text-cyan-400'
+            }`}
           >
             INNOVATION
           </motion.p>

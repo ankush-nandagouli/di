@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-export default function ThreeBackground() {
+export default function ThreeBackground({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -14,10 +14,14 @@ export default function ThreeBackground() {
     const container = containerRef.current;
     if (!container) return;
 
+    const isLight = theme === 'light';
+    const clearColorVal = isLight ? 0xffffff : 0x050505;
+    const fogColorVal = isLight ? 0xffffff : 0x050505;
+
     // 1. Create Scene
     const scene = new THREE.Scene();
     sceneRef.current = scene;
-    scene.fog = new THREE.FogExp2(0x050505, 0.015);
+    scene.fog = new THREE.FogExp2(fogColorVal, 0.015);
 
     // 2. Create Camera
     const camera = new THREE.PerspectiveCamera(
@@ -38,7 +42,7 @@ export default function ThreeBackground() {
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setClearColor(0x050505, 1);
+    renderer.setClearColor(clearColorVal, 1);
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -52,10 +56,9 @@ export default function ThreeBackground() {
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
 
-    // Color definitions matching Immersive UI theme (Deep Slate-Indigo & Glowing Cyan)
-    const colorBlue = new THREE.Color('#0a1d37');
-    const colorGold = new THREE.Color('#22d3ee');
-    const colorDark = new THREE.Color('#050505');
+    // Color definitions matching Immersive UI theme (Deep Slate-Indigo & Glowing Cyan for dark; Gold & Amber for light)
+    const colorBlue = isLight ? new THREE.Color('#ea580c') : new THREE.Color('#0a1d37'); // Orange-red vs Indigo
+    const colorGold = isLight ? new THREE.Color('#b45309') : new THREE.Color('#22d3ee'); // Deep Amber vs Teal cyan
 
     let idx = 0;
     for (let i = 0; i <= wSegments; i++) {
@@ -89,18 +92,26 @@ export default function ThreeBackground() {
     pCanvas.height = 16;
     const ctx = pCanvas.getContext('2d')!;
     const grad = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
-    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.8)');
-    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    
+    if (isLight) {
+      grad.addColorStop(0, 'rgba(180, 83, 9, 1)'); // Rich gold
+      grad.addColorStop(0.3, 'rgba(217, 119, 6, 0.8)');
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else {
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.8)');
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    }
+    
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 16, 16);
     const particleTexture = new THREE.CanvasTexture(pCanvas);
 
     const pointsMaterial = new THREE.PointsMaterial({
-      size: 0.45,
+      size: isLight ? 0.6 : 0.45,
       map: particleTexture,
       transparent: true,
-      blending: THREE.AdditiveBlending,
+      blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending,
       vertexColors: true,
       depthWrite: false,
     });
@@ -128,10 +139,10 @@ export default function ThreeBackground() {
     linesGeometry.setIndex(lineIndices);
 
     const linesMaterial = new THREE.LineBasicMaterial({
-      color: 0x113d4b,
+      color: isLight ? 0xd97706 : 0x113d4b,
       transparent: true,
-      opacity: 0.28,
-      blending: THREE.AdditiveBlending,
+      opacity: isLight ? 0.12 : 0.28,
+      blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
 
     const wireframe = new THREE.LineSegments(linesGeometry, linesMaterial);
@@ -142,13 +153,13 @@ export default function ThreeBackground() {
     const keyLights: THREE.PointLight[] = [];
     const lightGlowGeometry = new THREE.SphereGeometry(0.2, 8, 8);
     
-    const lightColors = [0x22d3ee, 0x6366f1, 0x0ea5e9];
+    const lightColors = isLight ? [0xd97706, 0xb45309, 0xfca5a5] : [0x22d3ee, 0x6366f1, 0x0ea5e9];
     lightColors.forEach((color, i) => {
-      const light = new THREE.PointLight(color, 2, 40);
+      const light = new THREE.PointLight(color, isLight ? 1.2 : 2, 40);
       const glowMat = new THREE.MeshBasicMaterial({
         color: color,
         transparent: true,
-        opacity: 0.6,
+        opacity: isLight ? 0.4 : 0.6,
       });
       const visual = new THREE.Mesh(lightGlowGeometry, glowMat);
       light.add(visual);
@@ -157,7 +168,7 @@ export default function ThreeBackground() {
     });
 
     // Ambient illumination
-    const ambientLight = new THREE.AmbientLight(0x081e26, 0.8);
+    const ambientLight = new THREE.AmbientLight(isLight ? 0xfef3c7 : 0x081e26, isLight ? 1.2 : 0.8);
     scene.add(ambientLight);
 
     // 7. Track mouse movements
@@ -170,12 +181,12 @@ export default function ThreeBackground() {
 
     // 8. Animation loop
     let animationFrameId: number;
-    let clock = new THREE.Clock();
+    const startTime = performance.now();
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
 
-      const time = clock.getElapsedTime() * 0.45;
+      const time = ((performance.now() - startTime) / 1000) * 0.45;
 
       // Smooth lerp mouse coordinates
       const mouse = mouseRef.current;
@@ -280,13 +291,13 @@ export default function ThreeBackground() {
         rendererRef.current.dispose();
       }
     };
-  }, []);
+  }, [theme]);
 
   return (
     <div 
       id="3d-mesh-background"
       ref={containerRef} 
-      className="absolute inset-0 w-full h-full bg-[#050505] overflow-hidden -z-10"
+      className={`absolute inset-0 w-full h-full overflow-hidden -z-10 transition-colors duration-500 ${theme === 'light' ? 'bg-white' : 'bg-[#050505]'}`}
       style={{ touchAction: 'none' }}
     />
   );

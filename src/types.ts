@@ -1,22 +1,139 @@
-export type NavSection = 'home' | 'innovations' | 'roadmap' | 'contact';
+export type NavSection = 'home' | 'portal' | 'services' | 'verification' | 'dashboard';
+export type UserRole = 'admin' | 'trainer' | 'student';
 
-export interface Milestone {
-  id: string;
-  quarter: string;
-  year: string;
-  title: string;
-  description: string;
-  status: 'completed' | 'in-progress' | 'upcoming';
+export interface UserProfile {
+  phone?: string;
+  institution?: string; // School or College
+  gradeOrBranch?: string;
+  address?: string;
 }
 
-export interface InnovationPillar {
+export interface StudentUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'student';
+  password?: string;
+  profile?: UserProfile;
+  groupId?: string | null;
+  createdAt: string;
+}
+
+export interface TrainerProfile {
+  phone?: string;
+  qualification?: string;
+  specialization?: string;
+  experienceYears?: string;
+  institution?: string;
+  bio?: string;
+}
+
+export interface TrainerUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'trainer';
+  isApproved: boolean; // Must be approved by Admin first
+  createdAt: string;
+  password?: string;
+  profile?: TrainerProfile;
+}
+
+export interface PromoBanner {
   id: string;
   title: string;
-  tagline: string;
+  subtitle: string;
+  imageUrl: string;
+  actionUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface GalleryImage {
+  id: string;
+  title: string;
   description: string;
-  details: string[];
-  iconName: string; // Lucide icon name matching
-  colorAccent: string; // Tailwind glow color
+  imageUrl: string;
+  category: 'school_programs' | 'iot_robotics' | 'mern_web' | 'lab_setups';
+  createdAt: string;
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin';
+  createdAt: string;
+}
+
+export type UserType = StudentUser | TrainerUser | AdminUser;
+
+export interface StudentGroup {
+  id: string;
+  name: string;
+  projectTitle: string;
+  projectDescription: string;
+  videoUrl?: string; // Optional student uploaded video mockup link/ID
+  memberIds: string[]; // List of Student IDs
+  points: number;
+  trainerId: string; // Trainer who created the group
+  createdAt: string;
+}
+
+export interface Course {
+  id: string;
+  title: string;
+  duration: string;
+  description: string;
+  tags: string[];
+  features: string[];
+  mobileHardwareIncluded?: boolean;
+}
+
+export interface CourseApplication {
+  id: string;
+  studentId?: string; // If registered while logged in
+  fullName: string;
+  email: string;
+  phone: string;
+  institution: string; // school/college
+  courseId: string;
+  appliedAt: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface Certificate {
+  id: string; // Unique Certificate ID (e.g. DKM-2026-X82F)
+  studentName: string;
+  studentEmail: string;
+  courseTitle: string;
+  projectTitle: string;
+  issueDate: string;
+  trainerId: string;
+  trainerName: string;
+  customLogoUrl?: string;
+  customSealUrl?: string;
+  trainingPartnerName?: string;
+  trainingPartnerLogoUrl?: string;
+}
+
+export interface VideoPost {
+  id: string;
+  groupId: string;
+  groupName: string;
+  title: string;
+  description: string;
+  videoUrl: string; // placeholder/mock url
+  likes: number;
+  likedByUserIds: string[];
+  views: number;
+  comments: Array<{
+    id: string;
+    senderName: string;
+    text: string;
+    timestamp: string;
+  }>;
+  createdAt: string;
 }
 
 export interface CountdownTime {
@@ -25,3 +142,48 @@ export interface CountdownTime {
   minutes: number;
   seconds: number;
 }
+
+export interface SpecialTrainingProgram {
+  id: string;
+  trainingName: string;
+  duration: string;
+  startingDateTime: string; // e.g. "2026-06-30T10:00"
+  institutionName: string; // specific school or college name
+  createdAt: string;
+}
+
+export interface CompanyFounder {
+  name: string;
+  role: string;
+  bio: string;
+  avatarText?: string;
+}
+
+export interface CompanyAbout {
+  companyName: string;
+  description: string;
+  mission: string;
+  vision: string;
+  officeLocation: string;
+  socialGithub: string;
+  socialLinkedin: string;
+  socialTwitter: string;
+  socialYoutube: string;
+  founders: CompanyFounder[];
+}
+
+export interface SpecialProgramEnrollment {
+  id: string;
+  programId: string;
+  trainingName: string;
+  institutionName: string;
+  name: string;
+  branch: string;
+  yearOfStudy: string;
+  fathersName: string;
+  email: string;
+  rollNumber: string;
+  mobileNumber: string;
+  enrolledAt: string;
+}
+
