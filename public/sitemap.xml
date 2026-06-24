@@ -1,9 +1,74 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+  <!-- Main Home Page -->
   <url>
     <loc>https://dakshyaminnovations.vercel.app/</loc>
-    <lastmod>2026-06-19</lastmod>
-    <changefreq>monthly</changefreq>
+    <lastmod>2026-06-24</lastmod>
+    <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://dakshyaminnovations.vercel.app/?tab=home</loc>
+    <lastmod>2026-06-24</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Vocational Services & Curriculum Packages -->
+  <url>
+    <loc>https://dakshyaminnovations.vercel.app/?tab=services</loc>
+    <lastmod>2026-06-24</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Certificate Verification Engine -->
+  <url>
+    <loc>https://dakshyaminnovations.vercel.app/?tab=verification</loc>
+    <lastmod>2026-06-24</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- About Company & Founding Board -->
+  <url>
+    <loc>https://dakshyaminnovations.vercel.app/?tab=about</loc>
+    <lastmod>2026-06-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Leaderboards & Academic Assessment Matrices -->
+  <url>
+    <loc>https://dakshyaminnovations.vercel.app/?tab=leaderboard</loc>
+    <lastmod>2026-06-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Student Telemetry Feeds & Live Diagnostics -->
+  <url>
+    <loc>https://dakshyaminnovations.vercel.app/?tab=social</loc>
+    <lastmod>2026-06-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Contact Desks & Lab Setup Booking -->
+  <url>
+    <loc>https://dakshyaminnovations.vercel.app/?tab=contact</loc>
+    <lastmod>2026-06-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Authentication portals -->
+  <url>
+    <loc>https://dakshyaminnovations.vercel.app/?tab=portal</loc>
+    <lastmod>2026-06-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>
 </urlset>

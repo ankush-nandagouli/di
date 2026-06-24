@@ -46,7 +46,18 @@ export default function App() {
   const [pinError, setPinError] = useState('');
 
   // Navigation states
-  const [activeTab, setActiveTab] = useState<'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact'>(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const tabParam = searchParams.get('tab');
+      if (tabParam && ['home', 'services', 'leaderboard', 'social', 'portal', 'verification', 'about', 'contact'].includes(tabParam)) {
+        return tabParam as any;
+      }
+    } catch (e) {
+      console.error('URL parse fail', e);
+    }
+    return 'home';
+  });
   const [preselectedCourseId, setPreselectedCourseId] = useState<string | null>(null);
   const [logoError, setLogoError] = useState(false);
 
@@ -106,6 +117,60 @@ export default function App() {
       console.error(e);
     }
   }, [theme]);
+
+  // SEO Tab Synchronization, Dynamic Document Titles, and Meta updates
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', activeTab);
+      window.history.replaceState(null, '', url.toString());
+
+      // Update document titles and meta tags dynamically based on the active vocational page
+      const titleMapping: Record<string, string> = {
+        home: 'DAKSHYAM INNOVATION | Physical-Digital Technical Vocational Training Labs',
+        services: 'DAKSHYAM INNOVATION | Vocational Courses & IoT Training Programs',
+        leaderboard: 'DAKSHYAM INNOVATION | Students Leaderboard & Matrix Performance',
+        social: 'DAKSHYAM INNOVATION | Social Telemetry Feed & Live Projects',
+        portal: 'DAKSHYAM INNOVATION | Student & Trainer Logins',
+        verification: 'DAKSHYAM INNOVATION | Verifiable Certificate Verification Engine',
+        about: 'DAKSHYAM INNOVATION | Board of Directors, Founders & Mission Statement',
+        contact: 'DAKSHYAM INNOVATION | Get In Touch - Dynamic Contact Desk',
+      };
+
+      const descMapping: Record<string, string> = {
+        home: 'Dakshyam Innovation is India\'s premier skill incubator under NEP 2020. Discover physical-digital integrated labs, embedded systems training, and modern technology camps.',
+        services: 'Explore our hand-crafted, industry-oriented computer literacy, IoT hardware training, and robotic engineering syllabus modules.',
+        leaderboard: 'Track student laboratory points, group capstone submissions, and real-time active grading matrices.',
+        social: 'See what our students are building. Experience live project diagnostic feeds, solar hardware telemetry streams, and social tech logs.',
+        portal: 'Secure access gateway for authenticated student users, authorized trainers, and system administrators.',
+        verification: 'Verify authentic certification credentials issued by Dakshyam Innovation. Examine student telemetry scores and download official print-ready PDFs.',
+        about: 'Meet the founding members, technical developers, board of directors, and visionaries shaping India\'s vocational development pipeline.',
+        contact: 'Connect directly with the Dakshyam team. Partner with us to construct modern computer literacy and IoT hardware labs inside your regional school.',
+      };
+
+      if (titleMapping[activeTab]) {
+        document.title = titleMapping[activeTab];
+      }
+
+      // Update meta description
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc && descMapping[activeTab]) {
+        metaDesc.setAttribute('content', descMapping[activeTab]);
+      }
+
+      // Update Open Graph tags for rich indexing previews
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle && titleMapping[activeTab]) {
+        ogTitle.setAttribute('content', titleMapping[activeTab]);
+      }
+      const ogDesc = document.querySelector('meta[property="og:description"]');
+      if (ogDesc && descMapping[activeTab]) {
+        ogDesc.setAttribute('content', descMapping[activeTab]);
+      }
+    } catch (err) {
+      console.error('SEO sync fail', err);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     refreshDb();

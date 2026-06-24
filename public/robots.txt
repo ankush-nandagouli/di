@@ -1,4 +1,22 @@
+# https://www.robotstxt.org/db.html
+# Dakshyam Innovation robots.txt configuration
+
 User-agent: *
 Allow: /
+Allow: /?tab=home
+Allow: /?tab=services
+Allow: /?tab=verification
+Allow: /?tab=about
+Allow: /?tab=leaderboard
+Allow: /?tab=social
+Allow: /?tab=contact
+Allow: /?tab=portal
 
+# Block caching of temporary media uploads or test endpoints if any
+Disallow: /api/
+Disallow: /admin/
+Disallow: /trainer/
+
+# Host & Sitemap links
+Host: https://dakshyaminnovations.vercel.app
 Sitemap: https://dakshyaminnovations.vercel.app/sitemap.xml
