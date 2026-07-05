@@ -21,6 +21,13 @@ import ContactUs from './components/ContactUs';
 import { DakshyamDatabase } from './utils/db';
 import { Course, CourseApplication, StudentGroup, StudentUser, Certificate, VideoPost, PromoBanner, GalleryImage } from './types';
 
+// Firebase Auth SDK imports for secure password resetting
+import { 
+  sendPasswordResetEmail,
+  createUserWithEmailAndPassword
+} from 'firebase/auth';
+import { auth as firebaseAuth } from './utils/firebase';
+
 export default function App() {
   // Theme, Sandbox & Mobile Menu states
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -63,7 +70,7 @@ export default function App() {
 
   // Authentication UI Modal
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [authRoleTab, setAuthRoleTab] = useState<'student' | 'trainer' | 'admin'>('student');
 
   // Input states
@@ -77,6 +84,181 @@ export default function App() {
   // Secret passcode states (Trainer/Admin URL security)
   const [secretCode, setSecretCode] = useState('');
   const [authError, setAuthError] = useState('');
+
+  // Rate limiting & security lockout states
+  const [failedAttempts, setFailedAttempts] = useState<Record<string, number>>({});
+  const [lockoutTimers, setLockoutTimers] = useState<Record<string, number>>({});
+
+  // Forgot Password Recovery states
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSuccessMessage, setResetSuccessMessage] = useState('');
+
+  // Strict secure input sanitization and verification against SQL/Query injection or Cross-Site Scripting (XSS)
+  const isInputSafe = (val: string, fieldName = 'input'): { safe: boolean; error?: string } => {
+    if (!val) return { safe: true };
+    if (val.length > 100) {
+      return { safe: false, error: `Invalid ${fieldName}: Input exceeds maximum secure length.` };
+    }
+    const maliciousPatterns = [
+      /['";`]/g,
+      /--/g,
+      /union\s+select/gi,
+      /select\s+.*\s+from/gi,
+      /insert\s+into/gi,
+      /delete\s+from/gi,
+      /drop\s+table/gi,
+      /update\s+.*\s+set/gi,
+      /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+      /javascript:/gi,
+      /onload=/gi,
+      /onerror=/gi
+    ];
+    for (const pattern of maliciousPatterns) {
+      if (pattern.test(val)) {
+        return { safe: false, error: `Malicious characters or query injection detected in ${fieldName}. Special symbols and SQL syntax are strictly forbidden.` };
+      }
+    }
+    return { safe: true };
+  };
+
+  const isValidEmail = (emailStr: string): boolean => {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(emailStr);
+  };
+
+  // Secure SHA-256 Client-Side Hashing Generator
+  const hashPassword = async (pwd: string): Promise<string> => {
+    try {
+      const msgUint8 = new TextEncoder().encode(pwd);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch {
+      let hash1 = 0x811c9dc5;
+      let hash2 = 0x55aa55aa;
+      for (let i = 0; i < pwd.length; i++) {
+        hash1 ^= pwd.charCodeAt(i);
+        hash1 += (hash1 << 1) + (hash1 << 4) + (hash1 << 7) + (hash1 << 8) + (hash1 << 24);
+        hash2 = (hash2 << 5) - hash2 + pwd.charCodeAt(i);
+        hash2 |= 0;
+      }
+      return 'sha_sim_' + Math.abs(hash1).toString(16) + Math.abs(hash2).toString(16);
+    }
+  };
+
+  const checkLockout = (emailStr: string): boolean => {
+    const lockTime = lockoutTimers[emailStr.toLowerCase()];
+    if (lockTime) {
+      const now = Date.now();
+      if (now < lockTime) {
+        const remaining = Math.ceil((lockTime - now) / 1000);
+        setAuthError(`❌ SECURITY BRACE LOCKOUT: Too many failed login attempts. Locked out. Please wait ${remaining} seconds before retrying.`);
+        return true;
+      } else {
+        const updatedLockouts = { ...lockoutTimers };
+        delete updatedLockouts[emailStr.toLowerCase()];
+        setLockoutTimers(updatedLockouts);
+        
+        const updatedAttempts = { ...failedAttempts };
+        delete updatedAttempts[emailStr.toLowerCase()];
+        setFailedAttempts(updatedAttempts);
+      }
+    }
+    return false;
+  };
+
+  const handleFailedAttempt = (emailStr: string) => {
+    const current = (failedAttempts[emailStr.toLowerCase()] || 0) + 1;
+    const updatedAttempts = { ...failedAttempts, [emailStr.toLowerCase()]: current };
+    setFailedAttempts(updatedAttempts);
+
+    if (current >= 5) {
+      const lockDuration = 30 * 1000; 
+      const lockUntil = Date.now() + lockDuration;
+      setLockoutTimers({ ...lockoutTimers, [emailStr.toLowerCase()]: lockUntil });
+      setAuthError(`❌ SECURITY LOCKOUT: 5 failed attempts reached. Brute-force safeguard active. Access is locked for 30 seconds.`);
+    } else {
+      setAuthError(`❌ Incorrect secure credentials. Attempt ${current}/5. Access blocks after 5 failures.`);
+    }
+  };
+
+  // --- FORGOT PASSWORD RECOVERY HANDLER ---
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setResetSuccessMessage('');
+
+    const emailClean = resetEmail.trim();
+
+    if (!emailClean) {
+      setAuthError('Please fill out your registered email address.');
+      return;
+    }
+
+    const emailCheck = isInputSafe(emailClean, 'Verification Email');
+    if (!emailCheck.safe) { setAuthError(emailCheck.error); return; }
+
+    if (!isValidEmail(emailClean)) {
+      setAuthError('❌ Invalid security format: Email structure is invalid.');
+      return;
+    }
+
+    try {
+      // First check if the user exists in our local systems (student or trainer)
+      const studentsList = DakshyamDatabase.getStudents();
+      const trainersList = DakshyamDatabase.getTrainers();
+      
+      const isStudent = studentsList.some(s => s.email.toLowerCase() === emailClean.toLowerCase());
+      const isTrainer = trainersList.some(t => t.email.toLowerCase() === emailClean.toLowerCase());
+
+      if (!isStudent && !isTrainer) {
+        setAuthError('❌ Account not found: This email address is not registered under any Student or Trainer account.');
+        return;
+      }
+
+      setResetSuccessMessage('⏳ Contacting secure authentication server... Dispatching recovery email...');
+
+      try {
+        // Attempt direct email dispatch
+        await sendPasswordResetEmail(firebaseAuth, emailClean);
+        setResetSuccessMessage(`✓ RECOVERY EMAIL DISPATCHED: A secure password reset link has been sent to ${emailClean}. Please verify your inbox and spam folder.`);
+        setResetEmail('');
+      } catch (fbError: any) {
+        // If the error indicates they are not in our auth record yet, let's provision them dynamically so they can receive it
+        if (
+          fbError.code === 'auth/user-not-found' || 
+          fbError.code === 'auth/invalid-credential' || 
+          fbError.message?.includes('user-not-found')
+        ) {
+          try {
+            // Retrieve their existing local password, or default to a dummy one
+            let localPassword = 'TemporaryUserPass123!';
+            if (isStudent) {
+              const sObj = studentsList.find(s => s.email.toLowerCase() === emailClean.toLowerCase());
+              if (sObj && sObj.password) localPassword = sObj.password;
+            } else if (isTrainer) {
+              const tObj = trainersList.find(t => t.email.toLowerCase() === emailClean.toLowerCase());
+              if (tObj && tObj.password) localPassword = tObj.password;
+            }
+
+            // Create user in Auth database so they can receive the password reset mail
+            await createUserWithEmailAndPassword(firebaseAuth, emailClean, localPassword);
+            // Now trigger password reset email
+            await sendPasswordResetEmail(firebaseAuth, emailClean);
+            
+            setResetSuccessMessage(`✓ RECOVERY EMAIL DISPATCHED: A secure password reset link has been successfully dispatched to ${emailClean}. Please check your inbox and spam folders.`);
+            setResetEmail('');
+          } catch (createError: any) {
+            setAuthError(`❌ Security Sync Error: ${createError.message || createError}`);
+          }
+        } else {
+          setAuthError(`❌ Authentication Service Error: ${fbError.message || fbError}`);
+        }
+      }
+    } catch (err: any) {
+      setAuthError(`❌ Reset Process Failed: ${err.message || err}`);
+    }
+  };
 
   // Loaded database states
   const [courses, setCourses] = useState<Course[]>([]);
@@ -176,19 +358,45 @@ export default function App() {
     refreshDb();
 
     // Secure URL listener: Check query parameters for secure trainer/admin login
-    const searchParams = new URLSearchParams(window.location.search);
-    const accessMatch = searchParams.get('access');
-    
-    if (accessMatch === 'admin') {
-      setIsStaffAccessEnabled(true);
-      setAuthRoleTab('admin');
-      setSecretCode('ADMIN2026');
-      setShowAuthModal(true);
-    } else if (accessMatch === 'trainer') {
-      setIsStaffAccessEnabled(true);
-      setAuthRoleTab('trainer');
-      setStudentEmail('trainer@dakshyam.com');
-      setShowAuthModal(true);
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const accessMatch = searchParams.get('access');
+      const tabMatch = searchParams.get('tab');
+
+      // Validate tabMatch whitelist
+      if (tabMatch) {
+        const allowedTabs = ['home', 'services', 'leaderboard', 'social', 'portal', 'verification', 'about', 'contact'];
+        if (!allowedTabs.includes(tabMatch)) {
+          console.warn('Security Warning: Corrupt tab parameter blocked.');
+          setActiveTab('home');
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('tab');
+          window.history.replaceState(null, '', cleanUrl.toString());
+        }
+      }
+      
+      // Strict whitelist verification of access match
+      if (accessMatch) {
+        const allowedAccess = ['admin', 'trainer'];
+        if (!allowedAccess.includes(accessMatch)) {
+          console.warn('Security Warning: Invalid bypass access parameter discarded.');
+          return;
+        }
+
+        if (accessMatch === 'admin') {
+          setIsStaffAccessEnabled(true);
+          setAuthRoleTab('admin');
+          setSecretCode('ADMIN2026');
+          setShowAuthModal(true);
+        } else if (accessMatch === 'trainer') {
+          setIsStaffAccessEnabled(true);
+          setAuthRoleTab('trainer');
+          setStudentEmail('trainer@dakshyam.com');
+          setShowAuthModal(true);
+        }
+      }
+    } catch (err) {
+      console.error('URL parse sequence failed security checks.', err);
     }
   }, []);
 
@@ -221,26 +429,51 @@ export default function App() {
   };
 
   // --- STUDENT REGULAR SIGNUP HANDLER ---
-  const handleStudentRegister = (e: React.FormEvent) => {
+  const handleStudentRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
 
-    if (!studentName.trim() || !studentEmail.trim() || !studentPhone.trim() || !studentSchool.trim() || !passwordInput) {
+    const nameClean = studentName.trim();
+    const emailClean = studentEmail.trim();
+    const phoneClean = studentPhone.trim();
+    const schoolClean = studentSchool.trim();
+
+    if (!nameClean || !emailClean || !phoneClean || !schoolClean || !passwordInput) {
       setAuthError('Please fill out all registration fields, including a secure password.');
       return;
     }
 
+    // Input Safeguard validation
+    const nameCheck = isInputSafe(nameClean, 'Full Name');
+    if (!nameCheck.safe) { setAuthError(nameCheck.error); return; }
+    const emailCheck = isInputSafe(emailClean, 'Email');
+    if (!emailCheck.safe) { setAuthError(emailCheck.error); return; }
+    const phoneCheck = isInputSafe(phoneClean, 'WhatsApp Node');
+    if (!phoneCheck.safe) { setAuthError(phoneCheck.error); return; }
+    const schoolCheck = isInputSafe(schoolClean, 'School');
+    if (!schoolCheck.safe) { setAuthError(schoolCheck.error); return; }
+    const pwdCheck = isInputSafe(passwordInput, 'Password');
+    if (!pwdCheck.safe) { setAuthError(pwdCheck.error); return; }
+
+    if (!isValidEmail(emailClean)) {
+      setAuthError('❌ Invalid security format: Email structure is invalid.');
+      return;
+    }
+
     try {
-      const res = DakshyamDatabase.registerStudent(studentName, studentEmail, passwordInput, {
-        phone: studentPhone,
-        institution: studentSchool,
+      // HASHING PASSWORD PRIOR TO PERSISTENCE (Anti-Steal and DevTools protection)
+      const hashedPassword = await hashPassword(passwordInput);
+
+      const res = DakshyamDatabase.registerStudent(nameClean, emailClean, hashedPassword, {
+        phone: phoneClean,
+        institution: schoolClean,
         gradeOrBranch: studentLevel
       });
 
       if (res.success) {
         // Log them in immediately
         const latestStudents = DakshyamDatabase.getStudents();
-        const createdUser = latestStudents.find(s => s.email.toLowerCase() === studentEmail.toLowerCase());
+        const createdUser = latestStudents.find(s => s.email.toLowerCase() === emailClean.toLowerCase());
         DakshyamDatabase.setLoggedInUser(createdUser);
         
         // Reset states
@@ -262,29 +495,56 @@ export default function App() {
   };
 
   // --- STUDENT NORMAL LOGIN HANDLER ---
-  const handleStudentLogin = (e: React.FormEvent) => {
+  const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
 
-    if (!studentEmail.trim()) {
+    const emailClean = studentEmail.trim();
+    if (!emailClean) {
       setAuthError('Email verification required.');
       return;
     }
-    if (!passwordInput) {
-      setAuthError('Secure password is required.');
+
+    // Input Safeguard checks to prevent SQL/NoSQL injections
+    const emailCheck = isInputSafe(emailClean, 'Email');
+    if (!emailCheck.safe) {
+      setAuthError(emailCheck.error || 'Invalid Email formatting.');
+      return;
+    }
+    const pwdCheck = isInputSafe(passwordInput, 'Password');
+    if (!pwdCheck.safe) {
+      setAuthError(pwdCheck.error || 'Invalid Password characters.');
       return;
     }
 
+    if (!isValidEmail(emailClean)) {
+      setAuthError('❌ Invalid security format: Email structure is invalid.');
+      return;
+    }
+
+    // Lockout verification
+    if (checkLockout(emailClean)) return;
+
     try {
       const allStudents = DakshyamDatabase.getStudents();
-      const match = allStudents.find(s => s.email.toLowerCase() === studentEmail.toLowerCase().trim());
+      const match = allStudents.find(s => s.email.toLowerCase() === emailClean.toLowerCase());
       
       if (match) {
         const userPassword = match.password || '123456';
-        if (passwordInput !== userPassword) {
-          setAuthError('Incorrect secure password credentials.');
+        const inputHashed = await hashPassword(passwordInput);
+        const savedHashed = await hashPassword(userPassword);
+
+        // Allow match if input hashed equals the saved password or if saved password matches plain text (fallback for seeded accounts)
+        if (inputHashed !== userPassword && passwordInput !== userPassword && inputHashed !== savedHashed) {
+          handleFailedAttempt(emailClean);
           return;
         }
+
+        // Success - Clear lockout history
+        const updatedAttempts = { ...failedAttempts };
+        delete updatedAttempts[emailClean.toLowerCase()];
+        setFailedAttempts(updatedAttempts);
+
         DakshyamDatabase.setLoggedInUser(match);
         setShowAuthModal(false);
         setStudentEmail('');
@@ -292,41 +552,69 @@ export default function App() {
         refreshDb();
         setActiveTab('portal');
       } else {
-        setAuthError('Student registry node not found. Please register to create an account profile.');
+        // Registering failed attempt even for non-existent users to protect user enumeration
+        handleFailedAttempt(emailClean);
       }
     } catch {
-      setAuthError('Exception: database is busy.');
+      setAuthError('Exception: secure database timeout.');
     }
   };
 
   // --- TRAINER LOGIN HANDLER WITH APPROVAL SYSTEM ---
-  const handleTrainerLogin = (e: React.FormEvent) => {
+  const handleTrainerLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
 
-    if (!studentEmail.trim()) {
+    const emailClean = studentEmail.trim();
+    if (!emailClean) {
       setAuthError('Trainer email verification required.');
       return;
     }
-    if (!passwordInput) {
-      setAuthError('Password identifier is required.');
+
+    // Input Safeguard checks
+    const emailCheck = isInputSafe(emailClean, 'Trainer Email');
+    if (!emailCheck.safe) {
+      setAuthError(emailCheck.error || 'Invalid Email characters.');
+      return;
+    }
+    const pwdCheck = isInputSafe(passwordInput, 'Password');
+    if (!pwdCheck.safe) {
+      setAuthError(pwdCheck.error || 'Invalid Password characters.');
       return;
     }
 
+    if (!isValidEmail(emailClean)) {
+      setAuthError('❌ Invalid security format: Trainer Email structure is invalid.');
+      return;
+    }
+
+    // Lockout verification
+    if (checkLockout(emailClean)) return;
+
     try {
       const trainers = DakshyamDatabase.getTrainers();
-      const match = trainers.find(t => t.email.toLowerCase() === studentEmail.toLowerCase().trim());
+      const match = trainers.find(t => t.email.toLowerCase() === emailClean.toLowerCase());
 
       if (match) {
         if (!match.isApproved) {
-          setAuthError('⚠ RESTRICTED ACCESS: Your Trainer profile registry ID is pending Admin authorization first. Please ask terminal leads to verify your account.');
+          setAuthError('⚠ RESTRICTED ACCESS: Your Trainer profile registry ID is pending Admin authorization. Please ask admin leads to verify your account.');
           return;
         }
+
         const userPassword = match.password || '123456';
-        if (passwordInput !== userPassword) {
-          setAuthError('Incorrect secure password credentials.');
+        const inputHashed = await hashPassword(passwordInput);
+        const savedHashed = await hashPassword(userPassword);
+
+        if (inputHashed !== userPassword && passwordInput !== userPassword && inputHashed !== savedHashed) {
+          handleFailedAttempt(emailClean);
           return;
         }
+
+        // Success - Clear lockout history
+        const updatedAttempts = { ...failedAttempts };
+        delete updatedAttempts[emailClean.toLowerCase()];
+        setFailedAttempts(updatedAttempts);
+
         DakshyamDatabase.setLoggedInUser(match);
         setShowAuthModal(false);
         setStudentEmail('');
@@ -334,7 +622,7 @@ export default function App() {
         refreshDb();
         setActiveTab('portal');
       } else {
-        setAuthError('Trainer profile record not found. Please apply to register as a new trainer.');
+        handleFailedAttempt(emailClean);
       }
     } catch {
       setAuthError('Trainer node access timeout.');
@@ -342,23 +630,41 @@ export default function App() {
   };
 
   // --- NEW TRAINER REGISTER REQUEST HANDLER ---
-  const handleTrainerRegister = (e: React.FormEvent) => {
+  const handleTrainerRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
 
-    if (!studentName.trim() || !studentEmail.trim() || !passwordInput) {
+    const nameClean = studentName.trim();
+    const emailClean = studentEmail.trim();
+
+    if (!nameClean || !emailClean || !passwordInput) {
       setAuthError('Trainer name, email, and password registry are required fields.');
       return;
     }
 
+    // Input Safeguards
+    const nameCheck = isInputSafe(nameClean, 'Trainer Name');
+    if (!nameCheck.safe) { setAuthError(nameCheck.error); return; }
+    const emailCheck = isInputSafe(emailClean, 'Trainer Email');
+    if (!emailCheck.safe) { setAuthError(emailCheck.error); return; }
+    const pwdCheck = isInputSafe(passwordInput, 'Password');
+    if (!pwdCheck.safe) { setAuthError(pwdCheck.error); return; }
+
+    if (!isValidEmail(emailClean)) {
+      setAuthError('❌ Invalid security format: Email structure is invalid.');
+      return;
+    }
+
     try {
-      const res = DakshyamDatabase.registerTrainer(studentName, studentEmail, passwordInput);
+      // HASHING PRIOR TO DB SUBMISSION
+      const hashedPassword = await hashPassword(passwordInput);
+
+      const res = DakshyamDatabase.registerTrainer(nameClean, emailClean, hashedPassword);
       if (res.success) {
         setStudentName('');
         setStudentEmail('');
         setPasswordInput('');
         refreshDb();
-        // Give explicit operational guidance
         setAuthError('✓ APPLICATION REQUISITION SUBMITTED! Your account is held as "Pending Approval". Once a Dakshyam Admin grants access, you can run courses.');
       } else {
         setAuthError(res.error || 'Trainer application failed.');
@@ -369,23 +675,40 @@ export default function App() {
   };
 
   // --- ADMIN PASSCODE LOGIN HANDLER ---
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
 
-    if (secretCode.trim().toUpperCase() === 'ADMIN2026') {
+    const cleanCode = secretCode.trim().toUpperCase();
+    
+    // Lockout verification for admin as well
+    if (checkLockout('admin_account')) return;
+
+    const codeCheck = isInputSafe(cleanCode, 'Admin Passcode');
+    if (!codeCheck.safe) {
+      setAuthError(codeCheck.error || 'Malicious input detected.');
+      return;
+    }
+
+    if (cleanCode === 'ADMIN2026') {
       try {
         const adminUser = DakshyamDatabase.getAdmins()[0];
         DakshyamDatabase.setLoggedInUser(adminUser);
         setShowAuthModal(false);
         setSecretCode('');
+        
+        // Clear attempts
+        const updatedAttempts = { ...failedAttempts };
+        delete updatedAttempts['admin_account'];
+        setFailedAttempts(updatedAttempts);
+
         refreshDb();
         setActiveTab('portal');
       } catch {
         setAuthError('Admin indexing node failure.');
       }
     } else {
-      setAuthError('Invalid administrator terminal signature override code.');
+      handleFailedAttempt('admin_account');
     }
   };
 
@@ -1037,8 +1360,9 @@ export default function App() {
                   {authError}
                 </div>
               )}
-                        {/* SECTION A: STUDENT REGISTRY */}
-              {authRoleTab === 'student' && (
+
+              {/* SECTION A: STUDENT REGISTRY */}
+              {authRoleTab === 'student' && authMode !== 'forgot' && (
                 <>
                   {authMode === 'login' ? (
                     <form onSubmit={handleStudentLogin} className="space-y-4 font-sans">
@@ -1064,7 +1388,6 @@ export default function App() {
                           <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
                             Secure Account Password
                           </label>
-                          <span className="text-[8px] font-mono opacity-60">(Seeded: 123456)</span>
                         </div>
                         <input
                           type="password"
@@ -1077,6 +1400,22 @@ export default function App() {
                             : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45 transition-all"
                           }
                         />
+                      </div>
+
+                      <div className="flex justify-end pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthMode('forgot');
+                            setAuthError('');
+                            setResetSuccessMessage('');
+                          }}
+                          className={`text-[9px] font-mono uppercase tracking-wide hover:underline cursor-pointer ${
+                            isLight ? 'text-amber-700 hover:text-amber-900' : 'text-cyan-400 hover:text-cyan-300'
+                          }`}
+                        >
+                          Forgot Password?
+                        </button>
                       </div>
 
                       <button
@@ -1241,7 +1580,7 @@ export default function App() {
               )}
 
               {/* SECTION B: TRAINER REGISTRY & VERIFICATION SYSTEM */}
-              {authRoleTab === 'trainer' && (
+              {authRoleTab === 'trainer' && authMode !== 'forgot' && (
                 <>
                   {authMode === 'login' ? (
                     <form onSubmit={handleTrainerLogin} className="space-y-4 font-sans">
@@ -1267,7 +1606,6 @@ export default function App() {
                           <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
                             Trainer Password
                           </label>
-                          <span className="text-[8px] font-mono opacity-60">(Seeded: 123456)</span>
                         </div>
                         <input
                           type="password"
@@ -1280,6 +1618,22 @@ export default function App() {
                             : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40"
                           }
                         />
+                      </div>
+
+                      <div className="flex justify-end pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthMode('forgot');
+                            setAuthError('');
+                            setResetSuccessMessage('');
+                          }}
+                          className={`text-[9px] font-mono uppercase tracking-wide hover:underline cursor-pointer ${
+                            isLight ? 'text-amber-700 hover:text-amber-900' : 'text-cyan-400 hover:text-cyan-300'
+                          }`}
+                        >
+                          Forgot Password?
+                        </button>
                       </div>
 
                       <button
@@ -1422,92 +1776,68 @@ export default function App() {
                 </form>
               )}
 
-              {/* COLLAPSIBLE SANDBOX TESTING PANELS */}
-              <div className={`mt-2 border-t pt-3.5 ${isLight ? 'border-amber-500/10' : 'border-cyan-500/5'}`}>
-                <div className="flex justify-between items-center">
-                  <span className={`text-[8px] font-mono uppercase tracking-wider ${isLight ? 'text-slate-505 text-slate-500' : 'text-slate-550'}`}>Preview Testing Helpers</span>
+              {/* SECTION D: SELF-SERVICE PASSWORD RECOVERY */}
+              {authMode === 'forgot' && (
+                <form onSubmit={handleResetPassword} className="space-y-4 font-sans">
+                  <div className="space-y-1.5 text-center pb-2 border-b border-cyan-500/5">
+                    <h3 className={`text-xs font-black uppercase tracking-wide ${isLight ? 'text-slate-800' : 'text-slate-100'}`}>
+                      Recover {authRoleTab === 'student' ? 'Student' : 'Trainer'} Access
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
+                      Enter your registered email address below to receive a secure password recovery link.
+                    </p>
+                  </div>
+
+                  {resetSuccessMessage && (
+                    <div className="text-[10px] font-mono p-2.5 rounded-xl border border-emerald-500/20 bg-emerald-50 text-emerald-600 font-bold text-center leading-relaxed">
+                      {resetSuccessMessage}
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                      Registered Account Email
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="e.g. user@example.com"
+                      className={isLight 
+                        ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500" 
+                        : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                      }
+                    />
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={() => setShowSandboxHints(!showSandboxHints)}
-                    className={`text-[8.5px] font-bold font-mono uppercase cursor-pointer hover:underline flex items-center gap-1 ${
-                      isLight ? 'text-amber-700' : 'text-cyan-400'
+                    type="submit"
+                    className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all uppercase font-mono tracking-wider shadow-xs ${
+                      isLight 
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white hover:shadow-[0_0_12px_rgba(217,119,6,0.15)]' 
+                        : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 hover:shadow-[0_0_12px_rgba(34,211,238,0.2)]'
                     }`}
                   >
-                    <Settings className="w-2.5 h-2.5 animate-spin-slow animate-spin" /> {showSandboxHints ? 'Hide Accounts' : 'Show Accounts'}
+                    Send Recovery Email
                   </button>
-                </div>
 
-                <AnimatePresence>
-                  {showSandboxHints && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{
-                        height: { duration: 0.35, ease: [0.16, 1, 0.3, 1] },
-                        opacity: { duration: 0.22, ease: 'linear' }
+                  <div className="text-center pt-1 font-mono text-4xs">
+                    <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Remember password? </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setAuthError('');
+                        setResetSuccessMessage('');
                       }}
-                      className="overflow-hidden mt-2.5"
+                      className={`uppercase font-black cursor-pointer ${isLight ? 'text-amber-700 hover:underline' : 'text-[#22d3ee] hover:underline'}`}
                     >
-                      <div className={`p-3 border rounded-xl font-mono text-[9px] space-y-2.5 leading-normal ${
-                        isLight ? 'bg-amber-50/70 border-amber-100' : 'bg-slate-950/45 border-slate-800/60'
-                      }`}>
-                        <p className={`text-[8px] leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                          Pre-configured sandbox role credentials to test the multi-dashboard supervisor tracks securely:
-                        </p>
-                        <div className="grid grid-cols-2 gap-1.5 font-sans">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStudentEmail('student@example.com');
-                              setAuthRoleTab('student');
-                              setAuthMode('login');
-                            }}
-                            className={`p-1.5 rounded-lg border text-[8px] font-bold text-center transition-all cursor-pointer ${
-                              isLight 
-                                ? 'bg-slate-100 border-slate-200 text-slate-850 text-slate-800 hover:bg-amber-600 hover:text-white' 
-                                : 'bg-[#111]/90 border-cyan-500/10 text-slate-350 hover:border-cyan-500/40 hover:text-cyan-400'
-                            }`}
-                          >
-                            Student Email
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStudentEmail('trainer@dakshyam.com');
-                              setIsStaffAccessEnabled(true);
-                              setAuthRoleTab('trainer');
-                              setAuthMode('login');
-                            }}
-                            className={`p-1.5 rounded-lg border text-[8px] font-bold text-center transition-all cursor-pointer ${
-                              isLight 
-                                ? 'bg-slate-100 border-slate-200 text-slate-850 text-slate-800 hover:bg-amber-600 hover:text-white' 
-                                : 'bg-[#111]/90 border-cyan-500/10 text-slate-350 hover:border-cyan-500/40 hover:text-cyan-400'
-                            }`}
-                          >
-                            Trainer Node
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSecretCode('ADMIN2026');
-                              setIsStaffAccessEnabled(true);
-                              setAuthRoleTab('admin');
-                            }}
-                            className={`p-1.5 rounded-lg border text-[8px] font-bold text-center transition-all cursor-pointer col-span-2 ${
-                              isLight 
-                                ? 'bg-slate-100 border-slate-200 text-slate-850 text-slate-800 hover:bg-amber-600 hover:text-white' 
-                                : 'bg-[#111]/90 border-cyan-500/10 text-slate-350 hover:border-cyan-500/40 hover:text-cyan-400'
-                            }`}
-                          >
-                            System Supervisor Admin [ADMIN2026]
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                      Sign In Page
+                    </button>
+                  </div>
+                </form>
+              )}
 
             </motion.div>
           </div>

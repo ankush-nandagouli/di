@@ -4,7 +4,8 @@ import { CompanyAbout, CompanyFounder } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import { 
   Building2, Users, Compass, Eye, MapPin, 
-  Github, Linkedin, Twitter, Youtube, Award, ExternalLink 
+  Github, Linkedin, Twitter, Youtube, Award, ExternalLink,
+  Atom, Cpu, Wrench, Percent
 } from 'lucide-react';
 
 interface AboutCompanyProps {
@@ -84,6 +85,85 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
           </div>
         </div>
 
+      </div>
+
+      {/* STEM Education Framework Section */}
+      <div className="space-y-6">
+        <div className={`border-l-2 pl-4 ${isLight ? 'border-amber-600' : 'border-cyan-400'}`}>
+          <span className={`text-[10px] font-mono tracking-widest uppercase font-bold text-cyan-400`}>NEP 2020 Aligned</span>
+          <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Our STEM Education Framework</h2>
+          <p className="text-xs text-slate-400 font-sans font-medium">
+            We bridge Science, Technology, Engineering, and Mathematics through immersive, hands-on physical-digital modules. Students learn to calibrate real sensors, write production code, and debug mechanical systems.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 font-sans">
+          
+          {/* Science Card */}
+          <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex gap-4 ${cardBg}`}>
+            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-amber-600/10 text-amber-700' : 'bg-cyan-950/40 border-cyan-500/15 text-[#22d3ee]'}`}>
+              <Atom className="w-5 h-5 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h4 className={`text-xs font-black uppercase tracking-wide ${isLight ? 'text-slate-800' : 'text-slate-100'}`}>Science (Experiential)</h4>
+              <p className="text-3xs text-slate-400 leading-relaxed font-sans font-medium">
+                Hands-on validation of environmental physics. Students configure analog soil hygrometers, calibrate photo-resistors, and measure thermodynamic behavior on live microcontrollers.
+              </p>
+              <div className="text-[8px] font-mono text-cyan-400 uppercase tracking-widest pt-1">
+                🔬 Live Telemetry & Calibration
+              </div>
+            </div>
+          </div>
+
+          {/* Technology Card */}
+          <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex gap-4 ${cardBg}`}>
+            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-amber-600/10 text-amber-700' : 'bg-cyan-950/40 border-cyan-500/15 text-[#22d3ee]'}`}>
+              <Cpu className="w-5 h-5" />
+            </div>
+            <div className="space-y-2">
+              <h4 className={`text-xs font-black uppercase tracking-wide ${isLight ? 'text-slate-800' : 'text-slate-100'}`}>Technology (Full-Stack Coding)</h4>
+              <p className="text-3xs text-slate-400 leading-relaxed font-sans font-medium">
+                Learning production software development. Programming ESP32 firmware in Embedded C, designing secure Django API controllers, and rendering high-speed real-time React web dashboards.
+              </p>
+              <div className="text-[8px] font-mono text-cyan-400 uppercase tracking-widest pt-1">
+                💻 Embedded C, React, & Django
+              </div>
+            </div>
+          </div>
+
+          {/* Engineering Card */}
+          <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex gap-4 ${cardBg}`}>
+            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-amber-600/10 text-amber-700' : 'bg-cyan-950/40 border-cyan-500/15 text-[#22d3ee]'}`}>
+              <Wrench className="w-5 h-5" />
+            </div>
+            <div className="space-y-2">
+              <h4 className={`text-xs font-black uppercase tracking-wide ${isLight ? 'text-slate-800' : 'text-slate-100'}`}>Engineering (Robotics)</h4>
+              <p className="text-3xs text-slate-400 leading-relaxed font-sans font-medium">
+                Constructing autonomous mechanisms. Calibrating H-bridge dual-motor drivers, designing mechanical chassis structures, and tuning high-speed servo actuators over Bluetooth links.
+              </p>
+              <div className="text-[8px] font-mono text-cyan-400 uppercase tracking-widest pt-1">
+                ⚙️ Kinematics & Circuit Assembly
+              </div>
+            </div>
+          </div>
+
+          {/* Mathematics Card */}
+          <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex gap-4 ${cardBg}`}>
+            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-amber-600/10 text-amber-700' : 'bg-cyan-950/40 border-cyan-500/15 text-[#22d3ee]'}`}>
+              <Percent className="w-5 h-5" />
+            </div>
+            <div className="space-y-2">
+              <h4 className={`text-xs font-black uppercase tracking-wide ${isLight ? 'text-slate-800' : 'text-slate-100'}`}>Mathematics (Algorithms)</h4>
+              <p className="text-3xs text-slate-400 leading-relaxed font-sans font-medium">
+                Applying math to code logic. Resolving obstacle avoidance avoidance vectors, calculating moving sensor value averages, evaluating solar conversion efficiency coefficients, and scaling telemetry ranges.
+              </p>
+              <div className="text-[8px] font-mono text-cyan-400 uppercase tracking-widest pt-1">
+                📐 Algorithmic Pathfinding & Scaling
+              </div>
+            </div>
+          </div>
+
+        </div>
       </div>
 
       {/* Co-Founders Team Dashboard Section */}
