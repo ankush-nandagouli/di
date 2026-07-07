@@ -1,0 +1,202 @@
+{
+  "entities": {
+    "verification": {
+      "title": "Verification",
+      "description": "Secure OTP verification code registry",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["code", "createdAt"]
+    },
+    "student": {
+      "title": "Student",
+      "description": "Student registry records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "password": { "type": "string" },
+        "groupId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "role", "createdAt"]
+    },
+    "trainer": {
+      "title": "Trainer",
+      "description": "Trainer registry records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "isApproved": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "password": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "role", "isApproved", "createdAt"]
+    },
+    "group": {
+      "title": "Group",
+      "description": "Class/batch groups of students",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "projectTitle": { "type": "string" },
+        "projectDescription": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "memberIds": { "type": "array" },
+        "points": { "type": "number" },
+        "trainerId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "projectTitle", "projectDescription", "memberIds", "points", "trainerId", "createdAt"]
+    },
+    "video": {
+      "title": "Video",
+      "description": "Video posts and student-uploaded mockup presentations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "groupId": { "type": "string" },
+        "groupName": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "likes": { "type": "number" },
+        "likedByUserIds": { "type": "array" },
+        "views": { "type": "number" },
+        "comments": { "type": "array" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "groupId", "groupName", "title", "description", "videoUrl", "likes", "likedByUserIds", "views", "comments", "createdAt"]
+    },
+    "certificate": {
+      "title": "Certificate",
+      "description": "Verifiable certificates awarded to students",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentEmail": { "type": "string" },
+        "courseTitle": { "type": "string" },
+        "projectTitle": { "type": "string" },
+        "issueDate": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "trainerName": { "type": "string" },
+        "customLogoUrl": { "type": "string" },
+        "customSealUrl": { "type": "string" },
+        "trainingPartnerName": { "type": "string" },
+        "trainingPartnerLogoUrl": { "type": "string" }
+      },
+      "required": ["id", "studentName", "studentEmail", "courseTitle", "projectTitle", "issueDate", "trainerId", "trainerName"]
+    },
+    "application": {
+      "title": "Application",
+      "description": "Course and batch admission applications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "institution": { "type": "string" },
+        "courseId": { "type": "string" },
+        "appliedAt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "fullName", "email", "phone", "institution", "courseId", "appliedAt", "status"]
+    },
+    "special_program": {
+      "title": "Special Program",
+      "description": "Custom training workshops in partner schools",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trainingName": { "type": "string" },
+        "duration": { "type": "string" },
+        "startingDateTime": { "type": "string" },
+        "institutionName": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "trainingName", "duration", "startingDateTime", "institutionName", "createdAt"]
+    },
+    "special_enrollment": {
+      "title": "Special Enrollment",
+      "description": "Student registrations in special school programs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "programId": { "type": "string" },
+        "trainingName": { "type": "string" },
+        "institutionName": { "type": "string" },
+        "name": { "type": "string" },
+        "branch": { "type": "string" },
+        "yearOfStudy": { "type": "string" },
+        "fathersName": { "type": "string" },
+        "email": { "type": "string" },
+        "rollNumber": { "type": "string" },
+        "mobileNumber": { "type": "string" },
+        "enrolledAt": { "type": "string" }
+      },
+      "required": ["id", "programId", "trainingName", "institutionName", "name", "branch", "yearOfStudy", "fathersName", "email", "rollNumber", "mobileNumber", "enrolledAt"]
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Global administration settings and about-us details",
+      "type": "object",
+      "properties": {
+        "value": { "type": "object" }
+      },
+      "required": ["value"]
+    }
+  },
+  "firestore": {
+    "/verifications/{email}": {
+      "schema": "verification",
+      "description": "Secure OTP registries for verification and recovery"
+    },
+    "/students/{studentId}": {
+      "schema": "student",
+      "description": "Student users collection"
+    },
+    "/trainers/{trainerId}": {
+      "schema": "trainer",
+      "description": "Trainers users collection"
+    },
+    "/groups/{groupId}": {
+      "schema": "group",
+      "description": "Student project groups and points"
+    },
+    "/videos/{videoId}": {
+      "schema": "video",
+      "description": "Shared video postings"
+    },
+    "/certificates/{certificateId}": {
+      "schema": "certificate",
+      "description": "Verifiable STEM academic credentials"
+    },
+    "/applications/{applicationId}": {
+      "schema": "application",
+      "description": "Academic program applications"
+    },
+    "/special_programs/{programId}": {
+      "schema": "special_program",
+      "description": "Localized institutional training programs"
+    },
+    "/special_enrollments/{enrollmentId}": {
+      "schema": "special_enrollment",
+      "description": "Student signups for regional institute programs"
+    },
+    "/settings/{settingId}": {
+      "schema": "settings",
+      "description": "System variables and administrative profiles"
+    }
+  }
+}

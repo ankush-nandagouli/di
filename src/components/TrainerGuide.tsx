@@ -9,9 +9,11 @@ interface GuideBlockProps {
   code?: string;
   language?: string;
   explanation: string;
+  theme?: 'light' | 'dark';
 }
 
-function GuideBlock({ title, desc, commands, code, language = 'javascript', explanation }: GuideBlockProps) {
+function GuideBlock({ title, desc, commands, code, language = 'javascript', explanation, theme = 'dark' }: GuideBlockProps) {
+  const isLight = theme === 'light';
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedCmdIndex, setCopiedCmdIndex] = useState<number | null>(null);
 
@@ -27,28 +29,42 @@ function GuideBlock({ title, desc, commands, code, language = 'javascript', expl
   };
 
   return (
-    <div className="bg-[#050505]/85 border border-cyan-500/10 rounded-2xl p-5 space-y-4 text-left hover:border-cyan-500/20 transition-all">
-      <div className="border-b border-cyan-500/15 pb-2">
-        <h4 className="text-xs font-black text-white font-mono tracking-wide uppercase flex items-center gap-1.5">
-          <ChevronRight className="w-4 h-4 text-cyan-400" /> {title}
+    <div className={`border rounded-2xl p-5 space-y-4 text-left transition-all duration-300 ${
+      isLight 
+        ? 'bg-slate-50/50 border-slate-200 hover:border-amber-500/20' 
+        : 'bg-[#050505]/85 border-cyan-500/10 hover:border-cyan-500/20'
+    }`}>
+      <div className={`border-b pb-2 ${isLight ? 'border-slate-200/60' : 'border-cyan-500/15'}`}>
+        <h4 className={`text-xs font-black font-mono tracking-wide uppercase flex items-center gap-1.5 ${
+          isLight ? 'text-slate-900' : 'text-white'
+        }`}>
+          <ChevronRight className={`w-4 h-4 ${isLight ? 'text-amber-700' : 'text-cyan-400'}`} /> {title}
         </h4>
-        <p className="text-[10px] text-slate-400 mt-1 leading-relaxed font-sans">{desc}</p>
+        <p className={`text-[10px] mt-1 leading-relaxed font-sans ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{desc}</p>
       </div>
 
       {commands && commands.length > 0 && (
         <div className="space-y-1.5">
-          <span className="text-[8px] font-mono uppercase tracking-wider text-cyan-400/80 block">Terminal / Installation Commands:</span>
+          <span className={`text-[8px] font-mono uppercase tracking-wider block ${
+            isLight ? 'text-amber-850 font-extrabold' : 'text-cyan-400/80'
+          }`}>Terminal / Installation Commands:</span>
           <div className="space-y-1">
             {commands.map((cmd, idx) => (
-              <div key={idx} className="flex items-center justify-between bg-black/60 border border-cyan-500/5 px-3 py-1.5 rounded-xl font-mono text-[10px] text-slate-350">
+              <div key={idx} className={`flex items-center justify-between border px-3 py-1.5 rounded-xl font-mono text-[10px] ${
+                isLight 
+                  ? 'bg-slate-100 border-slate-200 text-slate-750' 
+                  : 'bg-black/60 border-cyan-500/5 text-slate-350'
+              }`}>
                 <span className="select-all">$ {cmd}</span>
                 <button
                   type="button"
                   onClick={() => copyToClipboard(cmd, false, idx)}
-                  className="text-slate-500 hover:text-cyan-400 cursor-pointer p-0.5"
+                  className={`cursor-pointer p-0.5 transition-colors ${
+                    isLight ? 'text-slate-400 hover:text-amber-700' : 'text-slate-500 hover:text-cyan-400'
+                  }`}
                   title="Copy command"
                 >
-                  {copiedCmdIndex === idx ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedCmdIndex === idx ? <Check className="w-3.5 h-3.5 text-emerald-500 font-extrabold" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
               </div>
             ))}
@@ -58,17 +74,23 @@ function GuideBlock({ title, desc, commands, code, language = 'javascript', expl
 
       {code && (
         <div className="space-y-1.5 relative">
-          <div className="flex justify-between items-center bg-cyan-950/20 border-b border-cyan-500/10 px-3.5 py-1.5 rounded-t-xl">
-            <span className="text-[8px] font-mono uppercase tracking-wider text-cyan-400/80">Code Snippet ({language})</span>
+          <div className={`flex justify-between items-center border-b px-3.5 py-1.5 rounded-t-xl ${
+            isLight 
+              ? 'bg-amber-50/70 border-slate-200 text-amber-900' 
+              : 'bg-cyan-950/20 border-cyan-500/10 text-cyan-400/80'
+          }`}>
+            <span className="text-[8px] font-mono uppercase tracking-wider">Code Snippet ({language})</span>
             <button
               type="button"
               onClick={() => copyToClipboard(code, true)}
-              className="flex items-center gap-1 text-[9px] font-mono text-slate-400 hover:text-cyan-400 cursor-pointer"
+              className={`flex items-center gap-1 text-[9px] font-mono cursor-pointer transition-colors ${
+                isLight ? 'text-slate-600 hover:text-amber-800' : 'text-slate-400 hover:text-cyan-400'
+              }`}
             >
               {copiedCode ? (
                 <>
-                  <Check className="w-3 h-3 text-emerald-400" />
-                  <span className="text-emerald-400">Copied!</span>
+                  <Check className="w-3 h-3 text-emerald-500 font-bold" />
+                  <span className="text-emerald-600 font-bold">Copied!</span>
                 </>
               ) : (
                 <>
@@ -78,21 +100,34 @@ function GuideBlock({ title, desc, commands, code, language = 'javascript', expl
               )}
             </button>
           </div>
-          <pre className="bg-black/90 p-4 rounded-b-xl border border-t-0 border-cyan-500/10 font-mono text-[10px] text-emerald-400 overflow-x-auto max-h-72 select-text">
+          <pre className={`p-4 rounded-b-xl border border-t-0 font-mono text-[10px] overflow-x-auto max-h-72 select-text ${
+            isLight 
+              ? 'bg-slate-900 border-slate-200 text-emerald-300' 
+              : 'bg-black/90 border-cyan-500/10 text-emerald-400'
+          }`}>
             <code>{code}</code>
           </pre>
         </div>
       )}
 
-      <div className="bg-cyan-500/5 border border-cyan-500/10 rounded-xl p-3 text-3xs text-slate-400 leading-relaxed font-mono">
-        <strong className="text-slate-300 font-bold block uppercase mb-1">Architecture & Implementation Insights:</strong>
+      <div className={`border rounded-xl p-3 text-3xs leading-relaxed font-mono ${
+        isLight 
+          ? 'bg-amber-500/5 border-amber-500/10 text-slate-650' 
+          : 'bg-cyan-500/5 border-cyan-500/10 text-slate-400'
+      }`}>
+        <strong className={`font-bold block uppercase mb-1 ${isLight ? 'text-amber-850' : 'text-slate-300'}`}>Architecture & Implementation Insights:</strong>
         <p>{explanation}</p>
       </div>
     </div>
   );
 }
 
-export default function TrainerGuide() {
+interface TrainerGuideProps {
+  theme?: 'light' | 'dark';
+}
+
+export default function TrainerGuide({ theme = 'dark' }: TrainerGuideProps) {
+  const isLight = theme === 'light';
   const [guideCategory, setGuideCategory] = useState<'iot' | 'mern' | 'django' | 'robotics' | 'essential'>('iot');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -856,12 +891,14 @@ else:
     <div className="space-y-6 font-sans">
       
       {/* Category selector panel */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#050505]/50 border border-cyan-500/10 p-4 rounded-2xl">
+      <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border p-4 rounded-2xl transition-all duration-300 ${
+        isLight ? 'bg-slate-50 border-slate-200 shadow-xs' : 'bg-[#050505]/50 border-cyan-500/10'
+      }`}>
         <div className="flex items-center gap-2.5">
-          <BookOpen className="w-5 h-5 text-cyan-400" />
+          <BookOpen className={`w-5 h-5 ${isLight ? 'text-amber-700' : 'text-cyan-400'}`} />
           <div className="text-left font-mono">
-            <h3 className="text-xs font-black text-white uppercase">Supervisor Curriculum Guides</h3>
-            <p className="text-[9px] text-slate-400 leading-none mt-0.5">Search and preview production-ready code guides.</p>
+            <h3 className={`text-xs font-black uppercase ${isLight ? 'text-slate-900' : 'text-white'}`}>Supervisor Curriculum Guides</h3>
+            <p className={`text-[9px] leading-none mt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Search and preview production-ready code guides.</p>
           </div>
         </div>
 
@@ -872,7 +909,11 @@ else:
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search guides or code..."
-            className="w-full bg-black/60 border border-cyan-500/10 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-400 font-mono placeholder:text-slate-600"
+            className={`w-full rounded-xl px-3 py-1.5 text-xs focus:outline-none font-mono transition-all ${
+              isLight 
+                ? 'bg-white border border-slate-250 text-slate-800 placeholder:text-slate-400 focus:border-amber-500' 
+                : 'bg-black/60 border border-cyan-500/10 text-white placeholder:text-slate-600 focus:border-cyan-400'
+            }`}
           />
         </div>
       </div>
@@ -886,14 +927,14 @@ else:
             onClick={() => setGuideCategory('iot')}
             className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left cursor-pointer ${
               guideCategory === 'iot'
-                ? 'bg-cyan-500/15 border-cyan-500/30 text-white'
-                : 'bg-black/20 border-cyan-500/5 text-slate-400 hover:text-white hover:border-cyan-500/10'
+                ? (isLight ? 'bg-amber-600/10 border-amber-500/30 text-amber-900 font-black' : 'bg-cyan-500/15 border-cyan-500/30 text-white')
+                : (isLight ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'bg-black/20 border-cyan-500/5 text-slate-400 hover:text-white hover:border-cyan-500/10')
             }`}
           >
-            <Cpu className="w-4 h-4 shrink-0" />
+            <Cpu className={`w-4 h-4 shrink-0 ${guideCategory === 'iot' ? (isLight ? 'text-amber-800' : 'text-cyan-400') : 'text-slate-400'}`} />
             <div className="leading-tight">
               <span>IoT & Web Dev</span>
-              <span className="text-[8px] font-normal text-slate-500 block leading-none mt-0.5">Microcontrollers, WebSockets</span>
+              <span className={`text-[8px] font-normal block leading-none mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>Microcontrollers, WebSockets</span>
             </div>
           </button>
 
@@ -902,14 +943,14 @@ else:
             onClick={() => setGuideCategory('mern')}
             className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left cursor-pointer ${
               guideCategory === 'mern'
-                ? 'bg-cyan-500/15 border-cyan-500/30 text-white'
-                : 'bg-black/20 border-cyan-500/5 text-slate-400 hover:text-white hover:border-cyan-500/10'
+                ? (isLight ? 'bg-amber-600/10 border-amber-500/30 text-amber-900 font-black' : 'bg-cyan-500/15 border-cyan-500/30 text-white')
+                : (isLight ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'bg-black/20 border-cyan-500/5 text-slate-400 hover:text-white hover:border-cyan-500/10')
             }`}
           >
-            <Database className="w-4 h-4 shrink-0" />
+            <Database className={`w-4 h-4 shrink-0 ${guideCategory === 'mern' ? (isLight ? 'text-amber-800' : 'text-cyan-400') : 'text-slate-400'}`} />
             <div className="leading-tight">
               <span>MERN Stack</span>
-              <span className="text-[8px] font-normal text-slate-500 block leading-none mt-0.5">MongoDB, Express, JWT</span>
+              <span className={`text-[8px] font-normal block leading-none mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>MongoDB, Express, JWT</span>
             </div>
           </button>
 
@@ -918,14 +959,14 @@ else:
             onClick={() => setGuideCategory('django')}
             className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left cursor-pointer ${
               guideCategory === 'django'
-                ? 'bg-cyan-500/15 border-cyan-500/30 text-white'
-                : 'bg-black/20 border-cyan-500/5 text-slate-400 hover:text-white hover:border-cyan-500/10'
+                ? (isLight ? 'bg-amber-600/10 border-amber-500/30 text-amber-900 font-black' : 'bg-cyan-500/15 border-cyan-500/30 text-white')
+                : (isLight ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'bg-black/20 border-cyan-500/5 text-slate-400 hover:text-white hover:border-cyan-500/10')
             }`}
           >
-            <Globe className="w-4 h-4 shrink-0" />
+            <Globe className={`w-4 h-4 shrink-0 ${guideCategory === 'django' ? (isLight ? 'text-amber-800' : 'text-cyan-400') : 'text-slate-400'}`} />
             <div className="leading-tight">
               <span>Python & Django</span>
-              <span className="text-[8px] font-normal text-slate-500 block leading-none mt-0.5">Django Rest, postgres</span>
+              <span className={`text-[8px] font-normal block leading-none mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>Django Rest, postgres</span>
             </div>
           </button>
 
@@ -934,14 +975,14 @@ else:
             onClick={() => setGuideCategory('robotics')}
             className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left cursor-pointer ${
               guideCategory === 'robotics'
-                ? 'bg-cyan-500/15 border-cyan-500/30 text-white'
-                : 'bg-black/20 border-cyan-500/5 text-slate-400 hover:text-white hover:border-cyan-500/10'
+                ? (isLight ? 'bg-amber-600/10 border-amber-500/30 text-amber-900 font-black' : 'bg-cyan-500/15 border-cyan-500/30 text-white')
+                : (isLight ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'bg-black/20 border-cyan-500/5 text-slate-400 hover:text-white hover:border-cyan-500/10')
             }`}
           >
-            <Settings className="w-4 h-4 shrink-0" />
+            <Settings className={`w-4 h-4 shrink-0 ${guideCategory === 'robotics' ? (isLight ? 'text-amber-800' : 'text-cyan-400') : 'text-slate-400'}`} />
             <div className="leading-tight">
               <span>Robotics & Actuators</span>
-              <span className="text-[8px] font-normal text-slate-500 block leading-none mt-0.5">Kinematics, Motor Drivers</span>
+              <span className={`text-[8px] font-normal block leading-none mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>Kinematics, Motor Drivers</span>
             </div>
           </button>
 
@@ -950,25 +991,29 @@ else:
             onClick={() => setGuideCategory('essential')}
             className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left cursor-pointer ${
               guideCategory === 'essential'
-                ? 'bg-cyan-500/15 border-cyan-500/30 text-white'
-                : 'bg-black/20 border-cyan-500/5 text-slate-400 hover:text-white hover:border-cyan-500/10'
+                ? (isLight ? 'bg-amber-600/10 border-amber-500/30 text-amber-900 font-black' : 'bg-cyan-500/15 border-cyan-500/30 text-white')
+                : (isLight ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'bg-black/20 border-cyan-500/5 text-slate-400 hover:text-white hover:border-cyan-500/10')
             }`}
           >
-            <Terminal className="w-4 h-4 shrink-0" />
+            <Terminal className={`w-4 h-4 shrink-0 ${guideCategory === 'essential' ? (isLight ? 'text-amber-800' : 'text-cyan-400') : 'text-slate-400'}`} />
             <div className="leading-tight">
               <span>School Coding</span>
-              <span className="text-[8px] font-normal text-slate-500 block leading-none mt-0.5">HTML/CSS, Scratch translator</span>
+              <span className={`text-[8px] font-normal block leading-none mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>HTML/CSS, Scratch translator</span>
             </div>
           </button>
         </div>
 
         {/* Right Side: Guide content blocks list */}
-        <div className="md:col-span-3.5 space-y-5 text-left md:border-l md:border-cyan-500/10 md:pl-6">
+        <div className={`md:col-span-3.5 space-y-5 text-left md:border-l md:pl-6 ${
+          isLight ? 'md:border-slate-200' : 'md:border-cyan-500/10'
+        }`}>
           <div className="space-y-1 select-text">
-            <h4 className="text-sm font-black text-[#22d3ee] font-mono tracking-wider uppercase flex items-center gap-1.5 matches">
-              {currentCategory.icon} {currentCategory.title}
+            <h4 className={`text-sm font-black font-mono tracking-wider uppercase flex items-center gap-1.5 matches ${
+              isLight ? 'text-amber-900' : 'text-[#22d3ee]'
+            }`}>
+              {React.cloneElement(currentCategory.icon, { className: `w-4 h-4 ${isLight ? 'text-amber-850' : 'text-cyan-400'}` })} {currentCategory.title}
             </h4>
-            <p className="text-xs text-slate-400 leading-relaxed font-sans mt-1">{currentCategory.tagline}</p>
+            <p className={`text-xs leading-relaxed font-sans mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{currentCategory.tagline}</p>
           </div>
 
           <div className="space-y-5">
@@ -982,10 +1027,13 @@ else:
                   code={block.code}
                   language={block.language}
                   explanation={block.explanation}
+                  theme={theme}
                 />
               ))
             ) : (
-              <div className="text-center py-12 border border-dashed border-cyan-500/10 rounded-xl">
+              <div className={`text-center py-12 border border-dashed rounded-xl ${
+                isLight ? 'border-slate-300 bg-slate-50/50' : 'border-cyan-500/10'
+              }`}>
                 <p className="text-xs text-slate-500 italic font-mono">No matching guides found for current search parameters.</p>
               </div>
             )}

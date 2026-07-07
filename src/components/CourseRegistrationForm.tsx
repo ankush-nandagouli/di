@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Send, CheckCircle2, User, Phone, School, Mail, HelpCircle, ArrowRight } from 'lucide-react';
 import { Course, CourseApplication } from '../types';
 import { DakshyamDatabase } from '../utils/db';
+import { BeautifulErrorDisplay } from '../utils/errorShield';
 
 interface CourseRegistrationFormProps {
   courses: Course[];
@@ -56,6 +57,11 @@ export default function CourseRegistrationForm({
 
       if (!email.includes('@')) {
         throw new Error('Please enter a valid structure email address.');
+      }
+
+      const cleanPhone = phone.trim().replace(/\D/g, '');
+      if (cleanPhone.length !== 10) {
+        throw new Error('Contact / WhatsApp Number must be exactly 10 digits.');
       }
 
       setIsSubmitting(true);
@@ -155,14 +161,7 @@ export default function CourseRegistrationForm({
 
           <AnimatePresence mode="wait">
             {errorText && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="bg-red-500/10 border border-red-500/25 rounded-xl p-3 text-red-400 text-xs text-center"
-              >
-                {errorText}
-              </motion.div>
+              <BeautifulErrorDisplay errorText={errorText} isLight={false} />
             )}
           </AnimatePresence>
 
@@ -245,8 +244,11 @@ export default function CourseRegistrationForm({
                     type="text"
                     required
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+91 XXXXX XXXXX"
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      if (val.length <= 10) setPhone(val);
+                    }}
+                    placeholder="10-digit mobile number"
                     className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl py-3 pl-10 pr-4 text-xs md:text-sm focus:outline-none focus:border-cyan-450"
                   />
                 </div>

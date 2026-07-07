@@ -4,6 +4,7 @@ import { Plus, Users, Award, Percent, Printer, FileText, CheckCircle2, Bookmark,
 import { StudentUser, StudentGroup, Course, CourseApplication, Certificate, TrainerUser } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import TrainerGuide from './TrainerGuide';
+import { BeautifulErrorDisplay } from '../utils/errorShield';
 
 interface TrainerDashboardProps {
   trainer: TrainerUser;
@@ -13,6 +14,7 @@ interface TrainerDashboardProps {
   applications: CourseApplication[];
   certificates: Certificate[];
   onRefresh: () => void;
+  theme?: 'light' | 'dark';
 }
 
 export default function TrainerDashboard({
@@ -22,8 +24,10 @@ export default function TrainerDashboard({
   groups,
   applications,
   certificates,
-  onRefresh
+  onRefresh,
+  theme = 'dark'
 }: TrainerDashboardProps) {
+  const isLight = theme === 'light';
   // Navigation states inside dashboard
   const [activeTab, setActiveTab] = useState<'groups' | 'assessment' | 'certificates' | 'guide' | 'profile'>('groups');
 
@@ -223,32 +227,46 @@ export default function TrainerDashboard({
     <div className="space-y-6 text-left max-w-4xl mx-auto">
       
       {/* 1. Header welcome */}
-      <div className="bg-gradient-to-r from-slate-950 to-emerald-950/10 border border-cyan-500/15 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden">
+      <div className={`border p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden transition-all duration-300 ${
+        isLight 
+          ? 'bg-gradient-to-r from-amber-500/5 to-slate-50 border-slate-200 shadow-sm' 
+          : 'bg-gradient-to-r from-slate-950 to-emerald-950/10 border-cyan-500/15'
+      }`}>
         <div className="absolute top-0 right-0 h-full w-48 bg-radial from-cyan-500/5 to-transparent blur-xl pointer-events-none" />
         <div className="space-y-1">
-          <span className="text-[9px] font-mono tracking-widest text-cyan-400 uppercase">Lead Trainer Workspace</span>
-          <h1 className="text-xl font-black text-white tracking-wide uppercase">{trainer.name}</h1>
-          <p className="text-xs text-slate-400 font-sans">Active Supervisor • {trainer.email}</p>
+          <span className={`text-[9px] font-mono tracking-widest uppercase ${
+            isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'
+          }`}>Lead Trainer Workspace</span>
+          <h1 className={`text-xl font-black tracking-wide uppercase ${
+            isLight ? 'text-slate-900' : 'text-white'
+          }`}>{trainer.name}</h1>
+          <p className={`text-xs font-sans ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Active Supervisor • {trainer.email}</p>
         </div>
 
         <button
           onClick={handlePrintSheet}
-          className="flex items-center gap-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs px-4.5 py-2.5 rounded-xl cursor-pointer hover:shadow-[0_0_12px_rgba(34,211,238,0.22)] active:scale-95 transition-all self-stretch md:self-auto justify-center"
+          className={`flex items-center gap-1.5 font-bold text-xs px-4.5 py-2.5 rounded-xl cursor-pointer active:scale-95 transition-all self-stretch md:self-auto justify-center ${
+            isLight 
+              ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm' 
+              : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 hover:shadow-[0_0_12px_rgba(34,211,238,0.22)]'
+          }`}
         >
           <Printer className="w-4 h-4" /> Export Class Standings
         </button>
       </div>
 
       {/* Selector Tabs */}
-      <div className="flex flex-wrap gap-1.5 border-b border-cyan-500/10 pb-0.5 font-mono text-2xs uppercase">
+      <div className={`flex flex-wrap gap-1.5 border-b pb-0.5 font-mono text-2xs uppercase ${
+        isLight ? 'border-slate-200' : 'border-cyan-500/10'
+      }`}>
         {(['groups', 'assessment', 'certificates', 'guide', 'profile'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2.5 rounded-t-xl transition-all border-t border-x cursor-pointer ${
               activeTab === tab
-                ? 'bg-[#050505]/70 border-cyan-500/15 text-[#22d3ee] font-bold'
-                : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-500/5'
+                ? (isLight ? 'bg-white border-slate-250 text-amber-800 font-bold border-b-white z-10' : 'bg-[#050505]/70 border-cyan-500/15 text-[#22d3ee] font-bold')
+                : (isLight ? 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50' : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-500/5')
             }`}
           >
             {tab === 'groups' ? 'Group Builder' : tab === 'assessment' ? 'Assessment Matrix' : tab === 'certificates' ? 'Publish Certificates' : tab === 'guide' ? '📖 Curriculum Guides' : '👤 Profile Details'}
@@ -257,7 +275,9 @@ export default function TrainerDashboard({
       </div>
 
       {/* Tab Panels */}
-      <div className="bg-[#050505]/60 border border-cyan-500/10 rounded-2xl p-5 md:p-6 backdrop-blur-md overflow-hidden">
+      <div className={`rounded-2xl p-5 md:p-6 border transition-all duration-300 overflow-hidden ${
+        isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#050505]/60 border-cyan-500/10 backdrop-blur-md'
+      }`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -269,58 +289,74 @@ export default function TrainerDashboard({
         
         {/* TAB 1: GROUP BUILDER */}
         {activeTab === 'groups' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-left">
             
             {/* Form */}
             <form onSubmit={handleCreateGroup} className="space-y-4">
-              <h3 className="text-xs font-bold text-[#22d3ee] font-mono tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+              <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 ${
+                isLight ? 'text-amber-800 border-slate-100' : 'text-[#22d3ee] border-cyan-500/5'
+              }`}>
                 Establish Student Group Node
               </h3>
 
-              {groupError && <div className="text-xs text-red-400 font-mono">{groupError}</div>}
-              {groupSuccess && <div className="text-xs text-cyan-400 font-mono font-bold">{groupSuccess}</div>}
+              <BeautifulErrorDisplay errorText={groupError} isLight={isLight} />
+              {groupSuccess && <div className={`text-xs font-mono font-bold ${isLight ? 'text-emerald-700' : 'text-cyan-400'}`}>{groupSuccess}</div>}
 
               <div>
-                <label className="block text-3xs font-mono text-cyan-400 uppercase mb-1">Group Name</label>
+                <label className={`block text-3xs font-mono uppercase mb-1 ${isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'}`}>Group Name</label>
                 <input
                   type="text"
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
                   placeholder="e.g. Balaghat Robo Pioneers"
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full rounded-xl px-3 py-2.5 text-xs focus:outline-none border ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-3xs font-mono text-cyan-400 uppercase mb-1">Project Research Title</label>
+                <label className={`block text-3xs font-mono uppercase mb-1 ${isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'}`}>Project Research Title</label>
                 <input
                   type="text"
                   value={projectTitle}
                   onChange={(e) => setProjectTitle(e.target.value)}
                   placeholder="e.g. RFID Smart Attendance System"
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full rounded-xl px-3 py-2.5 text-xs focus:outline-none border ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-3xs font-mono text-cyan-400 uppercase mb-1">Brief Description (Objectives)</label>
+                <label className={`block text-3xs font-mono uppercase mb-1 ${isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'}`}>Brief Description (Objectives)</label>
                 <textarea
                   value={projectDesc}
                   onChange={(e) => setProjectDesc(e.target.value)}
                   placeholder="Objectives, microcontroller details or frameworks integrated..."
                   rows={2}
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full rounded-xl px-3 py-2.5 text-xs focus:outline-none border ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
               {/* Multiple Members Selector checkboxes */}
               <div>
-                <label className="block text-3xs font-mono text-cyan-400 uppercase mb-1.5">Select Student Members</label>
-                <div className="bg-[#111]/65 border border-cyan-500/10 rounded-xl p-3 max-h-36 overflow-y-auto space-y-2">
+                <label className={`block text-3xs font-mono uppercase mb-1.5 ${isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'}`}>Select Student Members</label>
+                <div className={`border rounded-xl p-3 max-h-36 overflow-y-auto space-y-2 ${
+                  isLight ? 'bg-slate-50 border-slate-200' : 'bg-[#111]/65 border-cyan-500/10'
+                }`}>
                   {students.map(std => {
                     const isChecked = selectedMemberIds.includes(std.id);
                     return (
-                      <label key={std.id} className="flex items-center gap-2 text-xs text-slate-350 cursor-pointer select-none">
+                      <label key={std.id} className="flex items-center gap-2 text-xs cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -331,9 +367,15 @@ export default function TrainerDashboard({
                               setSelectedMemberIds([...selectedMemberIds, std.id]);
                             }
                           }}
-                          className="rounded border-cyan-500/10 text-cyan-500 focus:ring-cyan-500/20"
+                          className={`rounded ${
+                            isLight 
+                              ? 'border-slate-300 text-amber-600 focus:ring-amber-500/20' 
+                              : 'border-cyan-500/10 text-cyan-500 focus:ring-cyan-500/20'
+                          }`}
                         />
-                        <span>{std.name} <strong className="text-slate-500 font-normal">({std.profile?.institution || 'General'})</strong></span>
+                        <span className={isLight ? 'text-slate-700 font-medium' : 'text-slate-300'}>
+                          {std.name} <strong className="text-slate-400 dark:text-slate-500 font-normal">({std.profile?.institution || 'General'})</strong>
+                        </span>
                       </label>
                     );
                   })}
@@ -342,7 +384,11 @@ export default function TrainerDashboard({
 
               <button
                 type="submit"
-                className="w-full bg-cyan-500 hover:bg-cyan-450 text-slate-950 font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all uppercase"
+                className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all uppercase border ${
+                  isLight 
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600 shadow-sm active:scale-98' 
+                    : 'bg-cyan-500 hover:bg-cyan-450 text-slate-950 border-cyan-500'
+                }`}
               >
                 Assemble Team & Project
               </button>
@@ -350,7 +396,9 @@ export default function TrainerDashboard({
 
             {/* List of my created groups */}
             <div className="space-y-4">
-              <h3 className="text-xs font-bold text-[#22d3ee] font-mono tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+              <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 ${
+                isLight ? 'text-amber-800 border-slate-100' : 'text-[#22d3ee] border-cyan-500/5'
+              }`}>
                 Active Supervised Groups ({myCreatedGroups.length})
               </h3>
 
@@ -364,17 +412,25 @@ export default function TrainerDashboard({
                   return (
                     <div 
                       key={gp.id}
-                      className="p-4 rounded-xl bg-[#111]/40 border border-cyan-500/5 hover:border-cyan-500/15 transition-all text-left space-y-1.5"
+                      className={`p-4 rounded-xl border transition-all text-left space-y-1.5 ${
+                        isLight 
+                          ? 'bg-slate-50/50 border-slate-200/60 hover:border-amber-500/20 shadow-xs' 
+                          : 'bg-[#111]/40 border-cyan-500/5 hover:border-cyan-500/15'
+                      }`}
                     >
                       <div className="flex justify-between items-center">
-                        <h4 className="text-xs font-black text-white uppercase">{gp.name}</h4>
-                        <span className="text-2xs font-mono text-cyan-400 bg-cyan-950/20 border border-cyan-500/10 px-2.5 py-0.5 rounded-full font-bold">
+                        <h4 className={`text-xs font-black uppercase ${isLight ? 'text-slate-900' : 'text-white'}`}>{gp.name}</h4>
+                        <span className={`text-2xs font-mono px-2.5 py-0.5 rounded-full font-bold border ${
+                          isLight 
+                            ? 'text-amber-800 bg-amber-50 border-amber-500/20' 
+                            : 'text-cyan-400 bg-cyan-950/20 border-cyan-500/10'
+                        }`}>
                           {gp.points} PTS
                         </span>
                       </div>
-                      <div className="text-2xs space-y-1 text-slate-400">
-                        <div><strong className="text-slate-200">Project:</strong> "{gp.projectTitle}"</div>
-                        <div><strong className="text-slate-200">Team:</strong> {memberNames}</div>
+                      <div className={`text-2xs space-y-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                        <div><strong className={isLight ? 'text-slate-800' : 'text-slate-200'}>Project:</strong> "{gp.projectTitle}"</div>
+                        <div><strong className={isLight ? 'text-slate-800' : 'text-slate-200'}>Team:</strong> {memberNames}</div>
                       </div>
                     </div>
                   );
@@ -387,29 +443,39 @@ export default function TrainerDashboard({
 
         {/* TAB 2: ASSESSMENT MATRIX */}
         {activeTab === 'assessment' && (
-          <div className="max-w-xl mx-auto space-y-5">
-            <h3 className="text-xs font-bold text-[#22d3ee] font-mono tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+          <div className="max-w-xl mx-auto space-y-5 text-left">
+            <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 ${
+              isLight ? 'text-amber-800 border-slate-100' : 'text-[#22d3ee] border-cyan-500/5'
+            }`}>
               Performance assessment Deck
             </h3>
 
-            <p className="text-xs text-slate-400 font-sans">
+            <p className={`text-xs font-sans ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>
               Award scores directly to student project teams. Points are calculated toward rankings and published on the live leaderboard.
             </p>
 
             {gradeSuccess && (
-              <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-3 text-cyan-400 text-xs font-mono">
+              <div className={`border rounded-xl p-3 text-xs font-mono text-center font-bold ${
+                isLight ? 'bg-emerald-50 border-emerald-500/20 text-emerald-800' : 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400'
+              }`}>
                 {gradeSuccess}
               </div>
             )}
 
-            <form onSubmit={handleAssignPoints} className="space-y-4 bg-[#111]/45 border border-cyan-500/5 p-5 rounded-2xl">
+            <form onSubmit={handleAssignPoints} className={`space-y-4 p-5 rounded-2xl border ${
+              isLight ? 'bg-slate-50/50 border-slate-200 shadow-sm' : 'bg-[#111]/45 border-cyan-500/5'
+            }`}>
               <div>
-                <label className="block text-3xs font-mono text-cyan-400 uppercase mb-1">Select Group Node</label>
+                <label className={`block text-3xs font-mono uppercase mb-1 ${isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'}`}>Select Group Node</label>
                 <select
                   value={selectedGroupIdForGrading}
                   onChange={(e) => setSelectedGroupIdForGrading(e.target.value)}
                   required
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full rounded-xl px-3 py-2.5 text-xs focus:outline-none border ${
+                    isLight 
+                      ? 'bg-white border-slate-200 text-slate-800 focus:border-amber-500' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 >
                   <option value="">-- Select Team --</option>
                   {myCreatedGroups.map(gp => (
@@ -419,7 +485,7 @@ export default function TrainerDashboard({
               </div>
 
               <div>
-                <label className="block text-3xs font-mono text-cyan-400 uppercase mb-1">Award Points (0 - 100)</label>
+                <label className={`block text-3xs font-mono uppercase mb-1 ${isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'}`}>Award Points (0 - 100)</label>
                 <div className="flex items-center gap-4">
                   <input
                     type="range"
@@ -427,9 +493,13 @@ export default function TrainerDashboard({
                     max="100"
                     value={newPoints}
                     onChange={(e) => setNewPoints(Number(e.target.value))}
-                    className="flex-1 accent-cyan-400"
+                    className={`flex-1 ${isLight ? 'accent-amber-600' : 'accent-cyan-400'}`}
                   />
-                  <span className="text-lg font-black text-white font-mono min-w-12 text-center bg-cyan-950/40 border border-cyan-500/10 px-3 py-1 rounded-xl">
+                  <span className={`text-lg font-black font-mono min-w-12 text-center border px-3 py-1 rounded-xl ${
+                    isLight 
+                      ? 'bg-amber-50 border-amber-500/20 text-amber-900' 
+                      : 'bg-cyan-950/40 border-cyan-500/10 text-white'
+                  }`}>
                     {newPoints} XP
                   </span>
                 </div>
@@ -437,7 +507,11 @@ export default function TrainerDashboard({
 
               <button
                 type="submit"
-                className="w-full bg-cyan-500 hover:bg-cyan-450 text-slate-950 font-bold text-xs py-2.5 rounded-xl cursor-pointer"
+                className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer border ${
+                  isLight 
+                    ? 'bg-amber-600 hover:bg-amber-700 border-amber-600 text-white shadow-sm' 
+                    : 'bg-cyan-500 hover:bg-cyan-450 border-cyan-500 text-slate-950'
+                }`}
               >
                 Record Grade Matrix
               </button>
@@ -447,24 +521,30 @@ export default function TrainerDashboard({
 
         {/* TAB 3: PUBLISH DECK CERTIFICATE */}
         {activeTab === 'certificates' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-left">
             
             {/* Cert Generator Form */}
             <form onSubmit={handleGenerateCertificate} className="space-y-4">
-              <h3 className="text-xs font-bold text-[#22d3ee] font-mono tracking-wider uppercase border-b border-cyan-500/5 pb-2 flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-cyan-400" /> Issue Credential Serializer
+              <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 flex items-center gap-1.5 ${
+                isLight ? 'text-amber-800 border-slate-150' : 'text-[#22d3ee] border-cyan-500/5'
+              }`}>
+                <Award className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-cyan-400'}`} /> Issue Credential Serializer
               </h3>
 
-              {certError && <div className="text-xs text-red-400 font-mono">{certError}</div>}
-              {certSuccess && <div className="text-xs text-cyan-400 font-mono font-bold">{certSuccess}</div>}
+              <BeautifulErrorDisplay errorText={certError} isLight={isLight} />
+              {certSuccess && <div className={`text-xs font-mono font-bold ${isLight ? 'text-emerald-700' : 'text-cyan-400'}`}>{certSuccess}</div>}
 
               <div>
-                <label className="block text-3xs font-mono text-cyan-400 uppercase mb-1">Select Student Applicant</label>
+                <label className={`block text-3xs font-mono uppercase mb-1 ${isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'}`}>Select Student Applicant</label>
                 <select
                   value={selectedAppIdForCert}
                   onChange={(e) => setSelectedAppIdForCert(e.target.value)}
                   required
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full rounded-xl px-3 py-2.5 text-xs focus:outline-none border ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-amber-500' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 >
                   <option value="">-- Choose Applicant --</option>
                   {eligibleApplicants.map(app => {
@@ -479,25 +559,31 @@ export default function TrainerDashboard({
               </div>
 
               <div>
-                <label className="block text-3xs font-mono text-cyan-400 uppercase mb-1">Major Development / Project Title</label>
+                <label className={`block text-3xs font-mono uppercase mb-1 ${isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'}`}>Major Development / Project Title</label>
                 <input
                   type="text"
                   value={certProjectTitle}
                   onChange={(e) => setCertProjectTitle(e.target.value)}
                   placeholder="e.g. Smart Agri Moisture Controller System"
                   required
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full rounded-xl px-3 py-2.5 text-xs focus:outline-none border ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
               {/* Customizable Branding and Partners for Trainer too! */}
-              <div className="border-t border-cyan-500/10 pt-3 space-y-3">
-                <h4 className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest font-extrabold text-left">Custom Branding & Partnership Options</h4>
+              <div className={`border-t pt-3 space-y-3 ${isLight ? 'border-slate-150' : 'border-cyan-500/10'}`}>
+                <h4 className={`text-[10px] font-mono uppercase tracking-widest font-extrabold text-left ${
+                  isLight ? 'text-amber-900' : 'text-cyan-400'
+                }`}>Custom Branding & Partnership Options</h4>
                 
                 <div className="grid grid-cols-2 gap-3 text-left">
                   {/* Custom Logo Upload */}
                   <div>
-                    <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Custom Issuer Logo</label>
+                    <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Custom Issuer Logo</label>
                     <div className="relative">
                       <input
                         type="file"
@@ -515,7 +601,11 @@ export default function TrainerDashboard({
                       />
                       <label
                         htmlFor="trainer-logo-upload"
-                        className="flex items-center justify-center gap-1 bg-black/40 border border-slate-500/10 hover:border-cyan-500/30 text-[9px] text-slate-300 font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase"
+                        className={`flex items-center justify-center gap-1 border text-[9px] font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase ${
+                          isLight 
+                            ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700' 
+                            : 'bg-black/40 border-slate-500/10 hover:border-cyan-500/30 text-slate-300'
+                        }`}
                       >
                         {certCustomLogoUrl ? "✓ Logo Loaded" : "Upload Logo"}
                       </label>
@@ -524,7 +614,7 @@ export default function TrainerDashboard({
                       <button
                         type="button"
                         onClick={() => setCertCustomLogoUrl("")}
-                        className="text-[8px] text-red-400 hover:underline mt-1 block"
+                        className="text-[8px] text-red-500 hover:underline mt-1 block"
                       >
                         Remove Logo
                       </button>
@@ -533,7 +623,7 @@ export default function TrainerDashboard({
 
                   {/* Custom Seal Upload */}
                   <div>
-                    <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Custom Seal Image</label>
+                    <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Custom Seal Image</label>
                     <div className="relative">
                       <input
                         type="file"
@@ -551,7 +641,11 @@ export default function TrainerDashboard({
                       />
                       <label
                         htmlFor="trainer-seal-upload"
-                        className="flex items-center justify-center gap-1 bg-black/40 border border-slate-500/10 hover:border-cyan-500/30 text-[9px] text-slate-300 font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase"
+                        className={`flex items-center justify-center gap-1 border text-[9px] font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase ${
+                          isLight 
+                            ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700' 
+                            : 'bg-black/40 border-slate-500/10 hover:border-cyan-500/30 text-slate-300'
+                        }`}
                       >
                         {certCustomSealUrl ? "✓ Seal Loaded" : "Upload Seal"}
                       </label>
@@ -560,7 +654,7 @@ export default function TrainerDashboard({
                       <button
                         type="button"
                         onClick={() => setCertCustomSealUrl("")}
-                        className="text-[8px] text-red-400 hover:underline mt-1 block"
+                        className="text-[8px] text-red-500 hover:underline mt-1 block"
                       >
                         Remove Seal
                       </button>
@@ -571,19 +665,23 @@ export default function TrainerDashboard({
                 {/* Training Partner */}
                 <div className="space-y-2 text-left">
                   <div>
-                    <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Training Partner Name (Optional)</label>
+                    <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Training Partner Name (Optional)</label>
                     <input
                       type="text"
                       value={certTrainingPartnerName}
                       onChange={(e) => setCertTrainingPartnerName(e.target.value)}
                       placeholder="e.g. State Science Council"
-                      className="w-full bg-[#111]/80 border border-[#22d3ee]/10 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-400 text-slate-350"
+                      className={`w-full rounded-xl px-3 py-1.5 text-xs focus:outline-none border ${
+                        isLight 
+                          ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500' 
+                          : 'w-full bg-[#111]/80 border border-[#22d3ee]/10 text-white placeholder-slate-500 focus:border-cyan-400 text-slate-350'
+                      }`}
                     />
                   </div>
 
                   {certTrainingPartnerName && (
                     <div>
-                      <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Partner Logo (Optional)</label>
+                      <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Partner Logo (Optional)</label>
                       <div className="relative">
                         <input
                           type="file"
@@ -601,7 +699,11 @@ export default function TrainerDashboard({
                         />
                         <label
                           htmlFor="trainer-partner-logo-upload"
-                          className="flex items-center justify-center gap-1 bg-black/40 border border-slate-500/10 hover:border-cyan-500/30 text-[9px] text-slate-300 font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase"
+                          className={`flex items-center justify-center gap-1 border text-[9px] font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase ${
+                            isLight 
+                              ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700' 
+                              : 'bg-black/40 border-slate-500/10 hover:border-cyan-500/30 text-slate-300'
+                          }`}
                         >
                           {certTrainingPartnerLogoUrl ? "✓ Partner Logo Loaded" : "Upload Partner Logo"}
                         </label>
@@ -610,7 +712,7 @@ export default function TrainerDashboard({
                         <button
                           type="button"
                           onClick={() => setCertTrainingPartnerLogoUrl("")}
-                          className="text-[8px] text-red-400 hover:underline mt-1 block"
+                          className="text-[8px] text-red-500 hover:underline mt-1 block"
                         >
                           Remove Partner Logo
                         </button>
@@ -620,14 +722,20 @@ export default function TrainerDashboard({
                 </div>
               </div>
 
-              <div className="p-3 bg-[#111]/50 border border-cyan-500/5 rounded-xl text-3xs text-slate-400 leading-relaxed space-y-1">
-                <div className="font-semibold text-slate-300">AUTHORITY CLAUSE:</div>
+              <div className={`p-3 border rounded-xl text-3xs leading-relaxed space-y-1 ${
+                isLight ? 'bg-amber-500/5 border-amber-500/10 text-slate-600' : 'bg-[#111]/50 border-cyan-500/5 text-slate-400'
+              }`}>
+                <div className={`font-semibold ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>AUTHORITY CLAUSE:</div>
                 <p>Generating this credential locks the record into the immutable directory query. It registers signatures and permits official student export packages.</p>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-cyan-500 hover:bg-cyan-450 text-slate-950 font-bold text-xs py-2.5 rounded-xl cursor-pointer"
+                className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer border ${
+                  isLight 
+                    ? 'bg-amber-600 hover:bg-amber-700 border-amber-600 text-white shadow-sm' 
+                    : 'bg-cyan-500 hover:bg-cyan-450 border-cyan-500 text-slate-950'
+                }`}
               >
                 Sign & Emit Digital Certificate
               </button>
@@ -635,7 +743,9 @@ export default function TrainerDashboard({
 
             {/* List of Issued Certs */}
             <div className="space-y-4">
-              <h3 className="text-xs font-bold text-[#22d3ee] font-mono tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+              <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 ${
+                isLight ? 'text-amber-800 border-slate-150' : 'text-[#22d3ee] border-cyan-500/5'
+              }`}>
                 Published Certificates Log ({certificates.length})
               </h3>
 
@@ -643,14 +753,18 @@ export default function TrainerDashboard({
                 {certificates.map(cert => (
                   <div 
                     key={cert.id}
-                    className="p-3 rounded-xl bg-[#111]/45 border border-cyan-500/5 text-left text-2xs space-y-1"
+                    className={`p-3 rounded-xl border text-left text-2xs space-y-1 ${
+                      isLight 
+                        ? 'bg-slate-50/50 border-slate-200/60' 
+                        : 'bg-[#111]/45 border-cyan-500/5'
+                    }`}
                   >
                     <div className="flex justify-between items-center text-3xs font-mono">
-                      <span className="text-[#22d3ee] font-bold">{cert.id}</span>
+                      <span className={`font-bold ${isLight ? 'text-amber-800' : 'text-[#22d3ee]'}`}>{cert.id}</span>
                       <span className="text-slate-500">{cert.issueDate}</span>
                     </div>
-                    <div className="text-slate-300 font-semibold">{cert.studentName}</div>
-                    <div className="text-slate-400 text-3xs block italic">Project: "{cert.projectTitle}"</div>
+                    <div className={`font-semibold ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>{cert.studentName}</div>
+                    <div className={`text-3xs block italic ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Project: "{cert.projectTitle}"</div>
                   </div>
                 ))}
               </div>
@@ -661,7 +775,7 @@ export default function TrainerDashboard({
 
         {/* TAB 4: TRAINER SYLLABUS & KNOWLEDGE KITS GUIDE */}
         {activeTab === 'guide' && (
-          <TrainerGuide />
+          <TrainerGuide theme={theme} />
         )}
 
         {/* TAB 5: TRAINER PROFILE SETTINGS & BADGE CARD */}
@@ -670,34 +784,36 @@ export default function TrainerDashboard({
             
             {/* Form Editor */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-black/45 border border-cyan-500/10 rounded-2xl p-5 md:p-6 space-y-4">
+              <div className={`border rounded-2xl p-5 md:p-6 space-y-4 ${
+                isLight ? 'bg-slate-50/50 border-slate-200' : 'bg-black/45 border-cyan-500/10'
+              }`}>
                 <div>
-                  <h3 className="text-sm font-black text-white font-mono tracking-wider uppercase">
+                  <h3 className={`text-sm font-black font-mono tracking-wider uppercase ${isLight ? 'text-slate-900' : 'text-white'}`}>
                     Update Trainer Profile Credentials
                   </h3>
-                  <p className="text-3xs text-slate-400 font-sans leading-relaxed mt-1">
+                  <p className={`text-3xs font-sans leading-relaxed mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                     Your profile values specify your center location and credential parameters printed onto generated student performance certificates.
                   </p>
                 </div>
 
                 {profileSuccess && (
-                  <div className="p-3 bg-emerald-950/20 border border-emerald-500/30 text-emerald-400 font-mono text-2xs font-semibold rounded-xl text-center">
+                  <div className={`p-3 border font-mono text-2xs font-semibold rounded-xl text-center ${
+                    isLight ? 'bg-emerald-50 border-emerald-500/20 text-emerald-800' : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-400'
+                  }`}>
                     {profileSuccess}
                   </div>
                 )}
                 
-                {profileError && (
-                  <div className="p-3 bg-red-950/20 border border-red-500/30 text-red-400 font-mono text-2xs rounded-xl text-center">
-                    {profileError}
-                  </div>
-                )}
+                <BeautifulErrorDisplay errorText={profileError} isLight={isLight} />
 
                 <form onSubmit={handleUpdateTrainerProfile} className="space-y-4 font-sans text-xs">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     
                     {/* Phone */}
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-mono text-cyan-400 uppercase tracking-wider">Mobile / Contact Number</label>
+                      <label className={`block text-[10px] font-mono uppercase tracking-wider ${
+                        isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'
+                      }`}>Mobile / Contact Number</label>
                       <div className="relative">
                         <Phone className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
                         <input
@@ -705,14 +821,20 @@ export default function TrainerDashboard({
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           placeholder="+91 WhatsApp Contact"
-                          className="w-full bg-black/60 border border-cyan-500/15 rounded-xl pl-9 pr-3 py-2.5 text-white tracking-wide placeholder:text-slate-600 focus:outline-none focus:border-cyan-400"
+                          className={`w-full border rounded-xl pl-9 pr-3 py-2.5 tracking-wide placeholder:text-slate-400 focus:outline-none ${
+                            isLight 
+                              ? 'bg-white border-slate-200 text-slate-800 focus:border-amber-500' 
+                              : 'bg-black/60 border-cyan-500/15 text-white placeholder:text-slate-600 focus:border-cyan-400'
+                          }`}
                         />
                       </div>
                     </div>
 
                     {/* Center Location */}
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-mono text-cyan-400 uppercase tracking-wider">Designated Training Center</label>
+                      <label className={`block text-[10px] font-mono uppercase tracking-wider ${
+                        isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'
+                      }`}>Designated Training Center</label>
                       <div className="relative">
                         <MapPin className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
                         <input
@@ -720,14 +842,20 @@ export default function TrainerDashboard({
                           value={institution}
                           onChange={(e) => setInstitution(e.target.value)}
                           placeholder="e.g. Govt Dev Center Balaghat"
-                          className="w-full bg-black/60 border border-cyan-500/15 rounded-xl pl-9 pr-3 py-2.5 text-white tracking-wide placeholder:text-slate-600 focus:outline-none focus:border-cyan-400"
+                          className={`w-full border rounded-xl pl-9 pr-3 py-2.5 tracking-wide placeholder:text-slate-400 focus:outline-none ${
+                            isLight 
+                              ? 'bg-white border-slate-200 text-slate-800 focus:border-amber-500' 
+                              : 'bg-black/60 border-cyan-500/15 text-white placeholder:text-slate-600 focus:border-cyan-400'
+                          }`}
                         />
                       </div>
                     </div>
 
                     {/* Qualification */}
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-mono text-cyan-400 uppercase tracking-wider">Academic Qualification</label>
+                      <label className={`block text-[10px] font-mono uppercase tracking-wider ${
+                        isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'
+                      }`}>Academic Qualification</label>
                       <div className="relative">
                         <Bookmark className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
                         <input
@@ -735,14 +863,20 @@ export default function TrainerDashboard({
                           value={qualification}
                           onChange={(e) => setQualification(e.target.value)}
                           placeholder="e.g. B.Tech ECE, NIT Bhopal"
-                          className="w-full bg-black/60 border border-cyan-500/15 rounded-xl pl-9 pr-3 py-2.5 text-white tracking-wide placeholder:text-slate-600 focus:outline-none focus:border-cyan-400"
+                          className={`w-full border rounded-xl pl-9 pr-3 py-2.5 tracking-wide placeholder:text-slate-400 focus:outline-none ${
+                            isLight 
+                              ? 'bg-white border-slate-200 text-slate-800 focus:border-amber-500' 
+                              : 'bg-black/60 border-cyan-500/15 text-white placeholder:text-slate-600 focus:border-cyan-400'
+                          }`}
                         />
                       </div>
                     </div>
 
                     {/* Specialization */}
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-mono text-cyan-400 uppercase tracking-wider">Specialization Fields</label>
+                      <label className={`block text-[10px] font-mono uppercase tracking-wider ${
+                        isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'
+                      }`}>Specialization Fields</label>
                       <div className="relative">
                         <Briefcase className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
                         <input
@@ -750,7 +884,11 @@ export default function TrainerDashboard({
                           value={specialization}
                           onChange={(e) => setSpecialization(e.target.value)}
                           placeholder="e.g. IoT Architecture, Robotics"
-                          className="w-full bg-black/60 border border-cyan-500/15 rounded-xl pl-9 pr-3 py-2.5 text-white tracking-wide placeholder:text-slate-600 focus:outline-none focus:border-cyan-400"
+                          className={`w-full border rounded-xl pl-9 pr-3 py-2.5 tracking-wide placeholder:text-slate-400 focus:outline-none ${
+                            isLight 
+                              ? 'bg-white border-slate-200 text-slate-800 focus:border-amber-500' 
+                              : 'bg-black/60 border-cyan-500/15 text-white placeholder:text-slate-600 focus:border-cyan-400'
+                          }`}
                         />
                       </div>
                     </div>
@@ -759,26 +897,38 @@ export default function TrainerDashboard({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Years of Experience */}
                     <div className="space-y-1 md:col-span-1">
-                      <label className="block text-[10px] font-mono text-cyan-400 uppercase tracking-wider">Years of Experience</label>
+                      <label className={`block text-[10px] font-mono uppercase tracking-wider ${
+                        isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'
+                      }`}>Years of Experience</label>
                       <input
                         type="text"
                         value={experienceYears}
                         onChange={(e) => setExperienceYears(e.target.value)}
                         placeholder="e.g. 5+ Years"
-                        className="w-full bg-black/60 border border-cyan-500/15 rounded-xl px-3 py-2.5 text-white tracking-wide placeholder:text-slate-600 focus:outline-none focus:border-cyan-400"
+                        className={`w-full border rounded-xl px-3 py-2.5 tracking-wide placeholder:text-slate-400 focus:outline-none ${
+                          isLight 
+                            ? 'bg-white border-slate-200 text-slate-800 focus:border-amber-500' 
+                            : 'bg-black/60 border-cyan-500/15 text-white placeholder:text-slate-600 focus:border-cyan-400'
+                        }`}
                       />
                     </div>
 
                     {/* Fixed Trainer Email Indicator */}
                     <div className="space-y-1 md:col-span-2">
-                      <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider">Registered Board Email</label>
+                      <label className={`block text-[10px] font-mono uppercase tracking-wider ${
+                        isLight ? 'text-slate-600' : 'text-slate-500'
+                      }`}>Registered Board Email</label>
                       <div className="relative">
                         <Mail className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
                         <input
                           type="text"
                           value={trainer.email}
                           disabled
-                          className="w-full bg-slate-900/40 border border-slate-800 text-slate-400 rounded-xl pl-9 pr-3 py-2.5 text-xs font-mono select-none"
+                          className={`w-full border rounded-xl pl-9 pr-3 py-2.5 text-xs font-mono select-none ${
+                            isLight 
+                              ? 'bg-slate-100 border-slate-200 text-slate-500' 
+                              : 'bg-slate-900/40 border-slate-800 text-slate-400'
+                          }`}
                         />
                       </div>
                     </div>
@@ -786,19 +936,29 @@ export default function TrainerDashboard({
 
                   {/* Biography */}
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-mono text-cyan-400 uppercase tracking-wider">Professional Biography</label>
+                    <label className={`block text-[10px] font-mono uppercase tracking-wider ${
+                      isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'
+                    }`}>Professional Biography</label>
                     <textarea
                       rows={3}
                       value={bio}
                       onChange={(e) => setBio(e.target.value)}
                       placeholder="Share a short background description about your teaching philosophy, labs setup, and digital literacy focus."
-                      className="w-full bg-black/60 border border-cyan-500/15 rounded-xl px-3 py-2.5 text-white tracking-wide placeholder:text-slate-600 focus:outline-none focus:border-cyan-400 resize-none font-sans"
+                      className={`w-full border rounded-xl px-3 py-2.5 tracking-wide placeholder:text-slate-400 focus:outline-none resize-none font-sans ${
+                        isLight 
+                          ? 'bg-white border-slate-200 text-slate-800 focus:border-amber-500' 
+                          : 'bg-black/60 border-cyan-500/15 text-white placeholder:text-slate-600 focus:border-cyan-400'
+                      }`}
                     />
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-cyan-950/40 to-cyan-800/40 border border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-500/10 text-cyan-400 text-xs py-2.5 rounded-xl transition-all cursor-pointer font-bold tracking-wider uppercase font-mono"
+                    className={`w-full border text-xs py-2.5 rounded-xl transition-all cursor-pointer font-bold tracking-wider uppercase font-mono ${
+                      isLight 
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600 shadow-sm' 
+                        : 'bg-gradient-to-r from-cyan-950/40 to-cyan-800/40 border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-500/10 text-cyan-400'
+                    }`}
                   >
                     Save Trainer Parameters & Sync
                   </button>
@@ -808,71 +968,111 @@ export default function TrainerDashboard({
 
             {/* Premium Badging ID Preview */}
             <div className="lg:col-span-1 space-y-4">
-              <span className="text-[9px] font-mono tracking-widest text-slate-500 uppercase block font-bold">Supervisor Credential Badge</span>
+              <span className={`text-[9px] font-mono tracking-widest uppercase block font-bold ${
+                isLight ? 'text-slate-700' : 'text-slate-500'
+              }`}>Supervisor Credential Badge</span>
               
               {/* Badge Preview */}
-              <div className="relative group overflow-hidden bg-gradient-to-br from-[#0c2a33] via-[#040d12] to-black border-2 border-cyan-500/35 rounded-2xl p-6 shadow-2xl relative select-text">
+              <div className={`relative group overflow-hidden border-2 rounded-2xl p-6 shadow-2xl relative select-text transition-all duration-300 ${
+                isLight 
+                  ? 'bg-gradient-to-br from-amber-50/50 via-slate-50 to-white border-slate-300 shadow-lg' 
+                  : 'bg-gradient-to-br from-[#0c2a33] via-[#040d12] to-black border-cyan-500/35 shadow-2xl'
+              }`}>
                 {/* Tactical Corner Marks */}
-                <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-cyan-400" />
-                <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-cyan-400" />
-                <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-cyan-400" />
-                <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-cyan-400" />
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-400/5 rounded-full blur-2xl pointer-events-none" />
+                <div className={`absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 ${isLight ? 'border-amber-600' : 'border-cyan-400'}`} />
+                <div className={`absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 ${isLight ? 'border-amber-600' : 'border-cyan-400'}`} />
+                <div className={`absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 ${isLight ? 'border-amber-600' : 'border-cyan-400'}`} />
+                <div className={`absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 ${isLight ? 'border-amber-600' : 'border-cyan-400'}`} />
+                <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl pointer-events-none ${
+                  isLight ? 'bg-amber-500/5' : 'bg-cyan-400/5'
+                }`} />
 
                 {/* ID Header */}
-                <div className="flex justify-between items-start border-b border-cyan-500/10 pb-4">
+                <div className={`flex justify-between items-start border-b pb-4 ${isLight ? 'border-slate-200' : 'border-cyan-500/10'}`}>
                   <div className="text-left">
-                    <span className="text-[10px] font-mono text-cyan-400 block tracking-widest font-extrabold">DAKSHYAM IN</span>
-                    <span className="text-[7px] font-mono text-slate-500 block uppercase">Manual Skill Enrichment Node</span>
+                    <span className={`text-[10px] font-mono block tracking-widest font-extrabold ${
+                      isLight ? 'text-amber-800' : 'text-cyan-400'
+                    }`}>DAKSHYAM IN</span>
+                    <span className="text-[7px] font-mono text-slate-500 block uppercase font-medium">Manual Skill Enrichment Node</span>
                   </div>
-                  <span className="text-[7.5px] font-mono bg-cyan-950/60 border border-cyan-400/30 text-cyan-400 px-2 py-0.5 rounded-md font-bold uppercase animate-pulse flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block animate-ping" /> Validated • Active
+                  <span className={`text-[7.5px] font-mono border px-2 py-0.5 rounded-md font-bold uppercase animate-pulse flex items-center gap-1 ${
+                    isLight 
+                      ? 'bg-amber-50 border-amber-400/30 text-amber-850' 
+                      : 'bg-cyan-950/60 border-cyan-400/30 text-cyan-400'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full inline-block animate-ping ${isLight ? 'bg-amber-600' : 'bg-cyan-400'}`} /> Validated • Active
                   </span>
                 </div>
 
                 {/* Core Person Meta */}
                 <div className="py-5 space-y-3.5 text-left">
                   <div className="space-y-0.5">
-                    <span className="text-[8px] font-mono text-cyan-500 uppercase tracking-widest block font-bold">Full Name</span>
-                    <h4 className="text-sm font-black text-white uppercase tracking-wide">{trainer.name}</h4>
+                    <span className={`text-[8px] font-mono uppercase tracking-widest block font-bold ${
+                      isLight ? 'text-amber-800' : 'text-cyan-500'
+                    }`}>Full Name</span>
+                    <h4 className={`text-sm font-black uppercase tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>{trainer.name}</h4>
                   </div>
 
                   <div className="space-y-0.5">
-                    <span className="text-[8px] font-mono text-cyan-500 uppercase tracking-widest block font-bold">Lead Status</span>
-                    <div className="flex items-center gap-1.5 text-slate-200 font-mono text-[10px] font-extrabold uppercase">
-                      <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className={`text-[8px] font-mono uppercase tracking-widest block font-bold ${
+                      isLight ? 'text-amber-800' : 'text-cyan-500'
+                    }`}>Lead Status</span>
+                    <div className={`flex items-center gap-1.5 font-mono text-[10px] font-extrabold uppercase ${
+                      isLight ? 'text-slate-800' : 'text-slate-200'
+                    }`}>
+                      <ShieldCheck className={`w-3.5 h-3.5 ${isLight ? 'text-amber-700' : 'text-cyan-400'}`} />
                       <span>Certified Board Supervisor</span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <div className="space-y-0.5">
-                      <span className="text-[8px] font-mono text-cyan-500 uppercase tracking-widest block font-bold">Qualification</span>
-                      <p className="text-[10px] text-slate-300 font-sans tracking-wide leading-tight uppercase font-medium">{qualification || 'Not Spec'}</p>
+                      <span className={`text-[8px] font-mono uppercase tracking-widest block font-bold ${
+                        isLight ? 'text-amber-800' : 'text-cyan-500'
+                      }`}>Qualification</span>
+                      <p className={`text-[10px] font-sans tracking-wide leading-tight uppercase font-semibold ${
+                        isLight ? 'text-slate-800' : 'text-slate-300'
+                      }`}>{qualification || 'Not Spec'}</p>
                     </div>
 
                     <div className="space-y-0.5">
-                      <span className="text-[8px] font-mono text-cyan-500 uppercase tracking-widest block font-bold">Center Location</span>
-                      <p className="text-[10px] text-slate-300 font-sans tracking-wide leading-tight uppercase font-medium">{institution || 'Dakshyam Gen Center'}</p>
+                      <span className={`text-[8px] font-mono uppercase tracking-widest block font-bold ${
+                        isLight ? 'text-amber-800' : 'text-cyan-500'
+                      }`}>Center Location</span>
+                      <p className={`text-[10px] font-sans tracking-wide leading-tight uppercase font-semibold ${
+                        isLight ? 'text-slate-800' : 'text-slate-300'
+                      }`}>{institution || 'Dakshyam Gen Center'}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-0.5">
-                      <span className="text-[8px] font-mono text-cyan-500 uppercase tracking-widest block font-bold">Fields / Domain</span>
-                      <p className="text-[10px] text-slate-300 font-sans tracking-wide leading-tight uppercase font-medium">{specialization || 'General Tech'}</p>
+                      <span className={`text-[8px] font-mono uppercase tracking-widest block font-bold ${
+                        isLight ? 'text-amber-800' : 'text-cyan-500'
+                      }`}>Fields / Domain</span>
+                      <p className={`text-[10px] font-sans tracking-wide leading-tight uppercase font-semibold ${
+                        isLight ? 'text-slate-800' : 'text-slate-300'
+                      }`}>{specialization || 'General Tech'}</p>
                     </div>
 
                     <div className="space-y-0.5">
-                      <span className="text-[8px] font-mono text-cyan-500 uppercase tracking-widest block font-bold">Experience</span>
-                      <p className="text-[10px] text-slate-300 font-mono tracking-wide leading-tight uppercase font-bold text-cyan-400">{experienceYears || '0+ Years'}</p>
+                      <span className={`text-[8px] font-mono uppercase tracking-widest block font-bold ${
+                        isLight ? 'text-amber-800' : 'text-cyan-500'
+                      }`}>Experience</span>
+                      <p className={`text-[10px] font-mono tracking-wide leading-tight uppercase font-black ${
+                        isLight ? 'text-amber-850' : 'text-cyan-400'
+                      }`}>{experienceYears || '0+ Years'}</p>
                     </div>
                   </div>
 
                   {bio && (
-                    <div className="space-y-0.5 pt-1 border-t border-cyan-500/5">
-                      <span className="text-[8px] font-mono text-cyan-500 uppercase tracking-widest block font-bold">Teaching Philosophy</span>
-                      <p className="text-[9.5px] text-slate-400 leading-normal font-sans tracking-wide select-text italic">
+                    <div className={`space-y-0.5 pt-1 border-t ${isLight ? 'border-slate-200' : 'border-cyan-500/5'}`}>
+                      <span className={`text-[8px] font-mono uppercase tracking-widest block font-bold ${
+                        isLight ? 'text-amber-800' : 'text-cyan-500'
+                      }`}>Teaching Philosophy</span>
+                      <p className={`text-[9.5px] leading-normal font-sans tracking-wide select-text italic ${
+                        isLight ? 'text-slate-700' : 'text-slate-400'
+                      }`}>
                         "{bio}"
                       </p>
                     </div>
@@ -880,14 +1080,18 @@ export default function TrainerDashboard({
                 </div>
 
                 {/* ID Footer */}
-                <div className="pt-3 border-t border-cyan-500/10 flex justify-between items-center text-[7.5px] font-mono text-slate-500">
+                <div className={`pt-3 border-t flex justify-between items-center text-[7.5px] font-mono ${
+                  isLight ? 'border-slate-200 text-slate-500' : 'border-cyan-500/10 text-slate-500'
+                }`}>
                   <span>REG ID: {trainer.id.toUpperCase()}</span>
                   <span>JOIN DATE: {trainer.createdAt}</span>
                 </div>
               </div>
 
-              <div className="p-4 bg-cyan-950/10 border border-cyan-500/5 rounded-2xl text-left text-2xs text-slate-400 leading-relaxed font-mono">
-                <span className="text-cyan-400 font-extrabold uppercase block mb-1">Board Sync Node verified</span>
+              <div className={`p-4 border rounded-2xl text-left text-2xs leading-relaxed font-mono ${
+                isLight ? 'bg-amber-500/5 border-amber-500/10 text-slate-650' : 'bg-cyan-950/10 border-cyan-500/5 text-slate-400'
+              }`}>
+                <span className={`font-extrabold uppercase block mb-1 ${isLight ? 'text-amber-850' : 'text-cyan-400'}`}>Board Sync Node verified</span>
                 <p>This supervisor profile card represents your official active credential recorded inside local and state training registers. All digital signatures on certificates are tracked dynamically by the Dakshyam Board office.</p>
               </div>
             </div>

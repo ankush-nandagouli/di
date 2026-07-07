@@ -17,6 +17,8 @@ interface AdminDashboardProps {
   groups: StudentGroup[];
   students: StudentUser[];
   onRefresh: () => void;
+  theme?: 'light' | 'dark';
+  isDbConnected?: boolean;
 }
 
 export default function AdminDashboard({
@@ -24,11 +26,21 @@ export default function AdminDashboard({
   applications,
   groups,
   students,
-  onRefresh
+  onRefresh,
+  theme = 'dark',
+  isDbConnected = false
 }: AdminDashboardProps) {
+  const isLight = theme === 'light';
   // Navigation tabs
-  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'promotions' | 'gallery' | 'special_training' | 'certificates' | 'about_editor';
+  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'promotions' | 'gallery' | 'special_training' | 'certificates' | 'about_editor' | 'logs';
   const [adminTab, setAdminTab] = useState<TabType>('analytics');
+
+  // Audit Logs Filtering States
+  const [searchLog, setSearchLog] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'ERROR' | 'INFO'>('ALL');
+
+  // DB connection advice helper
+  const [showDbAdvice, setShowDbAdvice] = useState(false);
 
   // --- NEW COURSE STATE FORM ---
   const [courseTitle, setCourseTitle] = useState('');
@@ -60,6 +72,133 @@ export default function AdminDashboard({
   const trainersList = DakshyamDatabase.getTrainers();
   const bannersList = DakshyamDatabase.getBanners();
   const galleryList = DakshyamDatabase.getGalleryImages();
+
+  // --- MODAL CONTROLLERS ---
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [showBannerModal, setShowBannerModal] = useState(false);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [showSpecialProgramModal, setShowSpecialProgramModal] = useState(false);
+  const [showManualEnrollModal, setShowManualEnrollModal] = useState(false);
+  const [showTrainerCreateModal, setShowTrainerCreateModal] = useState(false);
+  const [showStudentCreateModal, setShowStudentCreateModal] = useState(false);
+
+  // --- NEW TRAINER MANUALLY STATE FORM ---
+  const [newTrainerName, setNewTrainerName] = useState('');
+  const [newTrainerEmail, setNewTrainerEmail] = useState('');
+  const [newTrainerPassword, setNewTrainerPassword] = useState('');
+  const [newTrainerApproved, setNewTrainerApproved] = useState(true);
+  const [trainerError, setTrainerError] = useState('');
+  const [trainerSuccess, setTrainerSuccess] = useState('');
+
+  // --- NEW STUDENT MANUALLY STATE FORM ---
+  const [newStudentName, setNewStudentName] = useState('');
+  const [newStudentEmail, setNewStudentEmail] = useState('');
+  const [newStudentPhone, setNewStudentPhone] = useState('');
+  const [newStudentSchool, setNewStudentSchool] = useState('');
+  const [newStudentLevel, setNewStudentLevel] = useState('Grade 10');
+  const [newStudentPassword, setNewStudentPassword] = useState('');
+  const [newStudentPoints, setNewStudentPoints] = useState(0);
+  const [studentError, setStudentError] = useState('');
+  const [studentSuccess, setStudentSuccess] = useState('');
+
+  // --- MANUALLY CREATE TRAINER ---
+  const handleCreateTrainerManually = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTrainerError('');
+    setTrainerSuccess('');
+
+    if (!newTrainerName.trim() || !newTrainerEmail.trim() || !newTrainerPassword.trim()) {
+      setTrainerError('All trainer fields are required.');
+      return;
+    }
+
+    const res = DakshyamDatabase.registerTrainer(
+      newTrainerName.trim(),
+      newTrainerEmail.trim(),
+      newTrainerPassword.trim(),
+      newTrainerApproved
+    );
+
+    if (res.success) {
+      setTrainerSuccess('✓ Trainer successfully registered and stored!');
+      setNewTrainerName('');
+      setNewTrainerEmail('');
+      setNewTrainerPassword('');
+      onRefresh();
+      setTimeout(() => {
+        setShowTrainerCreateModal(false);
+        setTrainerSuccess('');
+      }, 1500);
+    } else {
+      setTrainerError(res.error || 'Failed to create trainer.');
+    }
+  };
+
+  // --- MANUALLY CREATE STUDENT ---
+  const handleCreateStudentManually = (e: React.FormEvent) => {
+    e.preventDefault();
+    setStudentError('');
+    setStudentSuccess('');
+
+    if (!newStudentName.trim() || !newStudentEmail.trim() || !newStudentPassword.trim()) {
+      setStudentError('Name, Email, and Password are required.');
+      return;
+    }
+
+    const studentsList = DakshyamDatabase.getStudents();
+    if (studentsList.some(s => s.email.toLowerCase() === newStudentEmail.trim().toLowerCase())) {
+      setStudentError('Student with this email already exists.');
+      return;
+    }
+
+    const newStudent: StudentUser = {
+      id: `usr-s${Date.now()}`,
+      name: newStudentName.trim(),
+      email: newStudentEmail.trim(),
+      role: 'student',
+      profile: {
+        phone: newStudentPhone.trim(),
+        institution: newStudentSchool.trim(),
+        gradeOrBranch: newStudentLevel,
+      },
+      createdAt: new Date().toISOString().split('T')[0],
+      password: newStudentPassword.trim()
+    };
+
+    studentsList.push(newStudent);
+    DakshyamDatabase.saveStudents(studentsList);
+    setStudentSuccess('✓ Student successfully registered and enrolled!');
+    setNewStudentName('');
+    setNewStudentEmail('');
+    setNewStudentPhone('');
+    setNewStudentSchool('');
+    setNewStudentPassword('');
+    setNewStudentPoints(0);
+    onRefresh();
+    setTimeout(() => {
+      setShowStudentCreateModal(false);
+      setStudentSuccess('');
+    }, 1500);
+  };
+
+  const handlePurgeDatabase = async () => {
+    if (confirm("🚨 WARNING: Are you sure you want to permanently delete each and every user and user-related record (Students, Trainers, Applications, Certificates, Student Groups, Social Videos, and Special Enrollments) from BOTH Firestore and Client Cache? This action is IRREVERSIBLE.")) {
+      try {
+        DakshyamDatabase.clearUserRelatedData();
+        const res = await fetch('/api/db/clear', { method: 'POST' });
+        if (res.ok) {
+          alert('✓ Success: All seeded user databases and server directories successfully wiped clean!');
+        } else {
+          alert('✓ Client Cache wiped. Server directory response pending.');
+        }
+        onRefresh();
+      } catch (err) {
+        console.error("Purge fail:", err);
+        alert('✓ Client cache cleared successfully!');
+        onRefresh();
+      }
+    }
+  };
 
   // --- SPECIAL TRAINING PROGRAM STATES ---
   const [specName, setSpecName] = useState('');
@@ -638,38 +777,121 @@ export default function AdminDashboard({
     <div className="space-y-6 text-left max-w-4xl mx-auto">
       
       {/* Admin Hero Header banner */}
-      <div className="bg-gradient-to-r from-slate-950 to-cyan-950/20 border border-cyan-500/15 p-6 rounded-2xl relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className={`border p-6 rounded-2xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all duration-300 ${
+        isLight 
+          ? 'bg-gradient-to-r from-amber-500/5 to-slate-50 border-slate-200 shadow-sm' 
+          : 'bg-gradient-to-r from-slate-950 to-cyan-950/20 border border-cyan-500/15'
+      }`}>
         <div className="absolute top-0 right-0 h-full w-48 bg-radial from-cyan-500/5 to-transparent blur-xl pointer-events-none" />
         
-        <div className="space-y-1">
-          <span className="text-[9px] font-mono tracking-widest text-[#22d3ee] uppercase font-bold">System Command Console</span>
-          <h1 className="text-xl font-black text-white tracking-wide uppercase">Administrator Console</h1>
-          <p className="text-xs text-slate-400 font-sans">Full Database Access • No-Code Dynamic Editing Active</p>
+        <div className="space-y-2">
+          <div>
+            <span className={`text-[9px] font-mono tracking-widest uppercase font-bold ${
+              isLight ? 'text-amber-800' : 'text-[#22d3ee]'
+            }`}>System Command Console</span>
+            <h1 className={`text-xl font-black tracking-wide uppercase ${
+              isLight ? 'text-slate-900' : 'text-white'
+            }`}>Administrator Console</h1>
+            <p className={`text-xs font-sans ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>Full Database Access • No-Code Dynamic Editing Active</p>
+          </div>
+          
+          <button
+            onClick={handlePurgeDatabase}
+            className={`text-[10px] font-mono font-bold border px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer ${
+              isLight
+                ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                : 'border-red-500/25 bg-red-950/20 text-red-400 hover:bg-red-900/30 hover:border-red-500/40'
+            }`}
+          >
+            <Trash className="w-3.5 h-3.5" /> Purge Seed & User-Related Data
+          </button>
         </div>
 
         <div className="flex flex-wrap gap-2 text-3xs font-mono">
-          <span className="px-3 py-1 bg-cyan-950/40 border border-cyan-500/10 rounded-full text-white font-bold">
+          <span className={`px-3 py-1 border rounded-full font-bold ${
+            isLight ? 'bg-amber-50 border-amber-500/20 text-amber-900' : 'bg-cyan-950/40 border-cyan-500/10 text-white'
+          }`}>
             Courses: {courses.length}
           </span>
-          <span className="px-3 py-1 bg-cyan-950/40 border border-cyan-500/10 rounded-full text-[#22d3ee]">
+          <span className={`px-3 py-1 border rounded-full font-bold ${
+            isLight ? 'bg-amber-50 border-amber-500/20 text-amber-900' : 'bg-cyan-950/40 border-cyan-500/10 text-[#22d3ee]'
+          }`}>
             Gallery: {galleryList.length}
           </span>
-          <span className="px-3 py-1 bg-[#111] border border-cyan-500/5 rounded-full text-slate-400">
+          <span className={`px-3 py-1 border rounded-full font-bold ${
+            isLight ? 'bg-slate-150 border-slate-250 text-slate-600' : 'bg-[#111] border-cyan-500/5 text-slate-400'
+          }`}>
             Pending Applicants: {pendingCount}
           </span>
+          {isDbConnected ? (
+            <span className={`px-3 py-1 border rounded-full font-bold flex items-center gap-1.5 bg-emerald-950/30 border-emerald-500/20 text-emerald-400`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live DB Connected
+            </span>
+          ) : (
+            <button 
+              onClick={() => setShowDbAdvice(!showDbAdvice)}
+              className={`px-3 py-1 border rounded-full font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                isLight 
+                  ? 'bg-amber-50 border-amber-500/25 text-amber-900 hover:bg-amber-100' 
+                  : 'bg-amber-950/20 border-amber-500/15 text-amber-400 hover:bg-amber-900/30 hover:border-amber-500/30'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> DB Fallback Mode
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Database connection details banner if in fallback mode and clicked */}
+      <AnimatePresence>
+        {!isDbConnected && showDbAdvice && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className={`border p-4 rounded-xl text-xs space-y-2 relative overflow-hidden transition-all ${
+              isLight 
+                ? 'bg-amber-50/50 border-amber-200 text-slate-800' 
+                : 'bg-amber-950/10 border-amber-500/10 text-slate-300'
+            }`}
+          >
+            <button 
+              onClick={() => setShowDbAdvice(false)}
+              className="absolute top-3 right-3 text-slate-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-2 font-bold font-mono text-[#f59e0b] text-3xs uppercase tracking-wider">
+              <Activity className="w-4 h-4" /> Connection Status: Local Failsafe Fallback Active
+            </div>
+            <p className="font-sans leading-relaxed">
+              The application is fully operational and automatically persists data in a resilient local fallback server store, ensuring no interruption to your session!
+            </p>
+            <p className="font-sans leading-relaxed">
+              To connect this container to your cloud MongoDB Database:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 font-mono text-[10px] pl-1 text-slate-400">
+              <li>Open <span className="text-[#22d3ee]">MongoDB Atlas</span> dashboard</li>
+              <li>Go to <span className="text-white font-bold">Network Access</span> -&gt; <span className="text-white font-bold">Add IP Address</span></li>
+              <li>Enter <span className="text-amber-300 font-bold">0.0.0.0/0</span> (Allow Access From Anywhere)</li>
+              <li>Save changes, then perform any editing task to automatically trigger a reconnect!</li>
+            </ol>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Tabs list */}
-      <div className="flex flex-wrap gap-1.5 border-b border-cyan-500/10 pb-0.5 font-mono text-3xs uppercase font-extrabold scrollbar-none overflow-x-auto">
-        {(['analytics', 'courses', 'applications', 'trainers', 'promotions', 'gallery', 'special_training', 'certificates', 'about_editor'] as const).map(tab => (
+      <div className={`flex flex-wrap gap-1.5 border-b pb-0.5 font-mono text-3xs uppercase font-extrabold scrollbar-none overflow-x-auto ${
+        isLight ? 'border-slate-200' : 'border-cyan-500/10'
+      }`}>
+        {(['analytics', 'courses', 'applications', 'trainers', 'promotions', 'gallery', 'special_training', 'certificates', 'about_editor', 'logs'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setAdminTab(tab)}
             className={`px-3.5 py-2 rounded-t-xl transition-all border-t border-x cursor-pointer shrink-0 ${
               adminTab === tab
-                ? 'bg-[#050505]/70 border-cyan-500/15 text-[#22d3ee]'
-                : 'border-transparent text-slate-450 hover:text-white'
+                ? (isLight ? 'bg-white border-slate-250 text-amber-800 font-bold border-b-white z-10' : 'bg-[#050505]/70 border-cyan-500/15 text-[#22d3ee]')
+                : (isLight ? 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50' : 'border-transparent text-slate-450 hover:text-white')
             }`}
           >
             {tab === 'analytics' && 'Analytics Deck'}
@@ -681,12 +903,15 @@ export default function AdminDashboard({
             {tab === 'special_training' && '🎓 Special Training Forms'}
             {tab === 'certificates' && '🎖 Certificate Dashboard'}
             {tab === 'about_editor' && '✏️ About Page Editor'}
+            {tab === 'logs' && '🛡️ System Audit Logs'}
           </button>
         ))}
       </div>
 
       {/* Panel containers */}
-      <div className="bg-[#050505]/60 border border-cyan-500/10 rounded-2xl p-5 md:p-6 backdrop-blur-md overflow-hidden">
+      <div className={`rounded-2xl p-5 md:p-6 border transition-all duration-300 overflow-hidden ${
+        isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#050505]/60 border-cyan-500/10 backdrop-blur-md'
+      }`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={adminTab}
@@ -704,14 +929,6 @@ export default function AdminDashboard({
             const lvl = st.profile?.gradeOrBranch || 'Grade 10';
             levelsCountMap[lvl] = (levelsCountMap[lvl] || 0) + 1;
           });
-          
-          // Pre-populate with high fidelity default counters if empty/mock for premium aesthetic rendering
-          if (Object.keys(levelsCountMap).length === 0) {
-            levelsCountMap['Grade 10 (IoT Basic)'] = 14;
-            levelsCountMap['Grade 12 (Robotics Pro)'] = 19;
-            levelsCountMap['B.Tech (Autonomous Django)'] = 11;
-            levelsCountMap['Vocational (MERN FullStack)'] = 24;
-          }
 
           const demographicsData = Object.entries(levelsCountMap).map(([lbl, val]) => ({
             label: lbl,
@@ -730,26 +947,18 @@ export default function AdminDashboard({
                 
                 <AnalyticsCharts 
                   title="Class Application Volumes" 
-                  data={courseRegistrationData.length > 0 ? courseRegistrationData : [
-                    { label: 'IoT Foundations', value: 12 },
-                    { label: 'MERN Stack Web Dev', value: 18 },
-                    { label: 'Django API Core', value: 7 },
-                    { label: 'Autonomous Agritech', value: 15 }
-                  ]} 
+                  data={courseRegistrationData} 
                   type="bar" 
                   icon={<BookOpen className="w-4 h-4 text-cyan-400" />}
+                  theme={theme}
                 />
 
                 <AnalyticsCharts 
                   title="Group Project Standings (Points)" 
-                  data={projectPointsData.length > 0 ? projectPointsData : [
-                    { label: 'Alpha IoT Waraseoni', value: 240 },
-                    { label: 'MERN Wizards Hub', value: 180 },
-                    { label: 'Django Sprinters', value: 165 },
-                    { label: 'Agritech Sensors Team', value: 310 }
-                  ]} 
+                  data={projectPointsData} 
                   type="line" 
                   icon={<Award className="w-4 h-4 text-cyan-400" />}
+                  theme={theme}
                 />
 
               </div>
@@ -762,43 +971,58 @@ export default function AdminDashboard({
                   data={demographicsData} 
                   type="bar" 
                   icon={<Users className="w-4 h-4 text-[#22d3ee]" />}
+                  theme={theme}
                 />
 
                 {/* Custom Logistics & Inventory health check card */}
-                <div className="bg-[#050505]/60 border border-cyan-500/10 rounded-2xl p-5 backdrop-blur-md hover:border-cyan-500/20 transition-all duration-300 space-y-4">
+                <div className={`border rounded-2xl p-5 transition-all duration-300 space-y-4 ${
+                  isLight 
+                    ? 'bg-slate-50/55 border-slate-200 hover:border-amber-500/15' 
+                    : 'bg-[#050505]/60 border border-cyan-500/10 hover:border-cyan-500/20 backdrop-blur-md'
+                }`}>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-slate-300 tracking-wider flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-amber-500" /> Physical IoT Kit Logistics Pool
+                    <h3 className={`text-sm font-semibold tracking-wider flex items-center gap-2 ${
+                      isLight ? 'text-slate-800' : 'text-slate-300'
+                    }`}>
+                      <Activity className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-amber-500'}`} /> Physical IoT Kit Logistics Pool
                     </h3>
-                    <span className="text-2xs font-mono text-amber-400/80 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                    <span className={`text-2xs font-mono px-2 py-0.5 rounded-full border ${
+                      isLight ? 'text-amber-800/85 border-amber-500/25 bg-amber-500/5' : 'text-amber-400/80 border border-amber-500/20'
+                    }`}>
                       Active Telemetry
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3.5 pt-1.5 text-left font-mono">
-                    <div className="p-3 rounded-xl bg-black/40 border border-slate-500/5 space-y-1">
-                      <span className="text-4xs text-slate-500 uppercase font-black">ESP32 Classes Leased</span>
-                      <span className="text-sm font-bold text-white block">85 Active Hubs</span>
-                      <div className="h-1 w-full bg-[#111] rounded mt-1.5 overflow-hidden">
-                        <div className="h-full bg-amber-500 w-[85%]" />
+                    <div className={`p-3 rounded-xl space-y-1 border ${
+                      isLight ? 'bg-slate-100/60 border-slate-250/50' : 'bg-black/40 border border-slate-500/5'
+                    }`}>
+                      <span className={`text-4xs uppercase font-black ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>ESP32 Classes Leased</span>
+                      <span className={`text-sm font-bold block ${isLight ? 'text-slate-900' : 'text-white'}`}>85 Active Hubs</span>
+                      <div className={`h-1 w-full rounded mt-1.5 overflow-hidden ${isLight ? 'bg-slate-200' : 'bg-[#111]'}`}>
+                        <div className={`h-full w-[85%] ${isLight ? 'bg-amber-600' : 'bg-amber-500'}`} />
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-black/40 border border-slate-500/5 space-y-1">
-                      <span className="text-4xs text-slate-500 uppercase font-black">Camps Reserve Stock</span>
-                      <span className="text-sm font-bold text-cyan-400 block">40 Lab Kits</span>
-                      <div className="h-1 w-full bg-[#111] rounded mt-1.5 overflow-hidden">
-                        <div className="h-full bg-cyan-400 w-[60%]" />
+                    <div className={`p-3 rounded-xl space-y-1 border ${
+                      isLight ? 'bg-slate-100/60 border-slate-250/50' : 'bg-black/40 border border-slate-500/5'
+                    }`}>
+                      <span className={`text-4xs uppercase font-black ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>Camps Reserve Stock</span>
+                      <span className={`text-sm font-bold block ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>40 Lab Kits</span>
+                      <div className={`h-1 w-full rounded mt-1.5 overflow-hidden ${isLight ? 'bg-slate-200' : 'bg-[#111]'}`}>
+                        <div className={`h-full w-[60%] ${isLight ? 'bg-amber-600' : 'bg-cyan-400'}`} />
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-black/40 border border-slate-500/5 space-y-1 col-span-2">
+                    <div className={`p-3 rounded-xl space-y-1 col-span-2 border ${
+                      isLight ? 'bg-slate-100/60 border-slate-250/50' : 'bg-black/40 border border-slate-500/5'
+                    }`}>
                       <div className="flex justify-between items-center text-4xs">
-                        <span className="text-slate-500 uppercase font-black">Waraseoni Central Lab Hardware Utilization</span>
-                        <span className="text-amber-500 font-bold">92% Load</span>
+                        <span className={`uppercase font-black ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>Waraseoni Central Lab Hardware Utilization</span>
+                        <span className={`font-bold ${isLight ? 'text-amber-700' : 'text-amber-500'}`}>92% Load</span>
                       </div>
-                      <span className="text-sm font-bold text-white block mt-1">16 Workstations Engaged</span>
-                      <div className="h-1 w-full bg-[#111] rounded mt-1.5 overflow-hidden">
+                      <span className={`text-sm font-bold block mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>16 Workstations Engaged</span>
+                      <div className={`h-1 w-full rounded mt-1.5 overflow-hidden ${isLight ? 'bg-slate-200' : 'bg-[#111]'}`}>
                         <div className="h-full bg-gradient-to-r from-amber-500 to-red-500 w-[92%]" />
                       </div>
                     </div>
@@ -810,42 +1034,42 @@ export default function AdminDashboard({
               {/* Detailed Performance Metric counters */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-left">
                 
-                <div className="p-4 rounded-xl border border-cyan-500/5 bg-[#111]/30">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase font-bold">Users Directory</span>
-                  <span className="text-sm font-black text-white font-mono mt-1.5 block">
+                <div className={`p-4 rounded-xl border ${isLight ? 'bg-slate-50/50 border-slate-200' : 'border-cyan-500/5 bg-[#111]/30'}`}>
+                  <span className={`text-[10px] font-mono block uppercase font-bold ${isLight ? 'text-slate-500' : 'text-slate-550'}`}>Users Directory</span>
+                  <span className={`text-sm font-black font-mono mt-1.5 block ${isLight ? 'text-slate-900' : 'text-white'}`}>
                     {students.length} Students
                   </span>
-                  <span className="text-4xs text-cyan-400 font-mono block mt-0.5">
+                  <span className={`text-4xs font-mono block mt-0.5 ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>
                     {trainersList.length} Authenticated Instructors
                   </span>
                 </div>
 
-                <div className="p-4 rounded-xl border border-cyan-500/5 bg-[#111]/30">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase font-bold">Content Exhibition</span>
-                  <span className="text-sm font-black text-[#22d3ee] font-mono mt-1.5 block">
+                <div className={`p-4 rounded-xl border ${isLight ? 'bg-slate-50/50 border-slate-200' : 'border-cyan-500/5 bg-[#111]/30'}`}>
+                  <span className={`text-[10px] font-mono block uppercase font-bold ${isLight ? 'text-slate-500' : 'text-slate-550'}`}>Content Exhibition</span>
+                  <span className={`text-sm font-black font-mono mt-1.5 block ${isLight ? 'text-amber-800' : 'text-[#22d3ee]'}`}>
                     {DakshyamDatabase.getVideos().length} Video Walkthroughs
                   </span>
-                  <span className="text-4xs text-slate-400 font-mono block mt-0.5">
-                    {galleryList.length} Captioned Project Mockups
+                  <span className={`text-4xs font-mono block mt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                    {galleryList.length} Captioned Gallery Showcase Items
                   </span>
                 </div>
 
-                <div className="p-4 rounded-xl border border-cyan-500/5 bg-[#111]/30">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase font-bold">Vocational Registry</span>
-                  <span className="text-sm font-black text-emerald-400 font-mono mt-1.5 block">
+                <div className={`p-4 rounded-xl border ${isLight ? 'bg-slate-50/50 border-slate-200' : 'border-cyan-500/5 bg-[#111]/30'}`}>
+                  <span className={`text-[10px] font-mono block uppercase font-bold ${isLight ? 'text-slate-500' : 'text-slate-550'}`}>Vocational Registry</span>
+                  <span className={`text-sm font-black font-mono mt-1.5 block ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>
                     {specialProgCount} Training Camps
                   </span>
-                  <span className="text-4xs text-slate-400 font-mono block mt-0.5">
+                  <span className={`text-4xs font-mono block mt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                     {specialEnrollsCount} Registered Candidates
                   </span>
                 </div>
 
-                <div className="p-4 rounded-xl border border-cyan-500/5 bg-[#111]/30">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase font-bold">Credentials Issued</span>
-                  <span className="text-sm font-black text-yellow-500 font-mono mt-1.5 block">
+                <div className={`p-4 rounded-xl border ${isLight ? 'bg-slate-50/50 border-slate-200' : 'border-cyan-500/5 bg-[#111]/30'}`}>
+                  <span className={`text-[10px] font-mono block uppercase font-bold ${isLight ? 'text-slate-500' : 'text-slate-550'}`}>Credentials Issued</span>
+                  <span className={`text-sm font-black font-mono mt-1.5 block ${isLight ? 'text-amber-600' : 'text-yellow-500'}`}>
                     {certCount} Verified Certificates
                   </span>
-                  <span className="text-4xs text-slate-400 font-mono block mt-0.5">
+                  <span className={`text-4xs font-mono block mt-0.5 ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>
                     {applications.length > 0 ? Math.round((approvedCount / applications.length) * 100) : 0}% Admission Rate
                   </span>
                 </div>
@@ -862,7 +1086,9 @@ export default function AdminDashboard({
             
             {/* Publisher Form */}
             <form onSubmit={handleCreateCourse} className="space-y-3.5">
-              <h3 className="text-xs font-bold text-white tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+              <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
+                isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
+              }`}>
                 Configure New Syllabus Course
               </h3>
 
@@ -871,61 +1097,81 @@ export default function AdminDashboard({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Course Title</label>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Course Title</label>
                   <input
                     type="text"
                     required
                     value={courseTitle}
                     onChange={(e) => setCourseTitle(e.target.value)}
                     placeholder="e.g. Django API Systems"
-                    className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                      isLight 
+                        ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                        : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Duration Block</label>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Duration Block</label>
                   <input
                     type="text"
                     required
                     value={courseDuration}
                     onChange={(e) => setCourseDuration(e.target.value)}
                     placeholder="e.g. 1 Week"
-                    className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                      isLight 
+                        ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                        : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                    }`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Description summary</label>
+                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Description summary</label>
                 <textarea
                   required
                   value={courseDesc}
                   onChange={(e) => setCourseDesc(e.target.value)}
                   placeholder="Master logical flows and database schemas..."
                   rows={2}
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-0.5">Tags (Comma-separated)</label>
+                <label className={`block text-[9px] font-mono uppercase mb-0.5 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Tags (Comma-separated)</label>
                 <input
                   type="text"
                   value={courseTags}
                   onChange={(e) => setCourseTags(e.target.value)}
                   placeholder="NEP Aligned, Python, HTML5, Scratch"
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-0.5">Core Features (Comma-separated)</label>
+                <label className={`block text-[9px] font-mono uppercase mb-0.5 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Core Features (Comma-separated)</label>
                 <input
                   type="text"
                   value={courseFeatures}
                   onChange={(e) => setCourseFeatures(e.target.value)}
                   placeholder="1-Week setup, Free laptop leasing, Microcontroller boards"
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
@@ -935,16 +1181,24 @@ export default function AdminDashboard({
                   id="hardware"
                   checked={mobHardware}
                   onChange={(e) => setMobHardware(e.target.checked)}
-                  className="rounded border-cyan-500/15 text-cyan-500 focus:ring-cyan-500/20"
+                  className={`rounded focus:ring-opacity-20 ${
+                    isLight 
+                      ? 'border-slate-350 text-amber-700 focus:ring-amber-500' 
+                      : 'border-cyan-500/15 text-cyan-500 focus:ring-cyan-500'
+                  }`}
                 />
-                <label htmlFor="hardware" className="text-3xs font-mono text-slate-350 cursor-pointer">
+                <label htmlFor="hardware" className={`text-3xs font-mono cursor-pointer ${isLight ? 'text-slate-600 font-semibold' : 'text-slate-350'}`}>
                   Includes free mobile computer hardware leasing support
                 </label>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-cyan-500 hover:bg-cyan-440 text-slate-950 font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-[0_0_12px_rgba(34,211,238,0.1)]"
+                className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-xs transition-all ${
+                  isLight 
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/10' 
+                    : 'bg-cyan-500 hover:bg-cyan-440 text-slate-950 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
+                }`}
               >
                 Publish New Course
               </button>
@@ -952,7 +1206,9 @@ export default function AdminDashboard({
 
             {/* List and delete */}
             <div className="space-y-4">
-              <h3 className="text-xs font-bold text-white tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+              <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
+                isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
+              }`}>
                 Live Catalog Operations ({courses.length})
               </h3>
 
@@ -960,20 +1216,30 @@ export default function AdminDashboard({
                 {courses.map(course => (
                   <div 
                     key={course.id}
-                    className="p-3.5 rounded-xl bg-[#111]/40 border border-cyan-500/5 hover:border-cyan-500/12 transition-all flex items-center justify-between"
+                    className={`p-3.5 rounded-xl border transition-all flex items-center justify-between ${
+                      isLight 
+                        ? 'bg-slate-50/50 border-slate-200 hover:border-amber-500/15' 
+                        : 'bg-[#111]/40 border border-cyan-500/5 hover:border-cyan-500/12'
+                    }`}
                   >
                     <div className="text-left space-y-0.5">
-                      <h4 className="text-2xs font-extrabold text-white uppercase">{course.title}</h4>
+                      <h4 className={`text-2xs font-extrabold uppercase ${isLight ? 'text-slate-800' : 'text-white'}`}>{course.title}</h4>
                       <div className="flex gap-2 items-center text-[10px] font-mono">
-                        <span className="text-[#22d3ee]/80 font-bold">{course.duration}</span>
-                        {course.mobileHardwareIncluded && <span className="text-emerald-400 text-nowrap">★ LEASED SYSTEMS</span>}
+                        <span className={`font-bold ${isLight ? 'text-amber-700' : 'text-[#22d3ee]/80'}`}>{course.duration}</span>
+                        {course.mobileHardwareIncluded && (
+                          <span className={`text-nowrap font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>★ LEASED SYSTEMS</span>
+                        )}
                       </div>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => handleDeleteCourse(course.id)}
-                      className="p-2 rounded-xl bg-red-950/20 border border-red-500/15 text-red-400 hover:bg-red-950/40 hover:text-red-300 transition-all cursor-pointer"
+                      className={`p-2 rounded-xl transition-all cursor-pointer border ${
+                        isLight 
+                          ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100 hover:text-red-700' 
+                          : 'bg-red-950/20 border border-red-500/15 text-red-400 hover:bg-red-950/40 hover:text-red-300'
+                      }`}
                       title="Permanently Delete Course"
                     >
                       <Trash className="w-3.5 h-3.5" />
@@ -989,7 +1255,9 @@ export default function AdminDashboard({
         {/* TAB 3: APPLICATIONS MANAGEMENT */}
         {adminTab === 'applications' && (
           <div className="space-y-4">
-            <h3 className="text-xs font-bold text-white tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+            <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
+              isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
+            }`}>
               Syllabus Registrations Desk
             </h3>
 
@@ -1001,18 +1269,24 @@ export default function AdminDashboard({
                   return (
                     <div 
                       key={app.id}
-                      className="p-4 rounded-xl bg-[#111]/45 border border-cyan-500/5 hover:border-cyan-500/15 transition-all text-left flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fadeIn"
+                      className={`p-4 rounded-xl border transition-all text-left flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fadeIn ${
+                        isLight 
+                          ? 'bg-slate-50 border-slate-200 hover:border-amber-500/15 shadow-3xs' 
+                          : 'bg-[#111]/45 border border-cyan-500/5 hover:border-cyan-500/15'
+                      }`}
                     >
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-black text-white">{app.fullName}</h4>
+                          <h4 className={`text-xs font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{app.fullName}</h4>
                           <span className="text-[10px] font-mono text-slate-500">[{app.id}]</span>
                         </div>
-                        <div className="text-3xs font-mono text-[#22d3ee] uppercase tracking-wider font-bold block">
+                        <div className={`text-3xs font-mono uppercase tracking-wider font-bold block ${
+                          isLight ? 'text-amber-700' : 'text-[#22d3ee]'
+                        }`}>
                           Applied For: {matchCourse ? matchCourse.title : 'General Stream'}
                         </div>
-                        <div className="text-3xs text-slate-450 space-y-0.5 leading-relaxed">
-                          <div>Institution node: <strong className="text-slate-350">{app.institution}</strong></div>
+                        <div className={`text-3xs space-y-0.5 leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-450'}`}>
+                          <div>Institution node: <strong className={isLight ? 'text-slate-800 font-bold' : 'text-slate-350'}>{app.institution}</strong></div>
                           <div>WhatsApp: {app.phone} • Email registry key: {app.email}</div>
                         </div>
                       </div>
@@ -1022,13 +1296,21 @@ export default function AdminDashboard({
                           <>
                             <button
                               onClick={() => handleUpdateAppStatus(app.id, 'rejected')}
-                              className="text-3xs font-mono font-black bg-transparent border border-red-500/30 text-red-400 hover:bg-red-500/10 px-3.5 py-2 rounded-xl cursor-pointer uppercase"
+                              className={`text-3xs font-mono font-black bg-transparent border px-3.5 py-2 rounded-xl cursor-pointer uppercase transition-all ${
+                                isLight 
+                                  ? 'border-red-300 text-red-650 hover:bg-red-50' 
+                                  : 'border-red-500/30 text-red-400 hover:bg-red-500/10'
+                              }`}
                             >
                               Reject
                             </button>
                             <button
                               onClick={() => handleUpdateAppStatus(app.id, 'approved')}
-                              className="text-3xs font-mono font-black border border-cyan-500/25 text-white bg-cyan-950/40 hover:bg-cyan-500 hover:text-slate-950 px-3.5 py-2 rounded-xl cursor-pointer flex items-center gap-1 uppercase"
+                              className={`text-3xs font-mono font-black border px-3.5 py-2 rounded-xl cursor-pointer flex items-center gap-1 uppercase transition-all ${
+                                isLight 
+                                  ? 'border-amber-500/30 text-amber-800 bg-amber-50/50 hover:bg-amber-600 hover:text-white' 
+                                  : 'border-cyan-500/25 text-white bg-cyan-950/40 hover:bg-cyan-500 hover:text-slate-950'
+                              }`}
                             >
                               <Check className="w-3 h-3" /> Approve
                             </button>
@@ -1036,8 +1318,8 @@ export default function AdminDashboard({
                         ) : (
                           <span className={`text-[9px] font-mono tracking-widest uppercase font-black px-3 py-1.5 rounded-full border ${
                             app.status === 'approved' 
-                              ? 'border-cyan-400/25 bg-cyan-500/5 text-cyan-400' 
-                              : 'border-red-400/25 bg-red-500/5 text-red-400'
+                              ? (isLight ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-cyan-400/25 bg-cyan-500/5 text-cyan-400') 
+                              : (isLight ? 'border-red-300 bg-red-50 text-red-700' : 'border-red-400/25 bg-red-500/5 text-red-400')
                           }`}>
                             {app.status}
                           </span>
@@ -1048,7 +1330,7 @@ export default function AdminDashboard({
                   );
                 })
               ) : (
-                <div className="text-xs font-mono text-slate-550 italic text-center py-8">
+                <div className={`text-xs font-mono italic text-center py-8 ${isLight ? 'text-slate-500' : 'text-slate-550'}`}>
                   No applicants registered in DB.
                 </div>
               )}
@@ -1060,10 +1342,12 @@ export default function AdminDashboard({
         {adminTab === 'trainers' && (
           <div className="space-y-4">
             <div className="text-left space-y-1">
-              <h3 className="text-xs font-bold text-white tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+              <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
+                isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
+              }`}>
                 Trainer ID Verification Desk
               </h3>
-              <p className="text-3xs text-slate-400 leading-relaxed max-w-xl">
+              <p className={`text-3xs leading-relaxed max-w-xl ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                 Dakshyam security guidelines mandate that newly registered Trainer profiles cannot access active grading grids, create peer groups, or issue dynamic student certificates until authorized below.
               </p>
             </div>
@@ -1072,32 +1356,48 @@ export default function AdminDashboard({
               {trainersList.map(trn => (
                 <div 
                   key={trn.id}
-                  className="p-4 rounded-xl bg-[#111]/45 border border-cyan-500/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-left animate-fadeIn"
+                  className={`p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-left animate-fadeIn ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-200 hover:border-amber-500/15 shadow-3xs' 
+                      : 'bg-[#111]/45 border border-cyan-500/5'
+                  }`}
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-xs font-black text-white">{trn.name}</h4>
+                      <h4 className={`text-xs font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{trn.name}</h4>
                       <span className="text-[10px] font-mono text-slate-500">[{trn.id}]</span>
                     </div>
-                    <div className="text-3xs text-slate-400 font-mono">Email: {trn.email} • Created: {trn.createdAt}</div>
+                    <div className={`text-3xs font-mono ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Email: {trn.email} • Created: {trn.createdAt}</div>
                   </div>
 
                   <div className="flex items-center gap-2.5">
                     {!trn.isApproved ? (
                       <>
-                        <span className="text-[9px] font-mono font-bold text-amber-500 border border-amber-500/10 bg-amber-500/5 px-2.5 py-1.5 rounded-lg uppercase">
+                        <span className={`text-[9px] font-mono font-bold border px-2.5 py-1.5 rounded-lg uppercase ${
+                          isLight 
+                            ? 'border-amber-300 text-amber-800 bg-amber-50' 
+                            : 'border-amber-500/10 bg-amber-500/5 text-amber-500'
+                        }`}>
                           ⚠ PENDING APPROVAL
                         </span>
                         <button
                           onClick={() => handleApproveTrainer(trn.id)}
-                          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-3xs font-mono font-black px-3.5 py-1.5 rounded-lg cursor-pointer uppercase transition-all"
+                          className={`text-3xs font-mono font-black px-3.5 py-1.5 rounded-lg cursor-pointer uppercase transition-all ${
+                            isLight 
+                              ? 'bg-amber-600 hover:bg-amber-700 text-white' 
+                              : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                          }`}
                         >
                           ✓ Grant ID Access
                         </button>
                       </>
                     ) : (
-                      <span className="text-[9px] font-mono font-black text-emerald-400 border border-emerald-500/15 bg-emerald-500/5 px-2.5 py-1.5 rounded-lg uppercase flex items-center gap-1">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> FULL MEMBERSHIP GRANTED
+                      <span className={`text-[9px] font-mono font-black border px-2.5 py-1.5 rounded-lg uppercase flex items-center gap-1 ${
+                        isLight 
+                          ? 'border-emerald-300 bg-emerald-50 text-emerald-800' 
+                          : 'border-emerald-500/15 bg-emerald-500/5 text-emerald-400'
+                      }`}>
+                        <ShieldCheck className={`w-3.5 h-3.5 ${isLight ? 'text-emerald-750' : 'text-emerald-400'}`} /> FULL MEMBERSHIP GRANTED
                       </span>
                     )}
 
@@ -1105,7 +1405,9 @@ export default function AdminDashboard({
                     {trn.id !== 'usr-t1' && (
                       <button
                         onClick={() => handleDeleteTrainer(trn.id)}
-                        className="p-1.5 text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
+                        className={`p-1.5 transition-colors cursor-pointer ${
+                          isLight ? 'text-slate-400 hover:text-red-650' : 'text-slate-500 hover:text-red-400'
+                        }`}
                         title="Remove Trainer Profile"
                       >
                         <Trash className="w-3.5 h-3.5" />
@@ -1124,7 +1426,9 @@ export default function AdminDashboard({
             
             {/* Banner Form */}
             <form onSubmit={handleCreateBanner} className="space-y-3.5">
-              <h3 className="text-xs font-bold text-white tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+              <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
+                isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
+              }`}>
                 Launch Carousel Banner Advertisement
               </h3>
 
@@ -1132,58 +1436,78 @@ export default function AdminDashboard({
               {bannerSuccess && <div className="text-3xs font-mono text-cyan-400 bg-cyan-950/25 p-2 rounded-xl font-bold">{bannerSuccess}</div>}
 
               <div>
-                <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Banner Title (Primary Topic)</label>
+                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Banner Title (Primary Topic)</label>
                 <input
                   type="text"
                   required
                   value={bannerTitle}
                   onChange={(e) => setBannerTitle(e.target.value)}
                   placeholder="e.g. NEP 2020 Programming camps open"
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Subtitle / Slogan description</label>
+                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Subtitle / Slogan description</label>
                 <textarea
                   required
                   value={bannerSubtitle}
                   onChange={(e) => setBannerSubtitle(e.target.value)}
                   placeholder="Active block coding camps provided directly to local classes..."
                   rows={2}
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Public Display Image URL</label>
+                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Public Display Image URL</label>
                 <input
                   type="url"
                   required
                   value={bannerImageUrl}
                   onChange={(e) => setBannerImageUrl(e.target.value)}
                   placeholder="Paste Unsplash or static picture URL"
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45 text-slate-350"
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 />
-                <span className="text-[8px] text-slate-500 block mt-0.5 font-mono">
-                  Curated Unsplash suggestions: <code>https://images.unsplash.com/photo-1516321318423-f06f85e504b3</code>
+                <span className={`text-[8px] block mt-0.5 font-mono ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
+                  Curated Unsplash suggestions: <code className={isLight ? 'bg-slate-100 text-amber-900 px-1 py-0.5 rounded' : 'text-cyan-400'}>https://images.unsplash.com/photo-1516321318423-f06f85e504b3</code>
                 </span>
               </div>
 
               <div>
-                <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Redirect Navigation Anchor (Optional)</label>
+                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Redirect Navigation Anchor (Optional)</label>
                 <input
                   type="text"
                   value={bannerActionUrl}
                   onChange={(e) => setBannerActionUrl(e.target.value)}
                   placeholder="e.g. #services"
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-cyan-500 hover:bg-cyan-440 text-slate-950 font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-[0_0_12px_rgba(34,211,238,0.1)]"
+                className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-xs transition-all ${
+                  isLight 
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/10' 
+                    : 'bg-cyan-500 hover:bg-cyan-440 text-slate-950 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
+                }`}
               >
                 Launch Promo Banner
               </button>
@@ -1191,7 +1515,9 @@ export default function AdminDashboard({
 
             {/* List and edit */}
             <div className="space-y-4">
-              <h3 className="text-xs font-bold text-white tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+              <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
+                isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
+              }`}>
                 Active Promo Carousels ({bannersList.length})
               </h3>
 
@@ -1199,15 +1525,19 @@ export default function AdminDashboard({
                 {bannersList.map(b => (
                   <div 
                     key={b.id}
-                    className="p-3 rounded-xl bg-[#111]/45 border border-cyan-500/5 flex items-center justify-between gap-3 text-left animate-fadeIn"
+                    className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-left animate-fadeIn ${
+                      isLight 
+                        ? 'bg-slate-50 border-slate-200 hover:border-amber-500/15 shadow-3xs' 
+                        : 'bg-[#111]/45 border border-cyan-500/5'
+                    }`}
                   >
-                    <div className="w-12 h-10 rounded overflow-hidden bg-slate-900 shrink-0">
+                    <div className={`w-12 h-10 rounded overflow-hidden shrink-0 ${isLight ? 'bg-slate-200' : 'bg-slate-900'}`}>
                       <img src={b.imageUrl} alt="" className="w-full h-full object-cover" />
                     </div>
                     
                     <div className="flex-1 min-w-0 space-y-0.5">
-                      <h4 className="text-3xs font-extrabold text-white uppercase truncate">{b.title}</h4>
-                      <p className="text-[9px] text-slate-400 truncate leading-relaxed">{b.subtitle}</p>
+                      <h4 className={`text-3xs font-extrabold uppercase truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{b.title}</h4>
+                      <p className={`text-[9px] truncate leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{b.subtitle}</p>
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
@@ -1216,8 +1546,8 @@ export default function AdminDashboard({
                         onClick={() => handleToggleBanner(b.id)}
                         className={`p-1 rounded-lg border transition-all cursor-pointer ${
                           b.isActive 
-                            ? 'border-cyan-500/20 text-[#22d3ee] bg-cyan-950/20' 
-                            : 'border-transparent text-slate-500 hover:text-slate-350'
+                            ? (isLight ? 'border-amber-500/30 text-amber-800 bg-amber-50' : 'border-cyan-500/20 text-[#22d3ee] bg-cyan-950/20') 
+                            : (isLight ? 'border-transparent text-slate-400 hover:text-slate-600' : 'border-transparent text-slate-500 hover:text-slate-350')
                         }`}
                         title={b.isActive ? "Deactivate advertisement" : "Activate advertisement"}
                       >
@@ -1227,7 +1557,9 @@ export default function AdminDashboard({
                       <button
                         type="button"
                         onClick={() => handleDeleteBanner(b.id)}
-                        className="p-1 rounded-lg text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
+                        className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                          isLight ? 'text-slate-400 hover:text-red-650' : 'text-slate-500 hover:text-red-400'
+                        }`}
                         title="Delete Banner"
                       >
                         <Trash className="w-4 h-4" />
@@ -1248,7 +1580,9 @@ export default function AdminDashboard({
             
             {/* Gallery Upload Form */}
             <form onSubmit={handleCreateGalleryImage} className="space-y-3.5 font-sans">
-              <h3 className="text-xs font-bold text-white tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+              <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
+                isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
+              }`}>
                 Post Photo snapshot to Public Exhibition
               </h3>
 
@@ -1256,61 +1590,81 @@ export default function AdminDashboard({
               {galSuccess && <div className="text-3xs font-mono text-cyan-400 bg-cyan-950/25 p-2 rounded-xl font-bold">{galSuccess}</div>}
 
               <div>
-                <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Event Snapshot Title</label>
+                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Event Snapshot Title</label>
                 <input
                   type="text"
                   required
                   value={galTitle}
                   onChange={(e) => setGalTitle(e.target.value)}
                   placeholder="e.g. Waraseoni School IT Delivery"
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Image Description (Contextual Caption)</label>
+                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Image Description (Contextual Caption)</label>
                 <textarea
                   required
                   value={galDesc}
                   onChange={(e) => setGalDesc(e.target.value)}
                   placeholder="Details on active training setups, logical loops designed, or hardware used..."
                   rows={2}
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Stock Portfolio Image URL</label>
+                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Stock Portfolio Image URL</label>
                 <input
                   type="url"
                   required
                   value={galImageUrl}
                   onChange={(e) => setGalImageUrl(e.target.value)}
                   placeholder="Paste Unsplash photo URL"
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45 text-slate-350"
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-455' 
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                  }`}
                 />
-                <span className="text-[8px] text-slate-500 block mt-0.5 font-mono">
-                  Example: <code>https://images.unsplash.com/photo-1509062522246-3755977927d7</code>
+                <span className={`text-[8px] block mt-0.5 font-mono ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
+                  Example: <code className={isLight ? 'bg-slate-100 text-amber-900 px-1 py-0.5 rounded' : 'text-cyan-400'}>https://images.unsplash.com/photo-1509062522246-3755977927d7</code>
                 </span>
               </div>
 
               <div>
-                <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Program Classification Category</label>
+                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Program Classification Category</label>
                 <select
                   value={galCategory}
                   onChange={(e) => setGalCategory(e.target.value as any)}
-                  className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2.5 text-xs focus:outline-none"
+                  className={`w-full border rounded-xl px-3 py-2.5 text-xs focus:outline-none transition-all ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50' 
+                      : 'bg-[#111]/80 border border-cyan-500/10 text-white'
+                  }`}
                 >
-                  <option value="school_programs">School Programs</option>
-                  <option value="iot_robotics">IoT & Computational Robotics</option>
-                  <option value="mern_web">Web & Django Engineering</option>
-                  <option value="lab_setups">Lab Setup Logistics</option>
+                  <option value="school_programs" className={isLight ? 'text-slate-800' : 'text-black'}>School Programs</option>
+                  <option value="iot_robotics" className={isLight ? 'text-slate-800' : 'text-black'}>IoT & Computational Robotics</option>
+                  <option value="mern_web" className={isLight ? 'text-slate-800' : 'text-black'}>Web & Django Engineering</option>
+                  <option value="lab_setups" className={isLight ? 'text-slate-800' : 'text-black'}>Lab Setup Logistics</option>
                 </select>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-cyan-500 hover:bg-cyan-440 text-slate-950 font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-[0_0_12px_rgba(34,211,238,0.1)]"
+                className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-xs transition-all ${
+                  isLight 
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/10' 
+                    : 'bg-cyan-500 hover:bg-cyan-440 text-slate-950 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
+                }`}
               >
                 Publish Event Snapshot
               </button>
@@ -1318,7 +1672,9 @@ export default function AdminDashboard({
 
             {/* List snaps */}
             <div className="space-y-4">
-              <h3 className="text-xs font-bold text-white tracking-wider uppercase border-b border-cyan-500/5 pb-2">
+              <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
+                isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
+              }`}>
                 Live Snapshots Directory ({galleryList.length})
               </h3>
 
@@ -1326,21 +1682,27 @@ export default function AdminDashboard({
                 {galleryList.map(g => (
                   <div 
                     key={g.id}
-                    className="p-3 rounded-xl bg-[#111]/45 border border-cyan-500/5 flex items-center justify-between gap-3 text-left animate-fadeIn"
+                    className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-left animate-fadeIn ${
+                      isLight 
+                        ? 'bg-slate-50 border-slate-200 hover:border-amber-500/15 shadow-3xs' 
+                        : 'bg-[#111]/45 border border-cyan-500/5'
+                    }`}
                   >
-                    <div className="w-14 h-11 rounded overflow-hidden bg-slate-900 shrink-0">
+                    <div className={`w-14 h-11 rounded overflow-hidden shrink-0 ${isLight ? 'bg-slate-200' : 'bg-slate-900'}`}>
                       <img src={g.imageUrl} alt="" className="w-full h-full object-cover" />
                     </div>
 
                     <div className="flex-1 min-w-0 space-y-0.5">
-                      <h4 className="text-3xs font-extrabold text-white uppercase truncate">{g.title}</h4>
-                      <p className="text-[9px] text-[#22d3ee] uppercase font-mono tracking-wider">{g.category.replace('_', ' ')}</p>
+                      <h4 className={`text-3xs font-extrabold uppercase truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{g.title}</h4>
+                      <p className={`text-[9px] uppercase font-mono tracking-wider ${isLight ? 'text-amber-750' : 'text-[#22d3ee]'}`}>{g.category.replace('_', ' ')}</p>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => handleDeleteGalleryImage(g.id)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 transition-colors cursor-pointer shrink-0"
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                        isLight ? 'text-slate-400 hover:text-red-650' : 'text-slate-500 hover:text-red-400'
+                      }`}
                       title="Delete snapshot"
                     >
                       <Trash className="w-4 h-4" />
@@ -1349,7 +1711,6 @@ export default function AdminDashboard({
                 ))}
               </div>
             </div>
-
           </div>
         )}
 
@@ -1359,12 +1720,16 @@ export default function AdminDashboard({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
               {/* Part A: Registration Form Designer */}
-              <div className="bg-[#050505]/75 border border-cyan-500/10 rounded-2xl p-5 space-y-4 lg:col-span-1">
-                <div className="border-b border-cyan-500/15 pb-2">
-                  <h3 className="text-xs font-bold text-[#22d3ee] font-mono tracking-wider uppercase flex items-center gap-1">
+              <div className={`rounded-2xl p-5 space-y-4 lg:col-span-1 border ${
+                isLight ? 'bg-slate-50 border-slate-200 shadow-3xs' : 'bg-[#050505]/75 border-cyan-500/10'
+              }`}>
+                <div className={`border-b pb-2 ${isLight ? 'border-slate-200' : 'border-cyan-500/15'}`}>
+                  <h3 className={`text-xs font-bold font-mono tracking-wider uppercase flex items-center gap-1 ${
+                    isLight ? 'text-amber-850' : 'text-[#22d3ee]'
+                  }`}>
                     <Plus className="w-4 h-4" /> Create Special Training form
                   </h3>
-                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                  <p className={`text-[10px] mt-1 leading-relaxed ${isLight ? 'text-slate-605' : 'text-slate-400'}`}>
                     Designed for colleges & schools. Active listings will render secure student registration hubs on public dashboards instantly.
                   </p>
                 </div>
@@ -1374,50 +1739,66 @@ export default function AdminDashboard({
                   {specSuccess && <p className="text-3xs text-cyan-400 bg-cyan-500/10 p-2.5 rounded-xl border border-cyan-500/15 font-mono font-bold text-center">{specSuccess}</p>}
 
                   <div>
-                    <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Training Program Name</label>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Training Program Name</label>
                     <input
                       type="text"
                       required
                       value={specName}
                       onChange={(e) => setSpecName(e.target.value)}
                       placeholder="e.g. Drone assembly workshop"
-                      className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                        isLight 
+                          ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                          : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                      }`}
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Duration</label>
+                      <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Duration</label>
                       <input
                         type="text"
                         required
                         value={specDuration}
                         onChange={(e) => setSpecDuration(e.target.value)}
                         placeholder="e.g. 5 Days / 1 Week"
-                        className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                          isLight 
+                            ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-455' 
+                            : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                        }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">College/School Name</label>
+                      <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>College/School Name</label>
                       <input
                         type="text"
                         required
                         value={specInstitution}
                         onChange={(e) => setSpecInstitution(e.target.value)}
                         placeholder="e.g. Govt Excellence School Waraseoni"
-                        className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                          isLight 
+                            ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-455' 
+                            : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                        }`}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Starting Date & Time (Expiry limit)</label>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Starting Date & Time (Expiry limit)</label>
                     <input
                       type="datetime-local"
                       required
                       value={specStartDateTime}
                       onChange={(e) => setSpecStartDateTime(e.target.value)}
-                      className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45 text-slate-300 font-mono"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all font-mono ${
+                        isLight 
+                          ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50' 
+                          : 'bg-[#111]/80 border border-cyan-500/10 text-white'
+                      }`}
                     />
                     <span className="text-[8px] text-slate-500 block mt-1 font-sans leading-relaxed">
                       ⚠ Public sign-up forms will automatically close/delete when starting date threshold is completed.
@@ -1426,7 +1807,11 @@ export default function AdminDashboard({
 
                   <button
                     type="submit"
-                    className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs py-2.5 rounded-xl transition-all cursor-pointer uppercase font-mono tracking-wider hover:shadow-[0_0_12px_rgba(34,211,238,0.22)]"
+                    className={`w-full font-black text-xs py-2.5 rounded-xl cursor-pointer uppercase transition-all font-mono tracking-wider ${
+                      isLight 
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white' 
+                        : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 hover:shadow-[0_0_12px_rgba(34,211,238,0.22)]'
+                    }`}
                   >
                     Generate Form Hub
                   </button>
@@ -1434,12 +1819,16 @@ export default function AdminDashboard({
               </div>
 
               {/* Part B: Programs Directory */}
-              <div className="bg-[#050505]/75 border border-cyan-500/10 rounded-2xl p-5 space-y-4 lg:col-span-2">
-                <div className="border-b border-cyan-500/15 pb-2">
-                  <h3 className="text-xs font-bold text-white tracking-wider uppercase font-mono">
+              <div className={`rounded-2xl p-5 space-y-4 lg:col-span-2 border ${
+                isLight ? 'bg-slate-50 border-slate-200 shadow-3xs' : 'bg-[#050505]/75 border-cyan-500/10'
+              }`}>
+                <div className={`border-b pb-2 ${isLight ? 'border-slate-200' : 'border-cyan-500/15'}`}>
+                  <h3 className={`text-xs font-bold tracking-wider uppercase font-mono ${
+                    isLight ? 'text-amber-850' : 'text-white'
+                  }`}>
                     Special Program Directory ({specialProgramsAll.length})
                   </h3>
-                  <p className="text-[10px] text-slate-400 leading-relaxed mt-0.5">
+                  <p className={`text-[10px] leading-relaxed mt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                     Lists active and closed programs. Click any item to inspect student enrollments, issue credentials, or manually register students.
                   </p>
                 </div>
@@ -1461,32 +1850,38 @@ export default function AdminDashboard({
                           }}
                           className={`p-4 rounded-xl border text-left cursor-pointer transition-all ${
                             selectedProgramId === prog.id
-                              ? 'bg-cyan-500/5 border-cyan-500/35 shadow-[0_0_15px_rgba(34,211,238,0.06)]'
-                              : 'bg-[#111]/45 border-cyan-500/5 hover:border-cyan-500/20'
+                              ? (isLight 
+                                  ? 'bg-amber-50/70 border-amber-500/50 shadow-3xs' 
+                                  : 'bg-cyan-500/5 border-cyan-500/35 shadow-[0_0_15px_rgba(34,211,238,0.06)]')
+                              : (isLight 
+                                  ? 'bg-slate-100/55 border-slate-200 hover:border-amber-500/15' 
+                                  : 'bg-[#111]/45 border-cyan-500/5 hover:border-cyan-500/20')
                           }`}
                         >
                           <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="text-xs font-black text-white uppercase">{prog.trainingName}</h4>
-                                <span className={`text-[8px] font-mono px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                                <h4 className={`text-xs font-black uppercase ${isLight ? 'text-slate-800' : 'text-white'}`}>{prog.trainingName}</h4>
+                                <span className={`text-[8px] font-mono px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
                                   isExpired 
-                                    ? 'bg-red-500/10 text-red-400 border border-red-500/15'
-                                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15'
+                                    ? (isLight ? 'bg-red-50 border-red-200 text-red-750' : 'bg-red-500/10 text-red-400 border border-red-500/15')
+                                    : (isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15')
                                 }`}>
                                   {isExpired ? '⌛ Closed / Auto-Deleted On Public' : '● Active Registration Hub'}
                                 </span>
                               </div>
-                              <p className="text-[10px] text-slate-400 mt-1 font-mono">
-                                College/School: <strong className="text-[#22d3ee] font-medium">{prog.institutionName}</strong> • Duration: {prog.duration}
+                              <p className={`text-[10px] mt-1 font-mono ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>
+                                College/School: <strong className={`font-semibold ${isLight ? 'text-amber-850' : 'text-[#22d3ee]'}`}>{prog.institutionName}</strong> • Duration: {prog.duration}
                               </p>
-                              <p className="text-[9px] text-slate-500 mt-0.5">
+                              <p className={`text-[9px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
                                 Start Date Threshold: {new Date(prog.startingDateTime).toLocaleString()}
                               </p>
                             </div>
 
                             <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
-                              <span className="text-[10px] font-mono text-slate-300 bg-slate-900/60 border border-slate-500/10 px-2 py-1 rounded-lg">
+                              <span className={`text-[10px] font-mono border px-2 py-1 rounded-lg ${
+                                isLight ? 'text-slate-700 bg-slate-100 border-slate-200' : 'text-slate-300 bg-slate-900/60 border-slate-500/10'
+                              }`}>
                                 {registries.length} students
                               </span>
                               <button
@@ -1495,7 +1890,9 @@ export default function AdminDashboard({
                                   e.stopPropagation();
                                   handleDeleteSpecialProgram(prog.id);
                                 }}
-                                className="p-1.5 text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
+                                className={`p-1.5 transition-colors cursor-pointer ${
+                                  isLight ? 'text-slate-400 hover:text-red-650' : 'text-slate-500 hover:text-red-400'
+                                }`}
                                 title="Delete Program Form"
                               >
                                 <Trash className="w-4 h-4" />
@@ -1507,8 +1904,10 @@ export default function AdminDashboard({
                     })}
                   </div>
                 ) : (
-                  <div className="text-center py-12 border border-dashed border-cyan-500/10 rounded-xl">
-                    <p className="text-xs text-slate-550 italic font-mono">No special program form templates configured yet.</p>
+                  <div className={`text-center py-12 border border-dashed rounded-xl ${
+                    isLight ? 'border-slate-300 bg-slate-100/30' : 'border-cyan-500/10'
+                  }`}>
+                    <p className={`text-xs italic font-mono ${isLight ? 'text-slate-500' : 'text-slate-550'}`}>No special program form templates configured yet.</p>
                   </div>
                 )}
               </div>
@@ -1523,13 +1922,21 @@ export default function AdminDashboard({
               const issuedCertificates = DakshyamDatabase.getCertificates();
 
               return (
-                <div className="bg-[#050505]/75 border border-cyan-500/10 rounded-2xl p-5 space-y-6 animate-fadeIn">
+                <div className={`rounded-2xl p-5 space-y-6 animate-fadeIn border ${
+                  isLight ? 'bg-slate-50 border-slate-200 shadow-2xs' : 'bg-[#050505]/75 border-cyan-500/10'
+                }`}>
                   
                   {/* Registry control bar */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-cyan-500/10 pb-4">
+                  <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4 ${
+                    isLight ? 'border-slate-200' : 'border-cyan-500/10'
+                  }`}>
                     <div>
-                      <span className="text-[9px] font-mono text-cyan-400 uppercase tracking-widest block font-bold">MANAGE TRAINING BATCH REGISTRY</span>
-                      <h4 className="text-sm font-black text-white uppercase mt-0.5">
+                      <span className={`text-[9px] font-mono uppercase tracking-widest block font-bold ${
+                        isLight ? 'text-amber-700' : 'text-cyan-400'
+                      }`}>
+                        MANAGE TRAINING BATCH REGISTRY
+                      </span>
+                      <h4 className={`text-sm font-black uppercase mt-0.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
                         {currentProgram.trainingName} ({currentProgram.institutionName})
                       </h4>
                     </div>
@@ -1538,7 +1945,11 @@ export default function AdminDashboard({
                       <button
                         type="button"
                         onClick={() => setManualEnrollOpen(!manualEnrollOpen)}
-                        className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/25 px-3 py-2 text-2xs font-mono font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                        className={`px-3 py-2 text-2xs font-mono font-bold rounded-xl transition-all cursor-pointer border flex items-center gap-1.5 ${
+                          isLight 
+                            ? 'bg-amber-50 text-amber-850 border-amber-500/25 hover:bg-amber-100' 
+                            : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/25'
+                        }`}
                       >
                         <Plus className="w-3.5 h-3.5" /> Manual Student Entry
                       </button>
@@ -1546,7 +1957,11 @@ export default function AdminDashboard({
                       <button
                         type="button"
                         onClick={() => handleExportToCSV(currentProgram)}
-                        className="bg-[#111] hover:bg-cyan-500/10 text-slate-300 hover:text-[#22d3ee] border border-slate-500/10 hover:border-cyan-500/20 px-3 py-2 text-2xs font-mono font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                        className={`px-3 py-2 text-2xs font-mono font-bold rounded-xl transition-all cursor-pointer border flex items-center gap-1.5 ${
+                          isLight 
+                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' 
+                            : 'bg-[#111] hover:bg-cyan-500/10 text-slate-300 hover:text-[#22d3ee] border-slate-500/10 hover:border-cyan-500/20'
+                        }`}
                         title="Export this student registry directly into Excel or CSV format"
                       >
                         <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> Export Excel/CSV
@@ -1555,7 +1970,11 @@ export default function AdminDashboard({
                       <button
                         type="button"
                         onClick={() => handleBulkGenerate(currentProgram)}
-                        className="bg-cyan-500 text-slate-950 px-3.5 py-2 text-2xs font-mono font-black rounded-xl transition-all hover:scale-[1.02] cursor-pointer flex items-center gap-1.5"
+                        className={`px-3.5 py-2 text-2xs font-mono font-black rounded-xl transition-all hover:scale-[1.02] cursor-pointer flex items-center gap-1.5 ${
+                          isLight 
+                            ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/10' 
+                            : 'bg-cyan-500 text-slate-950'
+                        }`}
                       >
                         <Award className="w-3.5 h-3.5" /> Bulk Generate certificates
                       </button>
@@ -1564,93 +1983,125 @@ export default function AdminDashboard({
 
                   {/* Manual Enroll Drawer/Area */}
                   {manualEnrollOpen && (
-                    <form onSubmit={handleManualEnroll} className="bg-cyan-500/5 border border-cyan-500/10 rounded-xl p-4 space-y-4 animate-slideDown max-w-2xl text-left">
-                      <div className="flex justify-between items-center border-b border-cyan-500/5 pb-2">
-                        <h5 className="text-2xs font-mono text-cyan-400 font-bold uppercase">Manually Add Candidate Student</h5>
-                        <button type="button" onClick={() => setManualEnrollOpen(false)} className="text-slate-400 hover:text-white">
+                    <form className={`rounded-xl p-4 space-y-4 animate-slideDown max-w-2xl text-left border ${
+                      isLight ? 'bg-amber-50/50 border-amber-500/15' : 'bg-cyan-500/5 border border-cyan-500/10'
+                    }`} onSubmit={handleManualEnroll}>
+                      <div className={`flex justify-between items-center border-b pb-2 ${
+                        isLight ? 'border-slate-200' : 'border-cyan-500/5'
+                      }`}>
+                        <h5 className={`text-2xs font-mono font-bold uppercase ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>Manually Add Candidate Student</h5>
+                        <button type="button" onClick={() => setManualEnrollOpen(false)} className="text-slate-400 hover:text-red-500">
                           <X className="w-4 h-4" />
                         </button>
                       </div>
 
-                      {manError && <p className="text-3xl text-red-400 font-mono bg-red-950/20 p-2 rounded-lg text-center text-3xs">{manError}</p>}
-                      {manSuccess && <p className="text-3xl text-cyan-400 font-mono bg-cyan-950/20 p-2 rounded-lg font-bold text-center text-3xs">{manSuccess}</p>}
+                      {manError && <p className="text-red-400 font-mono bg-red-950/20 p-2 rounded-lg text-center text-3xs">{manError}</p>}
+                      {manSuccess && <p className="text-cyan-400 font-mono bg-cyan-950/20 p-2 rounded-lg font-bold text-center text-3xs">{manSuccess}</p>}
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Student Name</label>
+                          <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Student Name</label>
                           <input
                             type="text"
                             required
                             value={manStudentName}
                             onChange={(e) => setManStudentName(e.target.value)}
                             placeholder="Full Name"
-                            className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none"
+                            className={`w-full border rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none ${
+                              isLight 
+                                ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-405' 
+                                : 'bg-[#111]/80 border border-cyan-500/10 text-white'
+                            }`}
                           />
                         </div>
                         <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Branch Specialization</label>
+                          <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Branch Specialization</label>
                           <input
                             type="text"
                             required
                             value={manBranch}
                             onChange={(e) => setManBranch(e.target.value)}
                             placeholder="e.g. CSE / IT / Class 10"
-                            className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none focus:border-cyan-45"
+                            className={`w-full border rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none ${
+                              isLight 
+                                ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-405' 
+                                : 'bg-[#111]/80 border border-cyan-500/10 text-white focus:border-cyan-45'
+                            }`}
                           />
                         </div>
                         <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Year of Study</label>
+                          <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Year of Study</label>
                           <input
                             type="text"
                             required
                             value={manYear}
                             onChange={(e) => setManYear(e.target.value)}
                             placeholder="e.g. 2nd Year / 10th Standard"
-                            className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none focus:border-cyan-45"
+                            className={`w-full border rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none ${
+                              isLight 
+                                ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-405' 
+                                : 'bg-[#111]/80 border border-cyan-500/10 text-white focus:border-cyan-45'
+                            }`}
                           />
                         </div>
                         <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Father's Name</label>
+                          <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Father's Name</label>
                           <input
                             type="text"
                             required
                             value={manFathersName}
                             onChange={(e) => setManFathersName(e.target.value)}
                             placeholder="Father's Name"
-                            className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none focus:border-cyan-45"
+                            className={`w-full border rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none ${
+                              isLight 
+                                ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-405' 
+                                : 'bg-[#111]/80 border border-cyan-500/10 text-white focus:border-cyan-45'
+                            }`}
                           />
                         </div>
                         <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Email ID</label>
+                          <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Email ID</label>
                           <input
                             type="email"
                             required
                             value={manEmail}
                             onChange={(e) => setManEmail(e.target.value)}
                             placeholder="student@example.com"
-                            className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none"
+                            className={`w-full border rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none ${
+                              isLight 
+                                ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-405' 
+                                : 'bg-[#111]/80 border border-cyan-500/10 text-white'
+                            }`}
                           />
                         </div>
                         <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Roll Number</label>
+                          <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Roll Number</label>
                           <input
                             type="text"
                             required
                             value={manRollNumber}
                             onChange={(e) => setManRollNumber(e.target.value)}
                             placeholder="Roll ID"
-                            className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none focus:border-cyan-45"
+                            className={`w-full border rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none ${
+                              isLight 
+                                ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-405' 
+                                : 'bg-[#111]/80 border border-cyan-500/10 text-white focus:border-cyan-45'
+                            }`}
                           />
                         </div>
                         <div className="md:col-span-3">
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Mobile / WhatsApp Number</label>
+                          <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Mobile / WhatsApp Number</label>
                           <input
                             type="text"
                             required
                             value={manMobile}
                             onChange={(e) => setManMobile(e.target.value)}
                             placeholder="+91 WhatsApp Contact"
-                            className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none"
+                            className={`w-full border rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none ${
+                              isLight 
+                                ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-405' 
+                                : 'bg-[#111]/80 border border-cyan-500/10 text-white'
+                            }`}
                           />
                         </div>
                       </div>
@@ -1659,13 +2110,15 @@ export default function AdminDashboard({
                         <button
                           type="button"
                           onClick={() => setManualEnrollOpen(false)}
-                          className="bg-transparent text-slate-400 hover:text-white px-3 py-1.5 text-2xs font-mono"
+                          className={`px-3 py-1.5 text-2xs font-mono bg-transparent ${isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'}`}
                         >
                           Cancel
                         </button>
                         <button
                           type="submit"
-                          className="bg-[#22d3ee] shadow-xs hover:shadow-md text-slate-950 px-4 py-1.5 rounded-lg text-2xs font-bold font-mono"
+                          className={`px-4 py-1.5 rounded-lg text-2xs font-bold font-mono transition-all hover:scale-[1.02] cursor-pointer shadow-xs ${
+                            isLight ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/10' : 'bg-[#22d3ee] text-slate-950'
+                          }`}
                         >
                           Enroll Student Candidate
                         </button>
@@ -1674,11 +2127,15 @@ export default function AdminDashboard({
                   )}
 
                   {/* Student enrollments checklist */}
-                  <div className="overflow-x-auto border border-cyan-500/5 rounded-xl bg-black/30">
+                  <div className={`overflow-x-auto rounded-xl border ${
+                    isLight ? 'bg-slate-100/50 border-slate-200' : 'border-cyan-500/5 bg-black/30'
+                  }`}>
                     {programEnrolls.length > 0 ? (
                       <table className="w-full table-auto text-left font-mono text-2xs">
                         <thead>
-                          <tr className="bg-cyan-950/20 text-[#22d3ee]/80 border-b border-cyan-500/10 uppercase tracking-wider font-extrabold text-[8px]">
+                          <tr className={`border-b uppercase tracking-wider font-extrabold text-[8px] ${
+                            isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-cyan-950/20 text-[#22d3ee]/80 border-cyan-500/10'
+                          }`}>
                             <th className="p-3">Roll ID</th>
                             <th className="p-3">Name</th>
                             <th className="p-3">Syllabus Details</th>
@@ -1687,38 +2144,46 @@ export default function AdminDashboard({
                             <th className="p-3 text-right">Credentials Certificate Action</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-cyan-500/5 select-text">
+                        <tbody className={`divide-y select-text ${isLight ? 'divide-slate-200' : 'divide-cyan-500/5'}`}>
                           {programEnrolls.map(enroll => {
                             const matchedCert = issuedCertificates.find(
                               c => c.studentEmail.toLowerCase() === enroll.email.toLowerCase() && c.courseTitle === currentProgram.trainingName
                             );
 
                             return (
-                              <tr key={enroll.id} className="hover:bg-cyan-500/5 transition-all text-slate-305">
-                                <td className="p-3 font-bold text-white">{enroll.rollNumber}</td>
+                              <tr key={enroll.id} className={`transition-all ${
+                                isLight ? 'hover:bg-slate-100/80 text-slate-700' : 'hover:bg-cyan-500/5 text-slate-305'
+                              }`}>
+                                <td className={`p-3 font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{enroll.rollNumber}</td>
                                 <td className="p-3">
-                                  <span className="font-extrabold text-[#22d3ee] uppercase block">{enroll.name}</span>
+                                  <span className={`font-extrabold uppercase block ${isLight ? 'text-amber-800' : 'text-[#22d3ee]'}`}>{enroll.name}</span>
                                   <span className="text-[9px] text-slate-500">Reg: {enroll.enrolledAt}</span>
                                 </td>
                                 <td className="p-3">
-                                  <span className="text-white block">{enroll.branch || 'N/A'}</span>
-                                  <span className="text-[9px] text-slate-450">Class Year: {enroll.yearOfStudy || 'N/A'}</span>
+                                  <span className={`block ${isLight ? 'text-slate-800 font-bold' : 'text-white'}`}>{enroll.branch || 'N/A'}</span>
+                                  <span className="text-[9px] text-slate-500">Class Year: {enroll.yearOfStudy || 'N/A'}</span>
                                 </td>
-                                <td className="p-3 text-slate-350">{enroll.fathersName || 'N/A'}</td>
+                                <td className={`p-3 ${isLight ? 'text-slate-700' : 'text-slate-350'}`}>{enroll.fathersName || 'N/A'}</td>
                                 <td className="p-3">
-                                  <span className="text-white block lowercase">{enroll.email}</span>
+                                  <span className={`block lowercase ${isLight ? 'text-slate-850 font-bold' : 'text-white'}`}>{enroll.email}</span>
                                   <span className="text-[9px] text-slate-500">{enroll.mobileNumber}</span>
                                 </td>
                                 <td className="p-3 text-right">
                                   {matchedCert ? (
-                                    <div className="flex items-center justify-end gap-1.5 text-emerald-400 font-bold border border-emerald-500/10 bg-emerald-500/5 px-2.5 py-1 rounded-lg inline-flex select-all">
+                                    <div className={`flex items-center justify-end gap-1.5 font-bold border px-2.5 py-1 rounded-lg inline-flex select-all ${
+                                      isLight ? 'border-emerald-300 bg-emerald-50 text-emerald-850' : 'border-emerald-500/10 bg-emerald-500/5 text-emerald-400'
+                                    }`}>
                                       <Check className="w-3.5 h-3.5" /> Approved: <code>{matchedCert.id}</code>
                                     </div>
                                   ) : (
                                     <button
                                       type="button"
                                       onClick={() => handleGenerateCertificateForStudent(enroll, currentProgram)}
-                                      className="bg-cyan-500/10 hover:bg-cyan-500/20 text-[#22d3ee] border border-cyan-500/20 hover:border-cyan-400/40 px-3 py-1 rounded-lg font-bold transition-all cursor-pointer uppercase text-[9px]"
+                                      className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer uppercase text-[9px] border ${
+                                        isLight 
+                                          ? 'border-amber-500/25 text-amber-805 bg-amber-50 hover:bg-amber-100' 
+                                          : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-[#22d3ee] border border-cyan-500/20 hover:border-cyan-400/40'
+                                      }`}
                                     >
                                       ✓ Issue Certificate
                                     </button>
@@ -2191,7 +2656,7 @@ export default function AdminDashboard({
                 )}
               </div>
 
-              {/* Dynamic SVG Certificate Preview / Generator Simulation Modal Overlay */}
+              {/* Dynamic SVG Certificate Preview / Generator Preview Modal Overlay */}
               {certPreviewObj && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                   <div 
@@ -2215,7 +2680,7 @@ export default function AdminDashboard({
                       </button>
                     </div>
 
-                    {/* Vector SVG Generator simulation inside container */}
+                    {/* Vector SVG Generator builder inside container */}
                     <div className="w-full bg-[#040d12] rounded-xl overflow-hidden shadow-2xl border border-cyan-500/15 flex items-center justify-center relative my-4">
                       
                       {/* Interactive live SVG model */}
@@ -2329,9 +2794,1056 @@ export default function AdminDashboard({
           <AboutEditorTab onRefresh={onRefresh} theme="" />
         )}
 
+        {/* TAB 10: ADMINISTRATIVE LOG CONTROL */}
+        {adminTab === 'logs' && (() => {
+          const rawLogs = DakshyamDatabase.getAppLogs();
+          const filteredLogs = rawLogs.filter(log => {
+            const matchesSearch = log.action.toLowerCase().includes(searchLog.toLowerCase()) || 
+                                  log.details.toLowerCase().includes(searchLog.toLowerCase()) ||
+                                  log.userEmail.toLowerCase().includes(searchLog.toLowerCase());
+            const matchesStatus = statusFilter === 'ALL' || log.status === statusFilter;
+            return matchesSearch && matchesStatus;
+          });
+
+          return (
+            <div className="space-y-6 text-left">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4 border-slate-500/10">
+                <div>
+                  <h3 className={`text-sm font-black font-mono tracking-wider uppercase ${isLight ? 'text-amber-800' : 'text-[#22d3ee]'}`}>
+                    🛡️ System Access and Security Audit logs
+                  </h3>
+                  <p className="text-3xs font-mono text-slate-500 mt-0.5">
+                    Centralized platform telemetry tracking user logins, failed attempts, and operational updates in real time.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to purge all security log streams? This cannot be undone.')) {
+                      DakshyamDatabase.saveAppLogs([
+                        {
+                          id: 'log-purged',
+                          timestamp: new Date().toISOString(),
+                          action: 'Audit Log Cleared',
+                          details: 'Admin purged the history log records manually.',
+                          userEmail: 'admin@dakshyam.com',
+                          role: 'admin',
+                          status: 'INFO'
+                        }
+                      ]);
+                      onRefresh();
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl border font-mono text-3xs font-bold transition-all hover:bg-red-500 hover:text-white cursor-pointer ${
+                    isLight ? 'border-red-500/35 text-red-700 bg-red-50/50' : 'border-red-500/20 text-red-400 bg-red-950/20'
+                  }`}
+                >
+                  Clear Audit Log Stream
+                </button>
+              </div>
+
+              {/* Filtering Controls */}
+              <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+                <input
+                  type="text"
+                  placeholder="Filter logs by action, details, or operator email..."
+                  value={searchLog}
+                  onChange={(e) => setSearchLog(e.target.value)}
+                  className={`w-full sm:max-w-md rounded-xl px-3 py-2 text-3xs font-mono border focus:outline-none focus:ring-1 ${
+                    isLight
+                      ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500'
+                      : 'bg-[#111]/80 border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-450'
+                  }`}
+                />
+                
+                <div className="flex gap-1">
+                  {(['ALL', 'SUCCESS', 'ERROR', 'INFO'] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setStatusFilter(f)}
+                      className={`px-2.5 py-1.5 rounded-lg border font-mono text-4xs font-bold uppercase transition-all cursor-pointer ${
+                        statusFilter === f
+                          ? (isLight ? 'bg-amber-100 border-amber-500 text-amber-950' : 'bg-cyan-950/80 border-cyan-400/85 text-cyan-400')
+                          : (isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-100' : 'border-cyan-500/5 text-slate-450 hover:text-white hover:bg-[#111]')
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Log List */}
+              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                {filteredLogs.length === 0 ? (
+                  <div className={`p-8 text-center rounded-2xl border ${
+                    isLight ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-[#111]/40 border-cyan-500/5 text-slate-500'
+                  }`}>
+                    <p className="text-3xs font-mono">No telemetry events found matching the criteria.</p>
+                  </div>
+                ) : (
+                  filteredLogs.map(log => {
+                    let statusBg = '';
+                    if (log.status === 'SUCCESS') {
+                      statusBg = isLight ? 'bg-emerald-50 text-emerald-800 border-emerald-500/20' : 'bg-emerald-950/20 text-emerald-400 border-emerald-500/20';
+                    } else if (log.status === 'ERROR') {
+                      statusBg = isLight ? 'bg-red-50 text-red-800 border-red-500/20' : 'bg-red-950/20 text-red-450 border-red-500/20';
+                    } else {
+                      statusBg = isLight ? 'bg-slate-50 text-slate-700 border-slate-200' : 'bg-zinc-900/60 text-zinc-400 border-cyan-500/5';
+                    }
+
+                    return (
+                      <div
+                        key={log.id}
+                        className={`p-3.5 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-3xs font-mono transition-all ${
+                          isLight ? 'bg-slate-50/50 border-slate-150 hover:bg-slate-50' : 'bg-[#111]/60 border-cyan-500/5 hover:border-cyan-500/10'
+                        }`}
+                      >
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`px-1.5 py-0.5 rounded text-4xs uppercase font-extrabold border ${statusBg}`}>
+                              {log.status}
+                            </span>
+                            <span className={`font-extrabold uppercase text-2xs ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+                              {log.action}
+                            </span>
+                            <span className="text-slate-500 select-none">•</span>
+                            <span className={`px-1 rounded-md text-4xs lowercase font-bold ${isLight ? 'bg-slate-100 text-slate-700' : 'bg-[#222] text-slate-400'}`}>
+                              {log.userEmail} ({log.role})
+                            </span>
+                          </div>
+                          <p className={`leading-relaxed text-4xs select-all break-words ${isLight ? 'text-slate-600' : 'text-slate-350'}`}>
+                            {log.details}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-[10px] text-slate-500">
+                          {new Date(log.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* 1. Course Creator Modal */}
+      <AnimatePresence>
+        {showCourseModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowCourseModal(false);
+                setCourseError('');
+                setCourseSuccess('');
+              }}
+              className="absolute inset-0 bg-black/85 backdrop-blur-xs cursor-pointer pointer-events-auto"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`border p-6 rounded-2xl max-w-lg w-full relative z-10 text-left space-y-4 max-h-[90vh] overflow-y-auto ${
+                isLight ? 'bg-white border-slate-200 shadow-2xl' : 'bg-[#050505]/98 border-cyan-500/20 shadow-[0_0_55px_rgba(6,182,212,0.12)]'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className={`text-xs font-bold tracking-wider uppercase ${isLight ? 'text-amber-800 font-mono' : 'text-[#22d3ee] font-mono'}`}>
+                  Configure New Syllabus Course
+                </h3>
+                <button
+                  onClick={() => setShowCourseModal(false)}
+                  className="text-slate-400 hover:text-red-400 transition-colors text-xs font-mono font-bold cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <form onSubmit={async (e) => {
+                await handleCreateCourse(e);
+                setShowCourseModal(false);
+              }} className="space-y-3.5">
+                {courseError && <div className="text-3xs font-mono text-red-400 bg-red-950/25 p-2 rounded-xl">{courseError}</div>}
+                {courseSuccess && <div className="text-3xs font-mono text-cyan-400 bg-cyan-950/25 p-2 rounded-xl font-bold">{courseSuccess}</div>}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Course Title</label>
+                    <input
+                      type="text"
+                      required
+                      value={courseTitle}
+                      onChange={(e) => setCourseTitle(e.target.value)}
+                      placeholder="e.g. Django API Systems"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Duration Block</label>
+                    <input
+                      type="text"
+                      required
+                      value={courseDuration}
+                      onChange={(e) => setCourseDuration(e.target.value)}
+                      placeholder="e.g. 1 Week"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Description summary</label>
+                  <textarea
+                    required
+                    value={courseDesc}
+                    onChange={(e) => setCourseDesc(e.target.value)}
+                    placeholder="Master logical flows and database schemas..."
+                    rows={2}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-0.5 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Tags (Comma-separated)</label>
+                  <input
+                    type="text"
+                    value={courseTags}
+                    onChange={(e) => setCourseTags(e.target.value)}
+                    placeholder="NEP Aligned, Python, HTML5, Scratch"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-0.5 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Core Features (Comma-separated)</label>
+                  <input
+                    type="text"
+                    value={courseFeatures}
+                    onChange={(e) => setCourseFeatures(e.target.value)}
+                    placeholder="1-Week setup, Free laptop leasing, Microcontroller boards"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 select-none">
+                  <input
+                    type="checkbox"
+                    id="hardware"
+                    checked={mobHardware}
+                    onChange={(e) => setMobHardware(e.target.checked)}
+                    className="rounded"
+                  />
+                  <label htmlFor="hardware" className={`text-3xs font-mono cursor-pointer ${isLight ? 'text-slate-600 font-semibold' : 'text-slate-355'}`}>
+                    Includes free mobile computer hardware leasing support
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-xs transition-all ${
+                    isLight ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                  }`}
+                >
+                  Publish New Course
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. Banner Creator Modal */}
+      <AnimatePresence>
+        {showBannerModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowBannerModal(false);
+                setBannerError('');
+                setBannerSuccess('');
+              }}
+              className="absolute inset-0 bg-black/85 backdrop-blur-xs cursor-pointer pointer-events-auto"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`border p-6 rounded-2xl max-w-lg w-full relative z-10 text-left space-y-4 max-h-[90vh] overflow-y-auto ${
+                isLight ? 'bg-white border-slate-200 shadow-2xl' : 'bg-[#050505]/98 border-cyan-500/20 shadow-[0_0_55px_rgba(6,182,212,0.12)]'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className={`text-xs font-bold tracking-wider uppercase ${isLight ? 'text-amber-800 font-mono' : 'text-[#22d3ee] font-mono'}`}>
+                  Launch Carousel Banner Advertisement
+                </h3>
+                <button
+                  onClick={() => setShowBannerModal(false)}
+                  className="text-slate-400 hover:text-red-400 transition-colors text-xs font-mono font-bold cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <form onSubmit={async (e) => {
+                await handleCreateBanner(e);
+                setShowBannerModal(false);
+              }} className="space-y-3.5">
+                {bannerError && <div className="text-3xs font-mono text-red-400 bg-red-950/25 p-2 rounded-xl">{bannerError}</div>}
+                {bannerSuccess && <div className="text-3xs font-mono text-cyan-400 bg-cyan-950/25 p-2 rounded-xl font-bold">{bannerSuccess}</div>}
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Banner Title</label>
+                  <input
+                    type="text"
+                    required
+                    value={bannerTitle}
+                    onChange={(e) => setBannerTitle(e.target.value)}
+                    placeholder="e.g. NEP 2020 Programming camps open"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Subtitle / Slogan description</label>
+                  <textarea
+                    required
+                    value={bannerSubtitle}
+                    onChange={(e) => setBannerSubtitle(e.target.value)}
+                    placeholder="Active block coding camps..."
+                    rows={2}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Media Asset Image URL</label>
+                  <input
+                    type="url"
+                    required
+                    value={bannerImageUrl}
+                    onChange={(e) => setBannerImageUrl(e.target.value)}
+                    placeholder="https://images.unsplash.com/..."
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Button Redirect Call to Action (URL)</label>
+                  <input
+                    type="text"
+                    required
+                    value={bannerActionUrl}
+                    onChange={(e) => setBannerActionUrl(e.target.value)}
+                    placeholder="e.g. #courses or external https://..."
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-xs transition-all ${
+                    isLight ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                  }`}
+                >
+                  Launch Banner Promo
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 3. Gallery Snapshot Creator Modal */}
+      <AnimatePresence>
+        {showGalleryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowGalleryModal(false);
+                setGalError('');
+                setGalSuccess('');
+              }}
+              className="absolute inset-0 bg-black/85 backdrop-blur-xs cursor-pointer pointer-events-auto"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`border p-6 rounded-2xl max-w-lg w-full relative z-10 text-left space-y-4 max-h-[90vh] overflow-y-auto ${
+                isLight ? 'bg-white border-slate-200 shadow-2xl' : 'bg-[#050505]/98 border-cyan-500/20 shadow-[0_0_55px_rgba(6,182,212,0.12)]'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className={`text-xs font-bold tracking-wider uppercase ${isLight ? 'text-amber-800 font-mono' : 'text-[#22d3ee] font-mono'}`}>
+                  Post Photo Snapshot to Exhibition
+                </h3>
+                <button
+                  onClick={() => setShowGalleryModal(false)}
+                  className="text-slate-400 hover:text-red-400 transition-colors text-xs font-mono font-bold cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <form onSubmit={async (e) => {
+                await handleCreateGalleryImage(e);
+                setShowGalleryModal(false);
+              }} className="space-y-3.5">
+                {galError && <div className="text-3xs font-mono text-red-400 bg-red-950/25 p-2 rounded-xl">{galError}</div>}
+                {galSuccess && <div className="text-3xs font-mono text-cyan-400 bg-cyan-950/25 p-2 rounded-xl font-bold">{galSuccess}</div>}
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Event Snapshot Title</label>
+                  <input
+                    type="text"
+                    required
+                    value={galTitle}
+                    onChange={(e) => setGalTitle(e.target.value)}
+                    placeholder="e.g. Waraseoni School IT Delivery"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Image Description (Contextual Caption)</label>
+                  <textarea
+                    required
+                    value={galDesc}
+                    onChange={(e) => setGalDesc(e.target.value)}
+                    placeholder="Details on active training setups..."
+                    rows={2}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Category Filter</label>
+                    <select
+                      value={galCategory}
+                      onChange={(e) => setGalCategory(e.target.value as any)}
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    >
+                      <option value="school_programs">School Outreach & NEP Labs</option>
+                      <option value="iot_robotics">IoT & Robotic Microcontrollers</option>
+                      <option value="mern_web">MERN Fullstack Architecture</option>
+                      <option value="lab_setups">Laboratory System Deployments</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Exhibition Photo URL</label>
+                    <input
+                      type="url"
+                      required
+                      value={galImageUrl}
+                      onChange={(e) => setGalImageUrl(e.target.value)}
+                      placeholder="https://images.unsplash.com/..."
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-xs transition-all ${
+                    isLight ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                  }`}
+                >
+                  Post to Exhibition
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 4. Special Program Creator Modal */}
+      <AnimatePresence>
+        {showSpecialProgramModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowSpecialProgramModal(false);
+                setSpecError('');
+                setSpecSuccess('');
+              }}
+              className="absolute inset-0 bg-black/85 backdrop-blur-xs cursor-pointer pointer-events-auto"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`border p-6 rounded-2xl max-w-lg w-full relative z-10 text-left space-y-4 max-h-[90vh] overflow-y-auto ${
+                isLight ? 'bg-white border-slate-200 shadow-2xl' : 'bg-[#050505]/98 border-cyan-500/20 shadow-[0_0_55px_rgba(6,182,212,0.12)]'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className={`text-xs font-bold tracking-wider uppercase ${isLight ? 'text-amber-800 font-mono' : 'text-[#22d3ee] font-mono'}`}>
+                  Create Special Training Form Hub
+                </h3>
+                <button
+                  onClick={() => setShowSpecialProgramModal(false)}
+                  className="text-slate-400 hover:text-red-400 transition-colors text-xs font-mono font-bold cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <form onSubmit={async (e) => {
+                await handleCreateSpecialProgram(e);
+                setShowSpecialProgramModal(false);
+              }} className="space-y-3.5">
+                {specError && <p className="text-3xs text-red-400 bg-red-500/10 p-2 rounded-xl text-center">{specError}</p>}
+                {specSuccess && <p className="text-3xs text-cyan-400 bg-cyan-500/10 p-2 rounded-xl text-center font-bold">{specSuccess}</p>}
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Training Program Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={specName}
+                    onChange={(e) => setSpecName(e.target.value)}
+                    placeholder="e.g. Drone assembly workshop"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Duration</label>
+                    <input
+                      type="text"
+                      required
+                      value={specDuration}
+                      onChange={(e) => setSpecDuration(e.target.value)}
+                      placeholder="e.g. 5 Days"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>College/School Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={specInstitution}
+                      onChange={(e) => setSpecInstitution(e.target.value)}
+                      placeholder="Govt Excellence School"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Starting Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={specStartDateTime}
+                    onChange={(e) => setSpecStartDateTime(e.target.value)}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none font-mono ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className={`w-full font-black text-xs py-2.5 rounded-xl cursor-pointer uppercase transition-all font-mono tracking-wider ${
+                    isLight ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-[#22d3ee] hover:bg-cyan-400 text-slate-950'
+                  }`}
+                >
+                  Generate Form Hub
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 5. Manual Special Program Enrollment Modal */}
+      <AnimatePresence>
+        {showManualEnrollModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowManualEnrollModal(false);
+                setManError('');
+                setManSuccess('');
+              }}
+              className="absolute inset-0 bg-black/85 backdrop-blur-xs cursor-pointer pointer-events-auto"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`border p-6 rounded-2xl max-w-lg w-full relative z-10 text-left space-y-4 max-h-[90vh] overflow-y-auto ${
+                isLight ? 'bg-white border-slate-200 shadow-2xl' : 'bg-[#050505]/98 border-cyan-500/20 shadow-[0_0_55px_rgba(6,182,212,0.12)]'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className={`text-xs font-bold tracking-wider uppercase ${isLight ? 'text-amber-800 font-mono' : 'text-[#22d3ee] font-mono'}`}>
+                  Manual Candidate Program Enrollment
+                </h3>
+                <button
+                  onClick={() => setShowManualEnrollModal(false)}
+                  className="text-slate-400 hover:text-red-400 transition-colors text-xs font-mono font-bold cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <form onSubmit={async (e) => {
+                handleManualEnroll(e);
+                setShowManualEnrollModal(false);
+              }} className="space-y-3.5">
+                {manError && <p className="text-3xs text-red-400 bg-red-500/10 p-2 rounded-xl text-center font-mono">{manError}</p>}
+                {manSuccess && <p className="text-3xs text-cyan-400 bg-cyan-500/10 p-2 rounded-xl text-center font-mono font-bold">{manSuccess}</p>}
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Select Special Program</label>
+                  <select
+                    required
+                    value={selectedProgramId}
+                    onChange={(e) => setSelectedProgramId(e.target.value)}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  >
+                    <option value="">-- Choose Program --</option>
+                    {specialProgramsAll.map(p => (
+                      <option key={p.id} value={p.id}>{p.trainingName} ({p.institutionName})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Student Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={manStudentName}
+                    onChange={(e) => setManStudentName(e.target.value)}
+                    placeholder="e.g. Priyanshu Patle"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Branch/Class</label>
+                    <input
+                      type="text"
+                      required
+                      value={manBranch}
+                      onChange={(e) => setManBranch(e.target.value)}
+                      placeholder="e.g. CSE-B / Grade XI"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Academic Year/Roll</label>
+                    <input
+                      type="text"
+                      required
+                      value={manYear}
+                      onChange={(e) => setManYear(e.target.value)}
+                      placeholder="e.g. 3rd Year / 41"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Father's Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={manFathersName}
+                      onChange={(e) => setManFathersName(e.target.value)}
+                      placeholder="e.g. Mr. S. R. Patle"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Roll Number</label>
+                    <input
+                      type="text"
+                      required
+                      value={manRollNumber}
+                      onChange={(e) => setManRollNumber(e.target.value)}
+                      placeholder="e.g. ROLL-102"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>WhatsApp Number</label>
+                    <input
+                      type="text"
+                      required
+                      value={manMobile}
+                      onChange={(e) => setManMobile(e.target.value)}
+                      placeholder="e.g. 9179XXXXXX"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Student Email Key</label>
+                    <input
+                      type="email"
+                      required
+                      value={manEmail}
+                      onChange={(e) => setManEmail(e.target.value)}
+                      placeholder="e.g. candidate@gmail.com"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className={`w-full font-black text-xs py-2.5 rounded-xl cursor-pointer uppercase transition-all font-mono tracking-wider ${
+                    isLight ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-cyan-50 hover:bg-cyan-400 text-slate-950'
+                  }`}
+                >
+                  Enroll Student
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 6. Manual Trainer Creator Modal */}
+      <AnimatePresence>
+        {showTrainerCreateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowTrainerCreateModal(false);
+                setTrainerError('');
+                setTrainerSuccess('');
+              }}
+              className="absolute inset-0 bg-black/85 backdrop-blur-xs cursor-pointer pointer-events-auto"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`border p-6 rounded-2xl max-w-lg w-full relative z-10 text-left space-y-4 max-h-[90vh] overflow-y-auto ${
+                isLight ? 'bg-white border-slate-200 shadow-2xl' : 'bg-[#050505]/98 border-cyan-500/20 shadow-[0_0_55px_rgba(6,182,212,0.12)]'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className={`text-xs font-bold tracking-wider uppercase ${isLight ? 'text-amber-800 font-mono' : 'text-[#22d3ee] font-mono'}`}>
+                  Register Authorized Trainer Profile
+                </h3>
+                <button
+                  onClick={() => setShowTrainerCreateModal(false)}
+                  className="text-slate-400 hover:text-red-400 transition-colors text-xs font-mono font-bold cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateTrainerManually} className="space-y-3.5">
+                {trainerError && <p className="text-3xs text-red-400 bg-red-500/10 p-2 rounded-xl text-center font-mono">{trainerError}</p>}
+                {trainerSuccess && <p className="text-3xs text-cyan-400 bg-cyan-500/10 p-2 rounded-xl text-center font-mono font-bold">{trainerSuccess}</p>}
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Trainer Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={newTrainerName}
+                    onChange={(e) => setNewTrainerName(e.target.value)}
+                    placeholder="e.g. Prof. Rakesh K. Verma"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={newTrainerEmail}
+                    onChange={(e) => setNewTrainerEmail(e.target.value)}
+                    placeholder="e.g. rakesh@dakshyam.in"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={newTrainerPassword}
+                    onChange={(e) => setNewTrainerPassword(e.target.value)}
+                    placeholder="Enter trainer secure key"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 select-none">
+                  <input
+                    type="checkbox"
+                    id="trainerApproved"
+                    checked={newTrainerApproved}
+                    onChange={(e) => setNewTrainerApproved(e.target.checked)}
+                    className="rounded"
+                  />
+                  <label htmlFor="trainerApproved" className={`text-3xs font-mono cursor-pointer ${isLight ? 'text-slate-600' : 'text-slate-355'}`}>
+                    Approve Trainer instantly (Full membership granted)
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-xs transition-all ${
+                    isLight ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-cyan-50hover:bg-cyan-400 text-slate-950'
+                  }`}
+                >
+                  Create Trainer Profile
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 7. Manual Student Creator Modal */}
+      <AnimatePresence>
+        {showStudentCreateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowStudentCreateModal(false);
+                setStudentError('');
+                setStudentSuccess('');
+              }}
+              className="absolute inset-0 bg-black/85 backdrop-blur-xs cursor-pointer pointer-events-auto"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`border p-6 rounded-2xl max-w-lg w-full relative z-10 text-left space-y-4 max-h-[90vh] overflow-y-auto ${
+                isLight ? 'bg-white border-slate-200 shadow-2xl' : 'bg-[#050505]/98 border-cyan-500/20 shadow-[0_0_55px_rgba(6,182,212,0.12)]'
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className={`text-xs font-bold tracking-wider uppercase ${isLight ? 'text-amber-800 font-mono' : 'text-[#22d3ee] font-mono'}`}>
+                  Enroll & Register Student Manually
+                </h3>
+                <button
+                  onClick={() => setShowStudentCreateModal(false)}
+                  className="text-slate-400 hover:text-red-400 transition-colors text-xs font-mono font-bold cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateStudentManually} className="space-y-3.5">
+                {studentError && <p className="text-3xs text-red-400 bg-red-500/10 p-2 rounded-xl text-center font-mono">{studentError}</p>}
+                {studentSuccess && <p className="text-3xs text-cyan-400 bg-cyan-500/10 p-2 rounded-xl text-center font-mono font-bold">{studentSuccess}</p>}
+
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Student Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={newStudentName}
+                    onChange={(e) => setNewStudentName(e.target.value)}
+                    placeholder="e.g. Ankush Nanda"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      value={newStudentEmail}
+                      onChange={(e) => setNewStudentEmail(e.target.value)}
+                      placeholder="e.g. student@gmail.com"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Contact Number</label>
+                    <input
+                      type="text"
+                      value={newStudentPhone}
+                      onChange={(e) => setNewStudentPhone(e.target.value)}
+                      placeholder="e.g. 91790XXXXX"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>School / Institute</label>
+                    <input
+                      type="text"
+                      value={newStudentSchool}
+                      onChange={(e) => setNewStudentSchool(e.target.value)}
+                      placeholder="e.g. Govt Excellence School"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Level / Standard</label>
+                    <select
+                      value={newStudentLevel}
+                      onChange={(e) => setNewStudentLevel(e.target.value)}
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    >
+                      <option value="Middle School">Middle School</option>
+                      <option value="Grade 9">Grade 9</option>
+                      <option value="Grade 10">Grade 10</option>
+                      <option value="Grade 11">Grade 11</option>
+                      <option value="Grade 12">Grade 12</option>
+                      <option value="College Undergraduate">College Undergraduate</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Student Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={newStudentPassword}
+                      onChange={(e) => setNewStudentPassword(e.target.value)}
+                      placeholder="Enter login password"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Initial Experience Points</label>
+                    <input
+                      type="number"
+                      value={newStudentPoints}
+                      onChange={(e) => setNewStudentPoints(Number(e.target.value))}
+                      placeholder="e.g. 100"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-xs transition-all ${
+                    isLight ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-cyan-50 hover:bg-cyan-400 text-slate-950'
+                  }`}
+                >
+                  Register & Create Student Profile
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

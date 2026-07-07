@@ -7,9 +7,11 @@ interface MetricChartProps {
   type?: 'bar' | 'line';
   color?: string;
   icon?: React.ReactNode;
+  theme?: 'light' | 'dark';
 }
 
-export default function AnalyticsCharts({ title, data, type = 'bar', color = 'cyan', icon }: MetricChartProps) {
+export default function AnalyticsCharts({ title, data, type = 'bar', color = 'cyan', icon, theme = 'dark' }: MetricChartProps) {
+  const isLight = theme === 'light';
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const maxValue = data.length > 0 ? Math.max(...data.map(d => d.value), 10) : 100;
@@ -20,18 +22,32 @@ export default function AnalyticsCharts({ title, data, type = 'bar', color = 'cy
   const graphWidth = 400;
 
   return (
-    <div className="bg-[#050505]/60 border border-cyan-500/10 rounded-2xl p-5 backdrop-blur-md hover:border-cyan-500/20 hover:shadow-[0_0_20px_rgba(34,211,238,0.05)] transition-all duration-300">
+    <div className={`border rounded-2xl p-5 transition-all duration-300 ${
+      isLight 
+        ? 'bg-slate-50/55 border-slate-200 hover:border-amber-500/15' 
+        : 'bg-[#050505]/60 border border-cyan-500/10 hover:border-cyan-500/20 hover:shadow-[0_0_20px_rgba(34,211,238,0.05)]'
+    }`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-slate-300 tracking-wider flex items-center gap-2">
-          {icon} {title}
+        <h3 className={`text-sm font-semibold tracking-wider flex items-center gap-2 ${
+          isLight ? 'text-slate-800' : 'text-slate-300'
+        }`}>
+          {icon && React.cloneElement(icon as React.ReactElement, { className: `w-4 h-4 ${isLight ? 'text-amber-700' : 'text-cyan-400'}` })} {title}
         </h3>
-        <span className="text-2xs font-mono text-cyan-400/70 border border-cyan-500/10 px-2 py-0.5 rounded-full">
+        <span className={`text-2xs font-mono border px-2 py-0.5 rounded-full ${
+          isLight ? 'text-amber-700/80 border-amber-500/20 bg-amber-500/5' : 'text-cyan-400/70 border border-cyan-500/10'
+        }`}>
           Live Data
         </span>
       </div>
 
       <div className="relative w-full overflow-hidden">
-        {type === 'bar' ? (
+        {data.length === 0 ? (
+          <div className={`py-10 text-center font-mono text-3xs uppercase tracking-wider ${
+            isLight ? 'text-slate-400 bg-slate-100/30' : 'text-slate-500 bg-[#111]/20'
+          } rounded-xl border border-dashed ${isLight ? 'border-slate-200' : 'border-cyan-500/5'}`}>
+            No live telemetry recorded yet
+          </div>
+        ) : type === 'bar' ? (
           <div className="flex flex-col gap-2.5 pt-2">
             {data.map((item, idx) => {
               const percentage = Math.min(100, (item.value / maxValue) * 100);
@@ -43,16 +59,22 @@ export default function AnalyticsCharts({ title, data, type = 'bar', color = 'cy
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-slate-400 group-hover:text-cyan-300 transition-colors">
+                    <span className={`transition-colors ${
+                      isLight ? 'text-slate-650 group-hover:text-amber-850' : 'text-slate-400 group-hover:text-cyan-300'
+                    }`}>
                       {item.label}
                     </span>
-                    <span className="text-white font-semibold">
+                    <span className={`font-semibold ${isLight ? 'text-slate-900' : 'text-white'}`}>
                       {item.value} {item.value > 10 ? 'pts' : 'reqs'}
                     </span>
                   </div>
-                  <div className="relative h-2 w-full bg-[#111]/80 rounded-full overflow-hidden border border-slate-500/5">
+                  <div className={`relative h-2 w-full rounded-full overflow-hidden border ${
+                    isLight ? 'bg-slate-200 border-slate-300/40' : 'bg-[#111]/80 border-slate-500/5'
+                  }`}>
                     <div 
-                      className={`h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-1000`}
+                      className={`h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${
+                        isLight ? 'from-amber-600 to-amber-500' : 'from-cyan-500 to-blue-500'
+                      }`}
                       style={{ width: `${percentage}%` }}
                     />
                     {hoveredIndex === idx && (
@@ -72,19 +94,19 @@ export default function AnalyticsCharts({ title, data, type = 'bar', color = 'cy
             >
               <defs>
                 <linearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.0" />
+                  <stop offset="0%" stopColor={isLight ? "#d97706" : "#06b6d4"} stopOpacity={isLight ? "0.15" : "0.25"} />
+                  <stop offset="100%" stopColor={isLight ? "#d97706" : "#06b6d4"} stopOpacity="0.0" />
                 </linearGradient>
                 <linearGradient id="lineColor" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#06b6d4" />
-                  <stop offset="100%" stopColor="#3b82f6" />
+                  <stop offset="0%" stopColor={isLight ? "#b45309" : "#06b6d4"} />
+                  <stop offset="100%" stopColor={isLight ? "#d97706" : "#3b82f6"} />
                 </linearGradient>
               </defs>
 
               {/* Grid Lines */}
-              <line x1={padding} y1={20} x2={graphWidth - 10} y2={20} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-              <line x1={padding} y1={chartHeight / 2} x2={graphWidth - 10} y2={chartHeight / 2} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-              <line x1={padding} y1={chartHeight - 30} x2={graphWidth - 10} y2={chartHeight - 30} stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+              <line x1={padding} y1={20} x2={graphWidth - 10} y2={20} stroke={isLight ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.03)"} strokeWidth="1" />
+              <line x1={padding} y1={chartHeight / 2} x2={graphWidth - 10} y2={chartHeight / 2} stroke={isLight ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.03)"} strokeWidth="1" />
+              <line x1={padding} y1={chartHeight - 30} x2={graphWidth - 10} y2={chartHeight - 30} stroke={isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)"} strokeWidth="1.5" />
 
               {/* Path calculation */}
               {(() => {
@@ -103,7 +125,7 @@ export default function AnalyticsCharts({ title, data, type = 'bar', color = 'cy
                     {/* Area under line */}
                     <path d={areaD} fill="url(#chartGlow)" />
                     {/* Main gradient line */}
-                    <path d={pathD} fill="none" stroke="url(#lineColor)" strokeWidth="3" className="drop-shadow-[0_2px_8px_rgba(34,211,238,0.3)]" />
+                    <path d={pathD} fill="none" stroke="url(#lineColor)" strokeWidth="3" className={isLight ? "" : "drop-shadow-[0_2px_8px_rgba(34,211,238,0.3)]"} />
 
                     {/* Nodes interactive */}
                     {points.map((pt, i) => (
@@ -117,8 +139,8 @@ export default function AnalyticsCharts({ title, data, type = 'bar', color = 'cy
                           cx={pt.x} 
                           cy={pt.y} 
                           r={hoveredIndex === i ? 6 : 4} 
-                          fill={hoveredIndex === i ? '#ffffff' : '#06b6d4'} 
-                          stroke="#050505" 
+                          fill={hoveredIndex === i ? (isLight ? '#78350f' : '#ffffff') : (isLight ? '#d97706' : '#06b6d4')} 
+                          stroke={isLight ? '#ffffff' : '#050505'} 
                           strokeWidth="2" 
                           className="transition-all"
                         />
@@ -127,7 +149,7 @@ export default function AnalyticsCharts({ title, data, type = 'bar', color = 'cy
                           x={pt.x} 
                           y={chartHeight - 10} 
                           textAnchor="middle" 
-                          fill="rgba(255,255,255,0.4)" 
+                          fill={isLight ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.4)"} 
                           fontSize="9" 
                           className="font-mono"
                         >
@@ -143,15 +165,15 @@ export default function AnalyticsCharts({ title, data, type = 'bar', color = 'cy
                               width="44" 
                               height="20" 
                               rx="5" 
-                              fill="#0f172a" 
-                              stroke="#06b6d4" 
+                              fill={isLight ? "#fef3c7" : "#0f172a"} 
+                              stroke={isLight ? "#d97706" : "#06b6d4"} 
                               strokeWidth="1" 
                             />
                             <text 
                               x={pt.x} 
                               y={pt.y - 19} 
                               textAnchor="middle" 
-                              fill="#ffffff" 
+                              fill={isLight ? "#78350f" : "#ffffff"} 
                               fontSize="9.5" 
                               fontWeight="bold"
                               className="font-mono"

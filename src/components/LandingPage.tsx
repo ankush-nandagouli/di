@@ -7,6 +7,7 @@ import {
 import DakshyamLogo from './DakshyamLogo';
 import { Course, PromoBanner, GalleryImage } from '../types';
 import { DakshyamDatabase } from '../utils/db';
+import { BeautifulErrorDisplay } from '../utils/errorShield';
 
 interface LandingPageProps {
   courses: Course[];
@@ -274,7 +275,7 @@ export default function LandingPage({
               <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>On-Demand High-Spec Computer Leases</h4>
             </div>
             <p className={`${textMuted}`}>
-              We deliver fully configured mobile laptop arrays directly to local and rural schools. These systems come pre-loaded with localized sandbox compilation editors, terminal diagnostics softwares, and electronic circuit emulators. This mitigates infrastructure constraints for standard schools and ensures 100% participation.
+              We deliver fully configured mobile laptop arrays directly to local and rural schools. These systems come pre-loaded with localized offline development compilation tools, terminal diagnostics softwares, and electronic circuit emulators. This mitigates infrastructure constraints for standard schools and ensures 100% participation.
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">✓ Leased Free of Charge</span>
@@ -860,7 +861,7 @@ export default function LandingPage({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`border rounded-2xl max-w-xl w-full overflow-hidden relative z-10 text-left space-y-4 flex flex-col justify-between ${
+              className={`border rounded-2xl max-w-xl w-full overflow-hidden relative z-10 text-left space-y-4 flex flex-col justify-between max-h-[90vh] overflow-y-auto ${
                 isLight ? 'bg-white border-amber-500/20 shadow-[0_0_40px_rgba(217,119,6,0.1)]' : 'bg-[#050505] border-cyan-500/25 shadow-[0_0_40px_rgba(34,211,238,0.15)]'
               }`}
             >

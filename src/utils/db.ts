@@ -1,279 +1,34 @@
-import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder } from '../types';
+import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder, AppLog } from '../types';
 
 // Default seeded courses requested by the user
-export const DEFAULT_COURSES: Course[] = [
-  {
-    id: 'course-1',
-    title: 'IoT Training with Web Development',
-    duration: '3 Months',
-    description: 'Learn modern Web Dashboard engineering integrated with embedded hardware. Build smart devices with live telemetry tracking.',
-    tags: ['IoT', 'React', 'Embedded C', 'Web Sockets', 'API Integrations'],
-    features: [
-      'Microcontroller Programming (ESP32/Arduino)',
-      'Direct REST/MQTT API development',
-      'Real-time React dashboards with Tailwind',
-      'Deploying embedded sensors to cloud layers'
-    ],
-    mobileHardwareIncluded: false
-  },
-  {
-    id: 'course-2',
-    title: 'Full Stack Technology (MERN & Django)',
-    duration: '2 Months',
-    description: 'Master powerful modern ecosystems. Bridge high-speed backend controllers in Django & Javascript to clean React interfaces.',
-    tags: ['MERN', 'Django', 'PostgreSQL', 'Redux', 'REST framework'],
-    features: [
-      'Database schema engineering with PostgreSQL & MongoDB',
-      'Robust JWT Authentication & Middleware security',
-      'Django Rest Framework (DRF) & Express backend APIs',
-      'Beautiful SPA state handling on the client client'
-    ],
-    mobileHardwareIncluded: false
-  },
-  {
-    id: 'course-3',
-    title: 'Robotics & Automation Bootcamp',
-    duration: '4 Weeks',
-    description: 'Build responsive mechanisms, motorized limbs, autonomous line crawlers and mobile-controlled robotics nodes.',
-    tags: ['Robotics', 'Kinematics', 'Bluetooth Tech', 'Sensors', 'Actuators'],
-    features: [
-      'Motor driver and H-Bridge configuration',
-      'Autonomous pathfinding and distance calculation',
-      'Custom app integration for wireless robotics control',
-      'Mechanical assembly and system integrations'
-    ],
-    mobileHardwareIncluded: true
-  },
-  {
-    id: 'course-4',
-    title: 'School Computer Training & Essential Coding',
-    duration: '1 Week (Customizable)',
-    description: 'Tailored school digital literacy. Bringing physical systems directly to schools so students learn software environments manually.',
-    tags: ['Basic Software', 'HTML/CSS', 'Scratch Coding', 'Office Suites'],
-    features: [
-      'Mobile hardware support (Laptops/Kits shipped directly)',
-      'Introduction to programming logic and syntax',
-      'Safe computer administration and operating systems',
-      'Dedicated guidance with professional lab setups'
-    ],
-    mobileHardwareIncluded: true
-  }
-];
+export const DEFAULT_COURSES: Course[] = [];
 
 // Initial seeded students
-export const SEEDED_STUDENTS: StudentUser[] = [
-  { id: 'usr-s1', name: 'Ayush Patel', email: 'ayush@example.com', role: 'student', createdAt: '2026-06-01', profile: { phone: '+91 9123456789', institution: 'Government Excellence School Balaghat', gradeOrBranch: 'Grade 10' } },
-  { id: 'usr-s2', name: 'Riya Shrivastava', email: 'riya@example.com', role: 'student', createdAt: '2026-06-02', profile: { phone: '+91 8877665544', institution: 'JIC Waraseoni', gradeOrBranch: 'Grade 11' } },
-  { id: 'usr-s3', name: 'Amit Nanda', email: 'amit@example.com', role: 'student', createdAt: '2026-06-03', profile: { phone: '+91 7766554433', institution: 'Dakshyam Academy Balaghat', gradeOrBranch: 'MERN Stack Batch' } },
-  { id: 'usr-s4', name: 'Kunal Sonkar', email: 'kunal@example.com', role: 'student', createdAt: '2026-06-04', profile: { phone: '+91 9988112233', institution: 'Govt Polytechnic Waraseoni', gradeOrBranch: 'Computer Science' } }
-];
+export const SEEDED_STUDENTS: StudentUser[] = [];
 
 // Initial seeded trainers
-export const SEEDED_TRAINERS: TrainerUser[] = [
-  { id: 'usr-t1', name: 'Trainer Vivek Mathur', email: 'trainer@dakshyam.com', role: 'trainer', isApproved: true, createdAt: '2026-05-15' },
-  { id: 'usr-t2', name: 'Trainer Dr. Shanti Rao', email: 'shanti@dakshyam.com', role: 'trainer', isApproved: true, createdAt: '2026-05-18' }
-];
+export const SEEDED_TRAINERS: TrainerUser[] = [];
 
 // Initial seeded admins
-export const SEEDED_ADMINS: AdminUser[] = [
-  { id: 'usr-a1', name: 'Dakshyam Admin Leader', email: 'admin@dakshyam.com', role: 'admin', createdAt: '2026-01-01' }
-];
+export const SEEDED_ADMINS: AdminUser[] = [];
 
 // Initial seeded project student groups with points
-export const SEEDED_GROUPS: StudentGroup[] = [
-  {
-    id: 'grp-1',
-    name: 'Team AgriBot',
-    projectTitle: 'Smart IoT Irrigation & Telemetry Node',
-    projectDescription: 'Esp32 based solar powered soil health monitor and automated watering node feeding real-time charts.',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    memberIds: ['usr-s1', 'usr-s2'],
-    points: 94,
-    trainerId: 'usr-t1',
-    createdAt: '2026-06-10'
-  },
-  {
-    id: 'grp-2',
-    name: 'Code Wizards',
-    projectTitle: 'Interactive Django-MERN Medical Core Scheduler',
-    projectDescription: 'A dynamic doctor reservation console linking MERN client components with a fast Django DRF schema mapping core services.',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    memberIds: ['usr-s3'],
-    points: 88,
-    trainerId: 'usr-t1',
-    createdAt: '2026-06-12'
-  },
-  {
-    id: 'grp-3',
-    name: 'Balaghat Robo Warriors',
-    projectTitle: 'Obstacle Interceptor Bluetooth Bot',
-    projectDescription: 'Autonomous crawling system running custom obstacle routing and manual overrides. Tested with custom mobile hardware sets.',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    memberIds: ['usr-s4'],
-    points: 79,
-    trainerId: 'usr-t2',
-    createdAt: '2026-06-15'
-  }
-];
+export const SEEDED_GROUPS: StudentGroup[] = [];
 
 // Initial social media video posts by groups
-export const SEEDED_VIDEOS: VideoPost[] = [
-  {
-    id: 'vid-1',
-    groupId: 'grp-1',
-    groupName: 'Team AgriBot',
-    title: 'Smart Soil Moisture Regulator in Action',
-    description: 'Watch the sensor live-stream threshold variables and trigger micro-solenoid pumps without latency!',
-    videoUrl: 'ESP32_AGRIBOT',
-    likes: 12,
-    likedByUserIds: [],
-    views: 145,
-    comments: [
-      { id: 'c1', senderName: 'Trainer Vivek Mathur', text: 'Stunning calibration, team. The solar charge rate metrics show high stability.', timestamp: '2026-06-12 14:20' },
-      { id: 'c2', senderName: 'Riya Shrivastava', text: 'This dashboard response looks so fast!', timestamp: '2026-06-13 09:12' }
-    ],
-    createdAt: '2026-06-11'
-  },
-  {
-    id: 'vid-2',
-    groupId: 'grp-2',
-    groupName: 'Code Wizards',
-    title: 'Django Rest API Schema Endpoint Stress Test',
-    description: 'Profiling database query resolution on complex nested models using Django debugging logs.',
-    videoUrl: 'DJANGO_CORE',
-    likes: 7,
-    likedByUserIds: [],
-    views: 89,
-    comments: [
-      { id: 'c3', senderName: 'Kunal Sonkar', text: 'Are the database calls serialized properly on the endpoints?', timestamp: '2026-06-13 18:01' }
-    ],
-    createdAt: '2026-06-13'
-  }
-];
+export const SEEDED_VIDEOS: VideoPost[] = [];
 
 // Seeded certificates
-export const SEEDED_CERTIFICATES: Certificate[] = [
-  {
-    id: 'DKM-2026-E49A',
-    studentName: 'Ayush Patel',
-    studentEmail: 'ayush@example.com',
-    courseTitle: 'IoT Training with Web Development',
-    projectTitle: 'Smart IoT Irrigation & Telemetry Node',
-    issueDate: '2026-06-18',
-    trainerId: 'usr-t1',
-    trainerName: 'Trainer Vivek Mathur'
-  },
-  {
-    id: 'DKM-2026-R82X',
-    studentName: 'Riya Shrivastava',
-    studentEmail: 'riya@example.com',
-    courseTitle: 'IoT Training with Web Development',
-    projectTitle: 'Smart IoT Irrigation & Telemetry Node',
-    issueDate: '2026-06-18',
-    trainerId: 'usr-t1',
-    trainerName: 'Trainer Vivek Mathur'
-  }
-];
+export const SEEDED_CERTIFICATES: Certificate[] = [];
 
 // Initial course registration applications
-export const SEEDED_APPLICATIONS: CourseApplication[] = [
-  {
-    id: 'app-1',
-    studentId: 'usr-s1',
-    fullName: 'Ayush Patel',
-    email: 'ayush@example.com',
-    phone: '+91 9123456789',
-    institution: 'Government Excellence School Balaghat',
-    courseId: 'course-1',
-    appliedAt: '2026-06-08',
-    status: 'approved'
-  },
-  {
-    id: 'app-2',
-    studentId: 'usr-s4',
-    fullName: 'Kunal Sonkar',
-    email: 'kunal@example.com',
-    phone: '+91 9988112233',
-    institution: 'Govt Polytechnic Waraseoni',
-    courseId: 'course-3',
-    appliedAt: '2026-06-14',
-    status: 'pending'
-  }
-];
+export const SEEDED_APPLICATIONS: CourseApplication[] = [];
 
 // Initial seeded promotional banners (fully editable by admin)
-export const DEFAULT_BANNERS: PromoBanner[] = [
-  {
-    id: 'ban-1',
-    title: 'NEP 2020 Aligned School Programming & Robotics Labs',
-    subtitle: 'Bringing 21st century programming, game design & smart hardware direct to students. High-spec training rigs leased free of charge!',
-    imageUrl: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?q=80&w=1200&auto=format&fit=crop',
-    actionUrl: '#services',
-    isActive: true,
-    createdAt: '2026-06-01'
-  },
-  {
-    id: 'ban-2',
-    title: 'Admissions Open: 3-Month IoT Integrated Web Apps Batch',
-    subtitle: 'Master complete ESP32 sensor telemetry pipelines hooked into real-time custom React dashboards. Earn verified industry-ready credentials!',
-    imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=1200&auto=format&fit=crop',
-    actionUrl: '#services',
-    isActive: true,
-    createdAt: '2026-06-05'
-  },
-  {
-    id: 'ban-3',
-    title: 'Customizable 1-Week Intensive Coding Workshops',
-    subtitle: 'Now booking for regional government and private schools in Balaghat. Focus is 100% on logical reasoning and hardware interfaces.',
-    imageUrl: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?q=80&w=1200&auto=format&fit=crop',
-    isActive: true,
-    createdAt: '2026-06-12'
-  }
-];
+export const DEFAULT_BANNERS: PromoBanner[] = [];
 
 // Initial seeded project image gallery displaying real actions (fully editable by admin)
-export const DEFAULT_GALLERY_IMAGES: GalleryImage[] = [
-  {
-    id: 'gal-1',
-    title: 'School IT Lab Integration - Balaghat Regional',
-    description: 'Providing mobile computer rigs and microcontrollers with custom programming guides. Supporting rural students with coding kits.',
-    imageUrl: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=650&auto=format&fit=crop',
-    category: 'school_programs',
-    createdAt: '2026-06-02'
-  },
-  {
-    id: 'gal-2',
-    title: 'ESP32 Wi-Fi Sensor Calibration',
-    description: 'Students testing telemetry thresholds. Connecting live analog signals to Express web relays and charting results live.',
-    imageUrl: 'https://images.unsplash.com/photo-1517055720730-076b4efc42a2?q=80&w=650&auto=format&fit=crop',
-    category: 'iot_robotics',
-    createdAt: '2026-06-04'
-  },
-  {
-    id: 'gal-3',
-    title: 'Autonomous Robotics Obstacle Schedulers',
-    description: 'Custom Bluetooth motor chassis calibrated inside regional secondary setups for algorithmic path calculations.',
-    imageUrl: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?q=80&w=650&auto=format&fit=crop',
-    category: 'iot_robotics',
-    createdAt: '2026-06-08'
-  },
-  {
-    id: 'gal-4',
-    title: 'Django API Core Security Exercises',
-    description: 'Advanced student programmers engineering JSON Web Token verification filters on REST schemas for patient tracking systems.',
-    imageUrl: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=650&auto=format&fit=crop',
-    category: 'mern_web',
-    createdAt: '2026-06-11'
-  },
-  {
-    id: 'gal-5',
-    title: 'National Education Policy Training Session',
-    description: 'Aligning classrooms to core developmental benchmarks in logical problem solving, manual building, and design mechanics.',
-    imageUrl: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=650&auto=format&fit=crop',
-    category: 'school_programs',
-    createdAt: '2026-06-14'
-  }
-];
+export const DEFAULT_GALLERY_IMAGES: GalleryImage[] = [];
 
 /**
  * Offline-first localStorage Data Layer
@@ -298,6 +53,14 @@ export class DakshyamDatabase {
   static set<T>(key: string, data: T): void {
     try {
       localStorage.setItem(`dakshyam_db_${key}`, JSON.stringify(data));
+      // Asynchronously synchronize with MongoDB Atlas
+      fetch(`/api/db/${key}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ data })
+      }).catch(err => console.warn(`Background MongoDB sync warning for key ${key}:`, err));
     } catch (e) {
       console.error(`Error writing ${key} to storage:`, e);
     }
@@ -346,7 +109,11 @@ export class DakshyamDatabase {
   }
 
   static getAdmins(): AdminUser[] {
-    return this.get<AdminUser[]>('admins', SEEDED_ADMINS);
+    const list = this.get<AdminUser[]>('admins', SEEDED_ADMINS);
+    if (!list || list.length === 0) {
+      return [{ id: 'usr-a1', name: 'Dakshyam Admin', email: 'admin@dakshyam.com', role: 'admin', createdAt: '2026-01-01' }];
+    }
+    return list;
   }
 
   static getGroups(): StudentGroup[] {
@@ -381,7 +148,7 @@ export class DakshyamDatabase {
     this.set('applications', items);
   }
 
-  // Register standard mock auth simulation
+  // Active authenticated user state manager
   static getLoggedInUser() {
     try {
       const item = localStorage.getItem('dakshyam_logged_in_user');
@@ -429,7 +196,7 @@ export class DakshyamDatabase {
     return { success: true };
   }
 
-  static registerTrainer(name: string, email: string, password?: string): { success: boolean; error?: string } {
+  static registerTrainer(name: string, email: string, password?: string, isApproved = false): { success: boolean; error?: string } {
     const trainers = this.getTrainers();
     const emailsMatch = (u: any) => u.email.toLowerCase() === email.toLowerCase();
     
@@ -442,7 +209,7 @@ export class DakshyamDatabase {
       name,
       email,
       role: 'trainer',
-      isApproved: false, // Starts as pending admin approval!
+      isApproved, // Set depending on code verification or admin approval
       password: password || '123456',
       createdAt: new Date().toISOString().split('T')[0]
     };
@@ -529,11 +296,73 @@ export class DakshyamDatabase {
   }
 
   static getSupervisorPin(): string {
-    return this.get<string>('supervisor_pin', '123456');
+    return this.get<string>('supervisor_pin', '427752');
   }
 
   static saveSupervisorPin(pin: string): void {
     this.set('supervisor_pin', pin);
+  }
+
+  static getAppLogs(): AppLog[] {
+    return this.get<AppLog[]>('app_logs', [
+      {
+        id: 'log-initial',
+        timestamp: new Date().toISOString(),
+        action: 'System Seed',
+        details: 'Initial system initialization, NEP 2020 diagnostic guidelines loaded.',
+        userEmail: 'system@dakshyam.com',
+        role: 'admin',
+        status: 'INFO'
+      }
+    ]);
+  }
+
+  static saveAppLogs(logs: AppLog[]): void {
+    this.set('app_logs', logs);
+  }
+
+  static logEvent(action: string, details: string, userEmail: string, role: string, status: 'SUCCESS' | 'ERROR' | 'INFO' = 'INFO'): void {
+    try {
+      const logs = this.getAppLogs();
+      const newLog: AppLog = {
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        action,
+        details,
+        userEmail: userEmail || 'guest@dakshyam.com',
+        role: role || 'guest',
+        status
+      };
+      logs.unshift(newLog);
+      if (logs.length > 200) {
+        logs.length = 200;
+      }
+      this.saveAppLogs(logs);
+    } catch (e) {
+      console.error('Failed to write app event log:', e);
+    }
+  }
+
+  static clearUserRelatedData(): void {
+    this.saveStudents([]);
+    this.saveTrainers([]);
+    this.saveGroups([]);
+    this.saveVideos([]);
+    this.saveCertificates([]);
+    this.saveApplications([]);
+    this.saveSpecialEnrollments([]);
+    this.saveAppLogs([
+      {
+        id: `log-purge-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        action: 'Database Purged',
+        details: 'Admin purged and wiped all candidate data stores and group tables.',
+        userEmail: 'admin@dakshyam.com',
+        role: 'admin',
+        status: 'INFO'
+      }
+    ]);
+    console.log('Successfully cleared all user-related data.');
   }
 
   // --- COOKIE PROTOCOL UTILITIES ---

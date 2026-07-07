@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Trophy, BookOpen, ShieldCheck, Play, UserCircle, 
   LogOut, LogIn, ChevronRight, HelpCircle, Activity, Sparkles, School,
-  Sun, Moon, Menu, X, Eye, EyeOff, Lock, Settings, Key, Info
+  Sun, Moon, Menu, X, Eye, EyeOff, Lock, Settings, Key, Info, Cpu, Compass
 } from 'lucide-react';
 
 import ThreeBackground from './components/ThreeBackground';
@@ -20,6 +20,7 @@ import ContactUs from './components/ContactUs';
 
 import { DakshyamDatabase } from './utils/db';
 import { Course, CourseApplication, StudentGroup, StudentUser, Certificate, VideoPost, PromoBanner, GalleryImage } from './types';
+import { BeautifulErrorDisplay } from './utils/errorShield';
 
 // Firebase Auth SDK imports for secure password resetting
 import { 
@@ -29,7 +30,7 @@ import {
 import { auth as firebaseAuth } from './utils/firebase';
 
 export default function App() {
-  // Theme, Sandbox & Mobile Menu states
+  // Theme & Mobile Menu states
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
       const cookieTheme = DakshyamDatabase.getCookie('dakshyam_theme');
@@ -44,7 +45,6 @@ export default function App() {
   const [cookieConsent, setCookieConsent] = useState(() => DakshyamDatabase.getCookie('dakshyam_cookie_consent'));
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showSandboxHints, setShowSandboxHints] = useState(false);
   const [isStaffAccessEnabled, setIsStaffAccessEnabled] = useState(false);
 
   // 6-digit Supervisor access PIN states
@@ -83,6 +83,7 @@ export default function App() {
 
   // Secret passcode states (Trainer/Admin URL security)
   const [secretCode, setSecretCode] = useState('');
+  const [trainerRegCode, setTrainerRegCode] = useState('');
   const [authError, setAuthError] = useState('');
 
   // Rate limiting & security lockout states
@@ -92,6 +93,63 @@ export default function App() {
   // Forgot Password Recovery states
   const [resetEmail, setResetEmail] = useState('');
   const [resetSuccessMessage, setResetSuccessMessage] = useState('');
+
+  // Email verification states
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [otpStatusMsg, setOtpStatusMsg] = useState('');
+
+  const triggerOtp = async () => {
+    setOtpStatusMsg('');
+    const emailClean = studentEmail.trim();
+    if (!emailClean || !emailClean.includes('@')) {
+      setOtpStatusMsg('❌ Enter a valid email first.');
+      return;
+    }
+    setOtpStatusMsg('⏳ Signalling secure OTP server...');
+    try {
+      const res = await fetch('/api/verify/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailClean })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setOtpSent(true);
+        setOtpStatusMsg(data.message || '✓ Code dispatched!');
+      } else {
+        setOtpStatusMsg(`❌ Error: ${data.error || 'Request failed.'}`);
+      }
+    } catch (err: any) {
+      setOtpStatusMsg(`❌ Connection Error: ${err.message || err}`);
+    }
+  };
+
+  const confirmOtp = async () => {
+    setOtpStatusMsg('');
+    if (!otpInput) {
+      setOtpStatusMsg('❌ Enter the 6-digit verification code.');
+      return;
+    }
+    setOtpStatusMsg('⏳ Confirming profile security...');
+    try {
+      const res = await fetch('/api/verify/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: studentEmail.trim(), code: otpInput.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setIsEmailVerified(true);
+        setOtpStatusMsg('✓ Profile verified successfully! Proceed to register.');
+      } else {
+        setOtpStatusMsg(`❌ Error: ${data.error || 'Verification failed.'}`);
+      }
+    } catch (err: any) {
+      setOtpStatusMsg(`❌ Network Exception: ${err.message || err}`);
+    }
+  };
 
   // Strict secure input sanitization and verification against SQL/Query injection or Cross-Site Scripting (XSS)
   const isInputSafe = (val: string, fieldName = 'input'): { safe: boolean; error?: string } => {
@@ -177,8 +235,10 @@ export default function App() {
       const lockUntil = Date.now() + lockDuration;
       setLockoutTimers({ ...lockoutTimers, [emailStr.toLowerCase()]: lockUntil });
       setAuthError(`❌ SECURITY LOCKOUT: 5 failed attempts reached. Brute-force safeguard active. Access is locked for 30 seconds.`);
+      DakshyamDatabase.logEvent('Security Lockout Engaged', `User/Admin account ${emailStr} locked out due to 5 consecutive authentication failures.`, emailStr, 'unknown', 'ERROR');
     } else {
       setAuthError(`❌ Incorrect secure credentials. Attempt ${current}/5. Access blocks after 5 failures.`);
+      DakshyamDatabase.logEvent('Failed Authentication Attempt', `Failed login attempt ${current}/5 for email: ${emailStr}`, emailStr, 'unknown', 'ERROR');
     }
   };
 
@@ -271,6 +331,7 @@ export default function App() {
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [aboutState, setAboutState] = useState<any>(null);
+  const [isDbConnected, setIsDbConnected] = useState<boolean>(false);
 
   // Helper trigger to synchronize live database alterations across dashboards
   const refreshDb = () => {
@@ -355,6 +416,34 @@ export default function App() {
   }, [activeTab]);
 
   useEffect(() => {
+    // Eagerly sync all database records from the backend to local cache
+    const syncDatabaseOnBoot = async () => {
+      try {
+        const response = await fetch('/api/db/all');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.connected !== undefined) {
+            setIsDbConnected(!!data.connected);
+          }
+          // Synchronize keys into local storage
+          const keys = [
+            'students', 'trainers', 'groups', 'videos', 'certificates', 
+            'applications', 'special_programs', 'special_enrollments', 
+            'company_about', 'supervisor_pin', 'courses', 'banners', 'gallery_images', 'app_logs', 'admins'
+          ];
+          for (const key of keys) {
+            if (data[key] !== undefined && data[key] !== null) {
+              localStorage.setItem(`dakshyam_db_${key}`, JSON.stringify(data[key]));
+            }
+          }
+          refreshDb();
+        }
+      } catch (err) {
+        console.warn("Could not sync live MongoDB database on startup:", err);
+      }
+    };
+    
+    syncDatabaseOnBoot();
     refreshDb();
 
     // Secure URL listener: Check query parameters for secure trainer/admin login
@@ -435,11 +524,21 @@ export default function App() {
 
     const nameClean = studentName.trim();
     const emailClean = studentEmail.trim();
-    const phoneClean = studentPhone.trim();
+    const phoneClean = studentPhone.trim().replace(/\D/g, '');
     const schoolClean = studentSchool.trim();
 
     if (!nameClean || !emailClean || !phoneClean || !schoolClean || !passwordInput) {
       setAuthError('Please fill out all registration fields, including a secure password.');
+      return;
+    }
+
+    if (phoneClean.length !== 10) {
+      setAuthError('❌ WhatsApp Node must be exactly 10 digits.');
+      return;
+    }
+
+    if (!isEmailVerified) {
+      setAuthError('❌ Email address must be verified using the verification code first.');
       return;
     }
 
@@ -475,6 +574,7 @@ export default function App() {
         const latestStudents = DakshyamDatabase.getStudents();
         const createdUser = latestStudents.find(s => s.email.toLowerCase() === emailClean.toLowerCase());
         DakshyamDatabase.setLoggedInUser(createdUser);
+        DakshyamDatabase.logEvent('Student Registered', `New student ${nameClean} (${emailClean}) registered and signed up successfully.`, emailClean, 'student', 'SUCCESS');
         
         // Reset states
         setStudentName('');
@@ -483,11 +583,16 @@ export default function App() {
         setStudentSchool('');
         setPasswordInput('');
         setAuthError('');
+        setIsEmailVerified(false);
+        setOtpSent(false);
+        setOtpInput('');
+        setOtpStatusMsg('');
         setShowAuthModal(false);
         refreshDb();
         setActiveTab('portal'); // Take directly to workspace
       } else {
         setAuthError(res.error || 'Registration failed.');
+        DakshyamDatabase.logEvent('Student Registration Failed', `Signup failed for ${emailClean}. Error: ${res.error}`, emailClean, 'student', 'ERROR');
       }
     } catch {
       setAuthError('Registry server timeout.');
@@ -546,6 +651,7 @@ export default function App() {
         setFailedAttempts(updatedAttempts);
 
         DakshyamDatabase.setLoggedInUser(match);
+        DakshyamDatabase.logEvent('Student Logged In', `Student ${match.name} (${match.email}) authenticated successfully.`, match.email, 'student', 'SUCCESS');
         setShowAuthModal(false);
         setStudentEmail('');
         setPasswordInput('');
@@ -616,6 +722,7 @@ export default function App() {
         setFailedAttempts(updatedAttempts);
 
         DakshyamDatabase.setLoggedInUser(match);
+        DakshyamDatabase.logEvent('Trainer Logged In', `Supervisor/Trainer ${match.name} (${match.email}) authenticated successfully.`, match.email, 'trainer', 'SUCCESS');
         setShowAuthModal(false);
         setStudentEmail('');
         setPasswordInput('');
@@ -659,15 +766,24 @@ export default function App() {
       // HASHING PRIOR TO DB SUBMISSION
       const hashedPassword = await hashPassword(passwordInput);
 
-      const res = DakshyamDatabase.registerTrainer(nameClean, emailClean, hashedPassword);
+      const isApprovedCode = trainerRegCode.trim() === 'trainer@dki2026';
+      const res = DakshyamDatabase.registerTrainer(nameClean, emailClean, hashedPassword, isApprovedCode);
       if (res.success) {
         setStudentName('');
         setStudentEmail('');
         setPasswordInput('');
+        setTrainerRegCode('');
         refreshDb();
-        setAuthError('✓ APPLICATION REQUISITION SUBMITTED! Your account is held as "Pending Approval". Once a Dakshyam Admin grants access, you can run courses.');
+        if (isApprovedCode) {
+          setAuthError('✓ TRAINER ACCOUNT ACTIVATED INSTANTLY! You entered a valid Trainer Access Code. You can now login directly and access your workspace.');
+          DakshyamDatabase.logEvent('Trainer Self-Registered', `Trainer ${nameClean} (${emailClean}) auto-approved and activated using instant code.`, emailClean, 'trainer', 'SUCCESS');
+        } else {
+          setAuthError('✓ APPLICATION REQUISITION SUBMITTED! Your account is held as "Pending Approval". Once a Dakshyam Admin grants access (or you supply a Trainer Registration Code), you can run courses.');
+          DakshyamDatabase.logEvent('Trainer Registration Submitted', `Trainer ${nameClean} (${emailClean}) submitted application queue request (Approval Pending).`, emailClean, 'trainer', 'INFO');
+        }
       } else {
         setAuthError(res.error || 'Trainer application failed.');
+        DakshyamDatabase.logEvent('Trainer Registration Failed', `Trainer registration failed for ${emailClean}. Error: ${res.error || 'Duplicate record'}`, emailClean, 'trainer', 'ERROR');
       }
     } catch {
       setAuthError('Storage exception. Retry later.');
@@ -690,10 +806,11 @@ export default function App() {
       return;
     }
 
-    if (cleanCode === 'ADMIN2026') {
+    if (secretCode.trim() === 'dki2026@w' || cleanCode === 'DKI2026@W' || cleanCode === 'ADMIN2026') {
       try {
         const adminUser = DakshyamDatabase.getAdmins()[0];
         DakshyamDatabase.setLoggedInUser(adminUser);
+        DakshyamDatabase.logEvent('Admin Logged In', `Platform administrator authenticated successfully and opened system tools.`, adminUser.email, 'admin', 'SUCCESS');
         setShowAuthModal(false);
         setSecretCode('');
         
@@ -1100,20 +1217,143 @@ export default function App() {
 
             {/* VIEW 2: COURSE & SERVICES REQUEST */}
             {activeTab === 'services' && (
-              <div className="space-y-8 max-w-4xl mx-auto">
-                <div className={`text-center space-y-2 max-w-xl mx-auto border-b pb-4 ${isLight ? 'border-amber-500/10' : 'border-cyan-500/5'}`}>
-                  <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${isLight ? 'text-amber-700' : 'text-cyan-400'}`}>Apply for classes</span>
-                  <h1 className={`text-2xl font-black tracking-wide uppercase ${isLight ? 'text-slate-900' : 'text-white'}`}>Course Registration Cell</h1>
+              <div className="space-y-6 max-w-7xl mx-auto">
+                <div className={`text-center space-y-2 max-w-2xl mx-auto border-b pb-4 transition-colors duration-300 ${isLight ? 'border-amber-500/10' : 'border-cyan-500/5'}`}>
+                  <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${isLight ? 'text-amber-700' : 'text-cyan-400'}`}>Services & Academic Catalogs</span>
+                  <h1 className={`text-2xl sm:text-3xl font-black tracking-wide uppercase ${isLight ? 'text-slate-900' : 'text-white'}`}>Academic Admissions Portal</h1>
                   <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                    Pre-fills details from your active logged-in student profile. Choose from 3-month IoT schemes, Django/MERN tracks, autonomous systems, or customizable school hardware workshops.
+                    Choose from our National Education Policy (NEP 2020) compliant programs, explore STEM vocational frameworks, and submit your registration request below.
                   </p>
                 </div>
-                
-                <CourseRegistrationForm 
-                  courses={courses} 
-                  preselectedCourseId={preselectedCourseId}
-                  onSuccess={refreshDb}
-                />
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                  
+                  {/* LEFT SIDE: NEP 2020, STEM & COURSE CATALOGS */}
+                  <div className="lg:col-span-7 space-y-6">
+                    
+                    {/* NEP 2020 & STEM Briefing Card */}
+                    <div className={`border rounded-2xl p-6 backdrop-blur-md transition-all ${
+                      isLight ? 'bg-white border-amber-500/15 text-slate-800 shadow-sm' : 'bg-[#050505]/70 border-cyan-500/10 text-white'
+                    }`}>
+                      <h2 className={`text-sm sm:text-base font-bold tracking-wide mb-3 flex items-center gap-2 uppercase font-mono ${
+                        isLight ? 'text-amber-800' : 'text-cyan-400'
+                      }`}>
+                        <Cpu className="w-5 h-5 animate-pulse" /> NEP 2020 & STEM Education Paradigm
+                      </h2>
+                      
+                      <div className="space-y-4 text-xs font-sans">
+                        <div className={`p-4 rounded-xl border ${
+                          isLight ? 'bg-amber-500/5 border-amber-500/10' : 'bg-cyan-950/10 border-cyan-500/5'
+                        }`}>
+                          <h3 className={`font-extrabold mb-1 tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>National Education Policy Compliance (NEP 2020)</h3>
+                          <p className={`leading-relaxed ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>
+                            Our curriculum structures are built from the ground up to support NEP 2020's mandate for **experiential, vocational, and inquiry-driven learning**. By removing the traditional boundaries of theoretical assessments, we introduce 6th to 12th graders and college undergraduates to physical computing, manual circuit assembly, and hardware diagnostics, ensuring early-stage technological fluency.
+                          </p>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border ${
+                          isLight ? 'bg-amber-500/5 border-amber-500/10' : 'bg-cyan-950/10 border-cyan-500/5'
+                        }`}>
+                          <h3 className={`font-extrabold mb-1 tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>Industrial STEM Pedagogy</h3>
+                          <p className={`leading-relaxed ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>
+                            STEM at Dakshyam is more than code on a screen—it is a physical-digital handshake. Students assemble dual-H-bridge motors, write PWM logic parameters, configure real analog sensors, and deploy telemetry dashboards. This practical laboratory approach turns abstract math and physics (such as spatial kinematics and spatial vector calculations) into highly intuitive, real-world engineering skills.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dynamic Course Catalogs Panel */}
+                    <div className={`border rounded-2xl p-6 backdrop-blur-md transition-all ${
+                      isLight ? 'bg-white border-amber-500/15 text-slate-800 shadow-sm' : 'bg-[#050505]/70 border-cyan-500/10 text-white'
+                    }`}>
+                      <h2 className={`text-sm sm:text-base font-bold tracking-wide mb-3 flex items-center gap-2 uppercase font-mono ${
+                        isLight ? 'text-amber-800' : 'text-cyan-400'
+                      }`}>
+                        <BookOpen className="w-5 h-5" /> Available Program Catalogs
+                      </h2>
+                      <p className={`text-xs mb-4 ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>
+                        Click on any course catalog below to select it and update the registration request form on the right.
+                      </p>
+
+                      <div className="space-y-4">
+                        {courses.map(course => {
+                          const isSelected = preselectedCourseId === course.id || (!preselectedCourseId && courses[0]?.id === course.id);
+                          return (
+                            <div 
+                              key={course.id}
+                              onClick={() => setPreselectedCourseId(course.id)}
+                              className={`p-4 rounded-xl border transition-all cursor-pointer text-left relative ${
+                                isSelected 
+                                  ? (isLight ? 'bg-amber-500/[0.04] border-amber-500/40 shadow-sm' : 'bg-cyan-950/20 border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.05)]')
+                                  : (isLight ? 'bg-slate-50 border-slate-200/60 hover:bg-slate-100/50' : 'bg-black/40 border-slate-500/5 hover:border-cyan-500/15')
+                              }`}
+                            >
+                              <div className="flex justify-between items-start gap-2">
+                                <div>
+                                  <span className={`text-[9px] font-mono font-bold tracking-widest uppercase ${
+                                    isLight ? 'text-amber-700' : 'text-cyan-400'
+                                  }`}>
+                                    {course.duration} Program
+                                  </span>
+                                  <h3 className={`text-xs sm:text-sm font-black uppercase tracking-wide mt-0.5 ${
+                                    isLight ? 'text-slate-900' : 'text-white'
+                                  }`}>
+                                    {course.title}
+                                  </h3>
+                                </div>
+                                {isSelected && (
+                                  <span className={`text-[8px] font-mono uppercase font-bold tracking-wider px-2 py-0.5 rounded-md ${
+                                    isLight ? 'bg-amber-500/10 text-amber-700' : 'bg-cyan-500/10 text-cyan-400'
+                                  }`}>
+                                    Selected
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className={`text-xs mt-2 leading-relaxed ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>
+                                {course.description}
+                              </p>
+
+                              <div className="flex flex-wrap gap-1 mt-3">
+                                {course.tags.map((tag, tIdx) => (
+                                  <span key={tIdx} className={`text-[9px] font-mono font-semibold px-2 py-0.5 rounded ${
+                                    isLight ? 'bg-amber-500/5 text-amber-800' : 'bg-cyan-950/30 text-cyan-400/80'
+                                  }`}>
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* RIGHT SIDE: COURSE REGISTRATION FORM */}
+                  <div className="lg:col-span-5 space-y-6">
+                    <div className={`border rounded-2xl p-6 backdrop-blur-md transition-all ${
+                      isLight ? 'bg-white border-amber-500/15 text-slate-800 shadow-sm' : 'bg-[#050505]/70 border-cyan-500/10'
+                    }`}>
+                      <h2 className={`text-sm sm:text-base font-bold tracking-wide mb-3 flex items-center gap-2 uppercase font-mono ${
+                        isLight ? 'text-amber-800' : 'text-cyan-400'
+                      }`}>
+                        <Compass className="w-5 h-5" /> Registration Request
+                      </h2>
+                      <p className={`text-xs mb-4 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                        Pre-fills from your logged-in student profile automatically. Submit your registration choice for admin board verification.
+                      </p>
+
+                      <CourseRegistrationForm 
+                        courses={courses} 
+                        preselectedCourseId={preselectedCourseId}
+                        onSuccess={refreshDb}
+                      />
+                    </div>
+                  </div>
+
+                </div>
               </div>
             )}
 
@@ -1129,7 +1369,7 @@ export default function App() {
 
             {/* VIEW 5: VERIFY CERTIFICATES */}
             {activeTab === 'verification' && (
-              <CertificateVerify />
+              <CertificateVerify theme={theme} />
             )}
 
             {/* VIEW 6: ABOUT US COMPANY VIEW */}
@@ -1177,6 +1417,8 @@ export default function App() {
                         groups={groups} 
                         students={students} 
                         onRefresh={refreshDb}
+                        theme={theme}
+                        isDbConnected={isDbConnected}
                       />
                     )}
                   </>
@@ -1216,7 +1458,19 @@ export default function App() {
         >
           © 2026 Dakshyam innovations
         </div>
-        <div className="text-[8px] tracking-normal text-slate-400/60 uppercase">NEP-Aligned School IoT & Full-Stack Robotics Integrations</div>
+        <div className="text-[8px] tracking-normal text-slate-400/60 uppercase flex items-center gap-2">
+          <span>NEP-Aligned School IoT & Full-Stack Robotics Integrations</span>
+          <span className="text-slate-500">•</span>
+          <button
+            onClick={() => {
+              DakshyamDatabase.setCookie('dakshyam_cookie_consent', '');
+              setCookieConsent('');
+            }}
+            className="hover:text-[#22d3ee] underline transition-colors cursor-pointer text-[8px] font-mono lowercase tracking-normal"
+          >
+            [ manage cookies ]
+          </button>
+        </div>
       </footer>
 
       {/* AUTHENTICATION CONSOLE PANEL MODAL */}
@@ -1240,7 +1494,7 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
-              className={`border p-6 sm:p-7 max-w-sm w-full relative z-10 text-left space-y-5 transition-colors duration-300 flex flex-col justify-between ${
+              className={`border p-6 sm:p-7 max-w-sm w-full relative z-10 text-left space-y-5 transition-colors duration-300 flex flex-col justify-between max-h-[90vh] overflow-y-auto ${
                 isLight 
                   ? 'bg-white border-amber-500/20 shadow-[0_0_55px_rgba(217,119,6,0.06)]' 
                   : 'bg-[#050505]/98 border-cyan-500/20 shadow-[0_0_55px_rgba(6,182,212,0.12)]'
@@ -1352,13 +1606,7 @@ export default function App() {
 
               {/* Status Alert Notification */}
               {authError && (
-                <div className={`text-[10px] font-mono p-2.5 rounded-xl border leading-relaxed text-center ${
-                  authError.includes('✓') 
-                    ? 'text-emerald-600 border-emerald-500/20 bg-emerald-50 font-bold' 
-                    : (isLight ? 'text-red-600 border-red-500/15 bg-red-50/50' : 'text-red-400 border-red-500/20 bg-red-950/20')
-                }`}>
-                  {authError}
-                </div>
+                <BeautifulErrorDisplay errorText={authError} isLight={isLight} />
               )}
 
               {/* SECTION A: STUDENT REGISTRY */}
@@ -1470,13 +1718,80 @@ export default function App() {
                           type="email"
                           required
                           value={studentEmail}
-                          onChange={(e) => setStudentEmail(e.target.value)}
+                          onChange={(e) => {
+                            setStudentEmail(e.target.value);
+                            setIsEmailVerified(false);
+                            setOtpSent(false);
+                            setOtpInput('');
+                            setOtpStatusMsg('');
+                          }}
                           placeholder="e.g. kunal@example.com"
                           className={isLight 
                             ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500 focus:bg-white" 
                             : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-45"
                           }
                         />
+                      </div>
+
+                      {/* Real OTP Profile Verification Integration */}
+                      <div className={`p-3 border rounded-xl space-y-1.5 transition-all ${
+                        isLight ? 'bg-amber-500/5 border-amber-500/10' : 'bg-cyan-950/10 border-cyan-500/10'
+                      }`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`text-[9px] font-mono uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                            Email Verification Security
+                          </span>
+                          {isEmailVerified ? (
+                            <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-widest">
+                              ✓ Verified
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={triggerOtp}
+                              className={`text-[8px] font-mono uppercase px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                                isLight 
+                                  ? 'bg-amber-50 border-amber-500/20 text-amber-700 hover:bg-amber-100/50' 
+                                  : 'bg-cyan-950/40 border-cyan-500/15 text-[#22d3ee] hover:bg-cyan-900/40'
+                              }`}
+                            >
+                              {otpSent ? 'Resend Code' : 'Send Code'}
+                            </button>
+                          )}
+                        </div>
+                        {otpSent && !isEmailVerified && (
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              value={otpInput}
+                              onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                              placeholder="6-digit verification code"
+                              className={isLight
+                                ? "flex-1 bg-white border border-amber-500/20 text-slate-800 rounded-lg px-2.5 py-1 text-xs focus:outline-none"
+                                : "flex-1 bg-[#111]/70 border border-cyan-500/10 text-white rounded-lg px-2.5 py-1 text-xs focus:outline-none"
+                              }
+                            />
+                            <button
+                              type="button"
+                              onClick={confirmOtp}
+                              className={`text-[8px] font-mono font-bold uppercase px-3 py-1 rounded-lg border transition-all cursor-pointer ${
+                                isLight 
+                                  ? 'bg-amber-600 border-amber-500/20 text-white hover:bg-amber-700' 
+                                  : 'bg-cyan-500 border-cyan-400/20 text-slate-950 hover:bg-cyan-400'
+                              }`}
+                            >
+                              Verify
+                            </button>
+                          </div>
+                        )}
+                        {otpStatusMsg && (
+                          <p className={`text-[9px] font-mono ${
+                            otpStatusMsg.includes('✓') ? 'text-emerald-400' : 'text-amber-500/90'
+                          }`}>
+                            {otpStatusMsg}
+                          </p>
+                        )}
                       </div>
 
                       <div className="space-y-1">
@@ -1487,8 +1802,11 @@ export default function App() {
                           type="text"
                           required
                           value={studentPhone}
-                          onChange={(e) => setStudentPhone(e.target.value)}
-                          placeholder="+91 WhatsApp number"
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            if (val.length <= 10) setStudentPhone(val);
+                          }}
+                          placeholder="10-digit mobile number"
                           className={isLight 
                             ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500 focus:bg-white" 
                             : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-45"
@@ -1707,6 +2025,22 @@ export default function App() {
                           value={passwordInput}
                           onChange={(e) => setPasswordInput(e.target.value)}
                           placeholder="Create strong account passcode"
+                          className={isLight 
+                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500" 
+                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40"
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                          Trainer Registration Code (Optional)
+                        </label>
+                        <input
+                          type="password"
+                          value={trainerRegCode}
+                          onChange={(e) => setTrainerRegCode(e.target.value)}
+                          placeholder="trainer@dki2026 for instant approval"
                           className={isLight 
                             ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500" 
                             : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40"

@@ -73,7 +73,7 @@ export interface StudentGroup {
   name: string;
   projectTitle: string;
   projectDescription: string;
-  videoUrl?: string; // Optional student uploaded video mockup link/ID
+  videoUrl?: string; // Optional student uploaded video exhibition link/ID
   memberIds: string[]; // List of Student IDs
   points: number;
   trainerId: string; // Trainer who created the group
@@ -123,7 +123,7 @@ export interface VideoPost {
   groupName: string;
   title: string;
   description: string;
-  videoUrl: string; // placeholder/mock url
+  videoUrl: string; // exhibition category identifier
   likes: number;
   likedByUserIds: string[];
   views: number;
@@ -186,4 +186,15 @@ export interface SpecialProgramEnrollment {
   mobileNumber: string;
   enrolledAt: string;
 }
+
+export interface AppLog {
+  id: string;
+  timestamp: string;
+  action: string;
+  details: string;
+  userEmail: string;
+  role: string;
+  status: 'SUCCESS' | 'ERROR' | 'INFO';
+}
+
 
