@@ -4,7 +4,7 @@ import {
   Trophy, BookOpen, ShieldCheck, Play, UserCircle, 
   LogOut, LogIn, ChevronRight, HelpCircle, Activity, Sparkles, School,
   Sun, Moon, Menu, X, Eye, EyeOff, Lock, Settings, Key, Info, Cpu, Compass,
-  UserPlus, ShieldAlert, CheckCircle2, Check
+  UserPlus, ShieldAlert, CheckCircle2, Check, ClipboardList
 } from 'lucide-react';
 
 import ThreeBackground from './components/ThreeBackground';
@@ -19,6 +19,8 @@ import AdminDashboard from './components/AdminDashboard';
 import AboutCompany from './components/AboutCompany';
 import ContactUs from './components/ContactUs';
 import PageLoader from './components/PageLoader';
+import WorkshopFeedbackForm from './components/WorkshopFeedbackForm';
+import AdminWorkshopFeedbackManager from './components/AdminWorkshopFeedbackManager';
 
 import { DakshyamDatabase } from './utils/db';
 import { Course, CourseApplication, StudentGroup, StudentUser, Certificate, VideoPost, PromoBanner, GalleryImage, PageLoaderConfig } from './types';
@@ -55,12 +57,40 @@ export default function App() {
   const [enteredPin, setEnteredPin] = useState('');
   const [pinError, setPinError] = useState('');
 
+  // Helper to parse feedback routes (supports /feedback-form/workshop-name, /feedback-form, ?tab=feedback, etc.)
+  const parseInitialFeedbackRoute = () => {
+    try {
+      if (typeof window === 'undefined') return { isFeedback: false, slug: null };
+      const pathname = window.location.pathname;
+      const searchParams = new URLSearchParams(window.location.search);
+
+      if (pathname.startsWith('/feedback-form') || pathname.startsWith('/feedback')) {
+        const parts = pathname.split('/').filter(Boolean);
+        const slug = parts.length > 1 ? decodeURIComponent(parts.slice(1).join('/')) : null;
+        return { isFeedback: true, slug, fromPath: true };
+      }
+
+      if (searchParams.get('tab') === 'feedback' || searchParams.get('feedback') !== null) {
+        const slug = searchParams.get('workshop') || searchParams.get('w') || searchParams.get('ws');
+        return { isFeedback: true, slug, fromPath: false };
+      }
+    } catch (e) {
+      console.error('URL parse fail', e);
+    }
+    return { isFeedback: false, slug: null, fromPath: false };
+  };
+
+  const initialFeedbackRoute = parseInitialFeedbackRoute();
+
   // Navigation states
-  const [activeTab, setActiveTab] = useState<'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact'>(() => {
+  const [activeTab, setActiveTab] = useState<'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact' | 'feedback'>(() => {
+    if (initialFeedbackRoute.isFeedback) {
+      return 'feedback';
+    }
     try {
       const searchParams = new URLSearchParams(window.location.search);
       const tabParam = searchParams.get('tab');
-      if (tabParam && ['home', 'services', 'leaderboard', 'social', 'portal', 'verification', 'about', 'contact'].includes(tabParam)) {
+      if (tabParam && ['home', 'services', 'leaderboard', 'social', 'portal', 'verification', 'about', 'contact', 'feedback'].includes(tabParam)) {
         return tabParam as any;
       }
     } catch (e) {
@@ -68,6 +98,14 @@ export default function App() {
     }
     return 'home';
   });
+  const [feedbackViewMode, setFeedbackViewMode] = useState<'audit' | 'form'>(() => {
+    // If arriving via shared feedback link, default directly to public participant form
+    if (initialFeedbackRoute.isFeedback) {
+      return 'form';
+    }
+    return 'audit';
+  });
+  const [preselectedWorkshopSlug, setPreselectedWorkshopSlug] = useState<string | null>(initialFeedbackRoute.slug);
   const [preselectedCourseId, setPreselectedCourseId] = useState<string | null>(null);
 
   // --- ANIMATED VIDEO LAZY LOADER STATES ---
@@ -113,6 +151,30 @@ export default function App() {
     }
   }, []);
 
+  // Listen to browser navigation popstate (e.g. back/forward or direct feedback links)
+  useEffect(() => {
+    const handlePopState = () => {
+      const route = parseInitialFeedbackRoute();
+      if (route.isFeedback) {
+        setActiveTab('feedback');
+        setFeedbackViewMode('form');
+        if (route.slug) {
+          setPreselectedWorkshopSlug(route.slug);
+        }
+      } else {
+        const searchParams = new URLSearchParams(window.location.search);
+        const tabParam = searchParams.get('tab');
+        if (tabParam && ['home', 'services', 'leaderboard', 'social', 'portal', 'verification', 'about', 'contact', 'feedback'].includes(tabParam)) {
+          setActiveTab(tabParam as any);
+        } else {
+          setActiveTab('home');
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Compute active loader configuration with local video preference
   const activeLoaderConfig: PageLoaderConfig = {
     ...pageLoaderConfig,
@@ -121,13 +183,38 @@ export default function App() {
 
   // Safe navigation function triggering the animated lazy loader on every page change
   const navigateToTab = (
-    newTab: 'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact',
-    preselectCourse: string | null = null
+    newTab: 'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact' | 'feedback',
+    preselectCourse: string | null = null,
+    preselectWorkshop: string | null = null
   ) => {
     if (preselectCourse !== undefined) {
       setPreselectedCourseId(preselectCourse);
     }
+    if (preselectWorkshop !== undefined) {
+      setPreselectedWorkshopSlug(preselectWorkshop);
+    }
     setMenuOpen(false);
+
+    try {
+      const url = new URL(window.location.href);
+      if (newTab === 'feedback') {
+        url.searchParams.set('tab', 'feedback');
+        if (preselectWorkshop) {
+          url.searchParams.set('workshop', preselectWorkshop);
+        }
+      } else if (newTab === 'home') {
+        url.pathname = '/';
+        url.searchParams.delete('tab');
+        url.searchParams.delete('workshop');
+        url.searchParams.delete('feedback');
+      } else {
+        url.pathname = '/';
+        url.searchParams.set('tab', newTab);
+        url.searchParams.delete('workshop');
+        url.searchParams.delete('feedback');
+      }
+      window.history.replaceState(null, '', url.toString());
+    } catch {}
 
     if (newTab === activeTab) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1129,6 +1216,22 @@ export default function App() {
             >
               CONTACT US
             </button>
+
+            {/* RESTRICTED ACCESS: WORKSHOP FEEDBACK (Admin & Trainer ONLY) */}
+            {currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') && (
+              <button
+                onClick={() => navigateToTab('feedback')}
+                className={`px-3 py-1.5 rounded-lg transition-all border flex items-center gap-1.5 font-mono ${
+                  activeTab === 'feedback' 
+                    ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold shadow-[0_0_12px_rgba(56,189,248,0.25)]') 
+                    : (isLight ? 'border-amber-500/25 bg-amber-50/70 text-amber-950 hover:bg-amber-100/70 font-semibold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20')
+                }`}
+                title="Workshop Participant Feedback Management Console"
+              >
+                <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
+                <span>FEEDBACK AUDIT</span>
+              </button>
+            )}
           </nav>
 
           {/* Right Theme & Auth Action button segment */}
@@ -1298,6 +1401,21 @@ export default function App() {
                 >
                   CONTACT US
                 </button>
+
+                {/* RESTRICTED ACCESS: WORKSHOP FEEDBACK (Admin & Trainer ONLY) */}
+                {currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') && (
+                  <button
+                    onClick={() => navigateToTab('feedback')}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all flex items-center gap-2 font-mono ${
+                      activeTab === 'feedback' 
+                        ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold') 
+                        : (isLight ? 'border-amber-500/25 bg-amber-50 text-amber-950 font-bold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300')
+                    }`}
+                  >
+                    <ClipboardList className="w-4 h-4 text-amber-400" />
+                    <span>WORKSHOP FEEDBACK AUDIT</span>
+                  </button>
+                )}
 
                 <div className="pt-2 border-t border-slate-500/10">
                   {currentUser ? (
@@ -1597,6 +1715,69 @@ export default function App() {
             {/* VIEW 7: CONTACT US PAGE VIEW */}
             {activeTab === 'contact' && (
               <ContactUs theme={theme} />
+            )}
+
+            {/* VIEW 8: WORKSHOP EVALUATION & FEEDBACK (Student Direct Form via Link & Admin/Trainer Management Audit) */}
+            {activeTab === 'feedback' && (
+              <div className="w-full">
+                {currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') ? (
+                  <div className="space-y-4">
+                    {/* View Switcher: Audit Console vs Participant Form Preview */}
+                    <div className="flex flex-wrap items-center justify-between max-w-7xl mx-auto px-4 gap-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setFeedbackViewMode('audit')}
+                          className={`text-2xs font-mono font-bold px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                            feedbackViewMode === 'audit'
+                              ? (isLight ? 'bg-blue-950 text-white border-blue-950 shadow-xs' : 'bg-sky-500/20 border-sky-400 text-sky-300 shadow-[0_0_10px_rgba(56,189,248,0.2)]')
+                              : (isLight ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700')
+                          }`}
+                        >
+                          📊 Feedback Audit & Export Console
+                        </button>
+                        <button
+                          onClick={() => setFeedbackViewMode('form')}
+                          className={`text-2xs font-mono font-bold px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                            feedbackViewMode === 'form'
+                              ? (isLight ? 'bg-blue-950 text-white border-blue-950 shadow-xs' : 'bg-sky-500/20 border-sky-400 text-sky-300 shadow-[0_0_10px_rgba(56,189,248,0.2)]')
+                              : (isLight ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700')
+                          }`}
+                        >
+                          📝 Participant Public Form Preview
+                        </button>
+                      </div>
+
+                      <div className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Logged in as <strong>{currentUser.name}</strong> ({currentUser.role.toUpperCase()})</span>
+                      </div>
+                    </div>
+
+                    {feedbackViewMode === 'audit' ? (
+                      <AdminWorkshopFeedbackManager
+                        theme={theme}
+                        currentUserRole={currentUser.role}
+                        onOpenPublicForm={(wsId) => {
+                          if (wsId) setPreselectedWorkshopSlug(wsId);
+                          setFeedbackViewMode('form');
+                        }}
+                      />
+                    ) : (
+                      <WorkshopFeedbackForm
+                        theme={theme}
+                        onNavigateHome={() => setFeedbackViewMode('audit')}
+                        preselectedWorkshopId={preselectedWorkshopSlug}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <WorkshopFeedbackForm
+                    theme={theme}
+                    onNavigateHome={() => navigateToTab('home')}
+                    preselectedWorkshopId={preselectedWorkshopSlug}
+                  />
+                )}
+              </div>
             )}
 
             {/* VIEW 6: MEMBERS / ROLES AREA DASHBOARDS */}

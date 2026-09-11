@@ -14,6 +14,7 @@ import { AboutEditorTab } from './AboutEditorTab';
 import OfficialCertificate from './OfficialCertificate';
 import PageLoaderSettingsTab from './PageLoaderSettingsTab';
 import Home3DArtSettingsTab from './Home3DArtSettingsTab';
+import AdminWorkshopFeedbackManager from './AdminWorkshopFeedbackManager';
 
 interface AdminDashboardProps {
   courses: Course[];
@@ -38,7 +39,7 @@ export default function AdminDashboard({
 }: AdminDashboardProps) {
   const isLight = theme === 'light';
   // Navigation tabs
-  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'promotions' | 'gallery' | 'special_training' | 'certificates' | 'about_editor' | 'page_loader' | 'home_3d_art' | 'logs';
+  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'promotions' | 'gallery' | 'special_training' | 'certificates' | 'about_editor' | 'page_loader' | 'home_3d_art' | 'logs' | 'workshop_feedback';
   const [adminTab, setAdminTab] = useState<TabType>('analytics');
 
   // Audit Logs Filtering States
@@ -925,7 +926,7 @@ export default function AdminDashboard({
       <div className={`flex flex-wrap gap-1.5 border-b pb-0.5 font-mono text-3xs uppercase font-extrabold scrollbar-none overflow-x-auto ${
         isLight ? 'border-slate-200' : 'border-cyan-500/10'
       }`}>
-        {(['analytics', 'courses', 'applications', 'trainers', 'promotions', 'gallery', 'special_training', 'certificates', 'about_editor', 'page_loader', 'home_3d_art', 'logs'] as const).map(tab => (
+        {(['analytics', 'courses', 'applications', 'trainers', 'promotions', 'gallery', 'special_training', 'certificates', 'about_editor', 'page_loader', 'home_3d_art', 'workshop_feedback', 'logs'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setAdminTab(tab)}
@@ -946,6 +947,7 @@ export default function AdminDashboard({
             {tab === 'about_editor' && '✏️ About Page Editor'}
             {tab === 'page_loader' && '🎬 Video Page Loader'}
             {tab === 'home_3d_art' && '🧊 Home 3D Art (.obj)'}
+            {tab === 'workshop_feedback' && '📋 Workshop Feedbacks'}
             {tab === 'logs' && '🛡️ System Audit Logs'}
           </button>
         ))}
@@ -2942,6 +2944,13 @@ export default function AdminDashboard({
             </div>
           );
         })()}
+
+        {/* TAB: WORKSHOP FEEDBACK MANAGER */}
+        {adminTab === 'workshop_feedback' && (
+          <div className="w-full">
+            <AdminWorkshopFeedbackManager theme={theme} currentUserRole="admin" />
+          </div>
+        )}
 
           </motion.div>
         </AnimatePresence>

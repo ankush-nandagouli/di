@@ -8,6 +8,7 @@ interface DakshyamLogoProps {
   interactive?: boolean;
   pulseGlow?: boolean;
   theme?: 'light' | 'dark';
+  className?: string;
 }
 
 export default function DakshyamLogo({
@@ -16,6 +17,7 @@ export default function DakshyamLogo({
   interactive = true,
   pulseGlow = true,
   theme = 'dark',
+  className = '',
 }: DakshyamLogoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<SVGGElement>(null);
@@ -160,7 +162,7 @@ export default function DakshyamLogo({
       ref={containerRef}
       className={`relative inline-flex flex-col items-center justify-center transition-all duration-300 ${
         interactive ? 'cursor-pointer hover:shadow-2xl hover:shadow-blue-500/10' : ''
-      }`}
+      } ${className}`}
     >
       {/* 1. Pulse glowing background elements if prompted */}
       {pulseGlow && (

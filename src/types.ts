@@ -213,4 +213,67 @@ export interface PageLoaderConfig {
   updatedAt?: string;
 }
 
+// Workshop Feedback System Types
+export type ParticipantCategory = 'student' | 'school' | 'college' | 'other';
+
+export interface WorkshopItem {
+  id: string;
+  name: string;
+  date: string;
+  venue: string;
+  trainerName?: string;
+  description?: string;
+  isActive: boolean;
+}
+
+export interface CustomFeedbackQuestion {
+  id: string;
+  label: string;
+  type: 'text' | 'rating' | 'choice' | 'yesno';
+  required: boolean;
+  options?: string[];
+}
+
+export interface WorkshopFeedbackConfig {
+  id: string;
+  formTitle: string;
+  formSubtitle: string;
+  isOpen: boolean;
+  workshops: WorkshopItem[];
+  customQuestions: CustomFeedbackQuestion[];
+  updatedAt: string;
+}
+
+export interface WorkshopFeedbackSubmission {
+  id: string;
+  workshopId: string;
+  workshopName: string;
+  workshopDate: string;
+  workshopVenue: string;
+  participantCategory: ParticipantCategory;
+  fullName: string;
+  email: string;
+  phone: string;
+  institutionName: string;
+  city: string;
+  state: string;
+  branchOrGrade?: string;
+  rollOrEmployeeId?: string;
+  designationOrRole?: string;
+  overallRating: number;
+  trainerKnowledgeRating: number;
+  practicalHardwareRating: number;
+  industryRelevanceRating: number;
+  labManagementRating: number;
+  keyLearnings: string;
+  favoriteComponent: string;
+  improvementSuggestions: string;
+  futureInterests: string[];
+  recommendDakshyam: 'Yes, Definitely' | 'Likely' | 'Uncertain' | 'No';
+  testimonial?: string;
+  customAnswers?: Record<string, any>;
+  submittedAt: string;
+}
+
+
 

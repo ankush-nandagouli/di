@@ -7,6 +7,7 @@ import { uploadMediaToCloudinary } from '../utils/mediaUpload';
 import TrainerGuide from './TrainerGuide';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
 import OfficialCertificate from './OfficialCertificate';
+import AdminWorkshopFeedbackManager from './AdminWorkshopFeedbackManager';
 
 interface TrainerDashboardProps {
   trainer: TrainerUser;
@@ -31,7 +32,7 @@ export default function TrainerDashboard({
 }: TrainerDashboardProps) {
   const isLight = theme === 'light';
   // Navigation states inside dashboard
-  const [activeTab, setActiveTab] = useState<'groups' | 'assessment' | 'certificates' | 'guide' | 'profile'>('groups');
+  const [activeTab, setActiveTab] = useState<'groups' | 'assessment' | 'certificates' | 'guide' | 'feedback' | 'profile'>('groups');
 
   // Trainer Profile States
   const [phone, setPhone] = useState(trainer.profile?.phone || '');
@@ -262,17 +263,17 @@ export default function TrainerDashboard({
       <div className={`flex flex-wrap gap-1.5 border-b pb-0.5 font-mono text-2xs uppercase ${
         isLight ? 'border-slate-200' : 'border-cyan-500/10'
       }`}>
-        {(['groups', 'assessment', 'certificates', 'guide', 'profile'] as const).map(tab => (
+        {(['groups', 'assessment', 'certificates', 'guide', 'feedback', 'profile'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2.5 rounded-t-xl transition-all border-t border-x cursor-pointer ${
               activeTab === tab
                 ? (isLight ? 'bg-white border-slate-250 text-amber-800 font-bold border-b-white z-10' : 'bg-[#050505]/70 border-cyan-500/15 text-[#22d3ee] font-bold')
-                : (isLight ? 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50' : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-500/5')
+                : (isLight ? 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50' : 'border-transparent text-slate-450 hover:text-white hover:bg-slate-500/5')
             }`}
           >
-            {tab === 'groups' ? 'Group Builder' : tab === 'assessment' ? 'Assessment Matrix' : tab === 'certificates' ? 'Publish Certificates' : tab === 'guide' ? '📖 Curriculum Guides' : '👤 Profile Details'}
+            {tab === 'groups' ? 'Group Builder' : tab === 'assessment' ? 'Assessment Matrix' : tab === 'certificates' ? 'Publish Certificates' : tab === 'guide' ? '📖 Curriculum Guides' : tab === 'feedback' ? '📋 Workshop Feedbacks' : '👤 Profile Details'}
           </button>
         ))}
       </div>
@@ -1106,6 +1107,13 @@ export default function TrainerDashboard({
               </div>
             </div>
 
+          </div>
+        )}
+
+        {/* TAB 6: WORKSHOP FEEDBACK REVIEW & EXPORT */}
+        {activeTab === 'feedback' && (
+          <div className="w-full">
+            <AdminWorkshopFeedbackManager theme={theme} currentUserRole="trainer" />
           </div>
         )}
           </motion.div>

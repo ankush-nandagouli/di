@@ -65,5 +65,20 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read, write: if true;
     }
+
+    // Workshop Feedbacks (Submissions from participants)
+    match /workshop_feedbacks/{feedbackId} {
+      allow create: if request.resource.data.fullName is string 
+                    && request.resource.data.email is string
+                    && request.resource.data.workshopId is string
+                    && isDataSizeOk(request.resource.data);
+      allow read, update, delete: if true;
+    }
+
+    // Workshop Feedback Configurations (Admin custom questions & programs)
+    match /workshop_feedback_configs/{configId} {
+      allow read: if true;
+      allow write: if isDataSizeOk(request.resource.data);
+    }
   }
 }

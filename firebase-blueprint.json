@@ -155,6 +155,55 @@
         "value": { "type": "object" }
       },
       "required": ["value"]
+    },
+    "workshop_feedback": {
+      "title": "Workshop Feedback",
+      "description": "Participant workshop evaluations from students, schools, colleges, and industry attendees",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workshopId": { "type": "string" },
+        "workshopName": { "type": "string" },
+        "workshopDate": { "type": "string" },
+        "workshopVenue": { "type": "string" },
+        "participantCategory": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "institutionName": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "branchOrGrade": { "type": "string" },
+        "rollOrEmployeeId": { "type": "string" },
+        "overallRating": { "type": "number" },
+        "trainerKnowledgeRating": { "type": "number" },
+        "practicalHardwareRating": { "type": "number" },
+        "industryRelevanceRating": { "type": "number" },
+        "labManagementRating": { "type": "number" },
+        "keyLearnings": { "type": "string" },
+        "favoriteComponent": { "type": "string" },
+        "improvementSuggestions": { "type": "string" },
+        "futureInterests": { "type": "array" },
+        "recommendDakshyam": { "type": "string" },
+        "testimonial": { "type": "string" },
+        "customAnswers": { "type": "object" },
+        "submittedAt": { "type": "string" }
+      },
+      "required": ["id", "workshopName", "participantCategory", "fullName", "email", "phone", "institutionName", "overallRating", "submittedAt"]
+    },
+    "workshop_feedback_config": {
+      "title": "Workshop Feedback Configuration",
+      "description": "Admin settings, active workshop programs, customizable questions, and submission status",
+      "type": "object",
+      "properties": {
+        "workshops": { "type": "array" },
+        "formTitle": { "type": "string" },
+        "formSubtitle": { "type": "string" },
+        "isOpen": { "type": "boolean" },
+        "customQuestions": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["formTitle", "isOpen", "updatedAt"]
     }
   },
   "firestore": {
@@ -197,6 +246,14 @@
     "/settings/{settingId}": {
       "schema": "settings",
       "description": "System variables and administrative profiles"
+    },
+    "/workshop_feedbacks/{feedbackId}": {
+      "schema": "workshop_feedback",
+      "description": "Collected student, school, and college workshop feedback forms"
+    },
+    "/workshop_feedback_configs/{configId}": {
+      "schema": "workshop_feedback_config",
+      "description": "Admin configuration for workshop feedback form"
     }
   }
 }
