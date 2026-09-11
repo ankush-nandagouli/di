@@ -1,58 +1,210 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    
+    <!-- Favicons and Touch Icons -->
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="alternate icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Search Engine Verification -->
     <meta name="google-site-verification" content="-J-4SJZZSZi8ZnXnGNkyvz1Sul8ujkFSQ-K5FoxFDug" />
+    
     <!-- Primary SEO Metadata -->
     <title>Dakshyam Innovations | IoT Training, Web Development & Industrial Automation</title>
     <meta name="title" content="Dakshyam Innovations | IoT Training, Web Development & Industrial Automation" />
-    <meta name="description" content="Dakshyam Innovations offers professional IoT services, expert full-stack web development, and comprehensive computer training in MERN stack, Django, and Flask. We also design advanced electronics lab setups. Coming this August!" />
-    <meta name="keywords" content="dakshyam innovations, dakshyam iot, daksyam balaghat, dakshyam waraseoni, daskshyam launch, daksyam, dakshyam, dakshyam innovation, dakshyam launch, iot training, web development, full stack, iot services, computer training, lab setups, learn django, learn mern, learn flask, learn react, learn python, iot startup balaghat, embedded systems waraseoni, industrial automation india, smart telemetry systems" />
-    <meta name="robots" content="index, follow" />
+    <meta name="description" content="Dakshyam Innovations offers elite Industrial IoT services, expert full-stack web engineering, industrial automation, and hands-on technical robotics and computer training with digital credential verification." />
+    <meta name="keywords" content="Dakshyam Innovations, Dakshyam IoT, Dakshyam Robotics, Industrial IoT India, IoT Training Balaghat, Embedded Systems Waraseoni, Web Development MERN, Learn Django Balaghat, Learn React India, Computer Training Institute Balaghat, Smart Telemetry Systems, Electronics Lab Setup, Industrial Automation Madhya Pradesh, Digital Certificate Verification, STEM Robotics Lab, IoT Startup Balaghat, Full Stack Web Engineering" />
     <meta name="author" content="Dakshyam Innovations" />
+    <meta name="publisher" content="Dakshyam Innovations" />
+    <meta name="copyright" content="Dakshyam Innovations" />
+    <meta name="rating" content="general" />
+    <meta name="revisit-after" content="2 days" />
+    <meta name="language" content="English" />
+    
+    <!-- Crawling & Indexing Directives -->
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
     <link rel="canonical" href="https://dakshyaminnovations.vercel.app/" />
+
+    <!-- Local SEO Geo Positioning -->
+    <meta name="geo.region" content="IN-MP" />
+    <meta name="geo.placename" content="Balaghat, Madhya Pradesh, India" />
+    <meta name="geo.position" content="21.8129;80.1838" />
+    <meta name="ICBM" content="21.8129, 80.1838" />
+
+    <!-- Mobile App & Theme Styling -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#0f172a" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a192f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Dakshyam" />
+    <meta name="format-detection" content="telephone=no" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://dakshyaminnovations.vercel.app/" />
+    <meta property="og:site_name" content="Dakshyam Innovations" />
     <meta property="og:title" content="Dakshyam Innovations | IoT Training, Web Development & Industrial Automation" />
-    <meta property="og:description" content="Professional IoT services, full-stack development, and computer training (MERN, Django, Flask) alongside premium lab setups. Arriving August 2026." />
-    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:description" content="Dakshyam Innovations offers elite Industrial IoT services, expert full-stack web engineering, industrial automation, and hands-on technical robotics and computer training with digital credential verification." />
+    <meta property="og:image" content="https://dakshyaminnovations.vercel.app/logo.png" />
+    <meta property="og:image:secure_url" content="https://dakshyaminnovations.vercel.app/logo.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Dakshyam Innovations - Sovereign Skill Systems & Robotics Integration" />
+    <meta property="og:locale" content="en_IN" />
 
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://dakshyaminnovations.vercel.app/" />
-    <meta property="twitter:title" content="Dakshyam Innovations | IoT Training, Web Development & Industrial Automation" />
-    <meta property="twitter:description" content="Professional IoT services, full-stack development, and computer training (MERN, Django, Flask) alongside premium lab setups. Arriving August 2026." />
-    <meta property="twitter:image" content="/og-image.png" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://dakshyaminnovations.vercel.app/" />
+    <meta name="twitter:title" content="Dakshyam Innovations | IoT Training, Web Development & Industrial Automation" />
+    <meta name="twitter:description" content="Dakshyam Innovations offers elite Industrial IoT services, expert full-stack web engineering, industrial automation, and hands-on technical robotics and computer training with digital credential verification." />
+    <meta name="twitter:image" content="https://dakshyaminnovations.vercel.app/logo.png" />
+    <meta name="twitter:image:alt" content="Dakshyam Innovations - Sovereign Skill Systems & Robotics Integration" />
+    <meta name="twitter:creator" content="@DakshyamInno" />
 
-    <!-- Structured JSON-LD Data for Google Rich Snippets -->
+    <!-- Performance: DNS Prefetch & Preconnect for Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+    <link href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@600;700;800;900&family=Cinzel+Decorative:wght@700;900&family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,600&family=Playfair+Display:ital,wght@0,600;0,700;0,800;0,900;1,600;1,700&display=swap" rel="stylesheet" />
+
+    <!-- Comprehensive Schema.org (JSON-LD) Microdata -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "Organization",
-        "name": "Dakshyam Innovations",
-        "alternateName": [
-          "Dakshyam IoT",
-          "Daksyam Balaghat",
-          "Dakshyam Waraseoni",
-          "Daskshyam Launch",
-          "Daksyam"
-        ],
-        "url": "https://dakshyaminnovations.vercel.app/",
-        "logo": "https://dakshyaminnovations.vercel.app/logo.png",
-        "description": "Dakshyam Innovations provides state-of-the-art Industrial IoT services, elite web & full-stack development, professional computer training setups (Django, MERN, Flask), and technical lab setups.",
-        "address": {
-          "@type": "PostalAddress",
-          "addressLocality": "Balaghat",
-          "addressRegion": "Madhya Pradesh",
-          "addressCountry": "IN"
-        },
-        "sameAs": [
-          "https://github.com/dakshyam-innovations"
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://dakshyaminnovations.vercel.app/#website",
+            "url": "https://dakshyaminnovations.vercel.app/",
+            "name": "Dakshyam Innovations",
+            "description": "Industrial IoT Systems, Full-Stack Web Development, Robotics Training, and Advanced Electronics Lab Setups.",
+            "publisher": {
+              "@id": "https://dakshyaminnovations.vercel.app/#organization"
+            },
+            "inLanguage": "en-US"
+          },
+          {
+            "@type": "EducationalOrganization",
+            "@id": "https://dakshyaminnovations.vercel.app/#organization",
+            "name": "Dakshyam Innovations",
+            "alternateName": [
+              "Dakshyam IoT",
+              "Dakshyam Robotics",
+              "Dakshyam Balaghat",
+              "Dakshyam Waraseoni",
+              "Daksyam"
+            ],
+            "url": "https://dakshyaminnovations.vercel.app/",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://dakshyaminnovations.vercel.app/logo.png",
+              "width": 512,
+              "height": 512
+            },
+            "image": "https://dakshyaminnovations.vercel.app/logo.png",
+            "description": "Dakshyam Innovations provides state-of-the-art Industrial IoT services, elite web & full-stack development, professional computer training setups (Django, MERN, Flask), and technical lab setups.",
+            "email": "contact@dakshyaminnovations.com",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Balaghat",
+              "addressRegion": "Madhya Pradesh",
+              "postalCode": "481001",
+              "addressCountry": "IN"
+            },
+            "geo": {
+              "@type": "GeoCoordinates",
+              "latitude": 21.8129,
+              "longitude": 80.1838
+            },
+            "sameAs": [
+              "https://github.com/dakshyam-innovations",
+              "https://linkedin.com/company/dakshyam-innovations"
+            ],
+            "hasOfferCatalog": {
+              "@type": "OfferCatalog",
+              "name": "Vocational Technical Training & Services",
+              "itemListElement": [
+                {
+                  "@type": "Course",
+                  "name": "Industrial IoT Systems & Embedded Architecture",
+                  "description": "Hands-on industrial automation, sensor telemetry, edge computing, ESP32/ARM, and cloud connectivity.",
+                  "provider": {
+                    "@id": "https://dakshyaminnovations.vercel.app/#organization"
+                  }
+                },
+                {
+                  "@type": "Course",
+                  "name": "Full-Stack Web Engineering (MERN & Django)",
+                  "description": "Professional modern web engineering covering React, Node.js, Express, Python Django, and database engineering.",
+                  "provider": {
+                    "@id": "https://dakshyaminnovations.vercel.app/#organization"
+                  }
+                },
+                {
+                  "@type": "Course",
+                  "name": "Robotics & Microcontroller Automation Setup",
+                  "description": "Advanced hardware fabrication, PCB layout basics, actuator control, and industrial smart systems.",
+                  "provider": {
+                    "@id": "https://dakshyaminnovations.vercel.app/#organization"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": "https://dakshyaminnovations.vercel.app/#breadcrumbs",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://dakshyaminnovations.vercel.app/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Technical Services & Curriculum",
+                "item": "https://dakshyaminnovations.vercel.app/?tab=services"
+              },
+              {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "Digital Credential Verification",
+                "item": "https://dakshyaminnovations.vercel.app/?tab=verification"
+              },
+              {
+                "@type": "ListItem",
+                "position": 4,
+                "name": "About Dakshyam",
+                "item": "https://dakshyaminnovations.vercel.app/?tab=about"
+              },
+              {
+                "@type": "ListItem",
+                "position": 5,
+                "name": "Competency Leaderboard",
+                "item": "https://dakshyaminnovations.vercel.app/?tab=leaderboard"
+              },
+              {
+                "@type": "ListItem",
+                "position": 6,
+                "name": "Community Telemetry Feed",
+                "item": "https://dakshyaminnovations.vercel.app/?tab=social"
+              },
+              {
+                "@type": "ListItem",
+                "position": 7,
+                "name": "Contact & Booking",
+                "item": "https://dakshyaminnovations.vercel.app/?tab=contact"
+              }
+            ]
+          }
         ]
       }
     </script>
@@ -62,4 +214,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Users, Award, Percent, Printer, FileText, CheckCircle2, Bookmark, Check, ShieldCheck, BookOpen, User, Mail, Phone, Briefcase, MapPin } from 'lucide-react';
+import { Plus, Users, Award, Percent, Printer, FileText, CheckCircle2, Bookmark, Check, ShieldCheck, BookOpen, User, Mail, Phone, Briefcase, MapPin, Eye } from 'lucide-react';
 import { StudentUser, StudentGroup, Course, CourseApplication, Certificate, TrainerUser } from '../types';
 import { DakshyamDatabase } from '../utils/db';
+import { uploadMediaToCloudinary } from '../utils/mediaUpload';
 import TrainerGuide from './TrainerGuide';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
+import OfficialCertificate from './OfficialCertificate';
 
 interface TrainerDashboardProps {
   trainer: TrainerUser;
@@ -63,6 +65,7 @@ export default function TrainerDashboard({
   const [certTrainingPartnerLogoUrl, setCertTrainingPartnerLogoUrl] = useState<string>('');
   const [certError, setCertError] = useState('');
   const [certSuccess, setCertSuccess] = useState('');
+  const [viewCertModal, setViewCertModal] = useState<Certificate | null>(null);
 
   // CREATE GROUP HANDLER
   const handleCreateGroup = (e: React.FormEvent) => {
@@ -528,7 +531,7 @@ export default function TrainerDashboard({
               <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 flex items-center gap-1.5 ${
                 isLight ? 'text-amber-800 border-slate-150' : 'text-[#22d3ee] border-cyan-500/5'
               }`}>
-                <Award className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-cyan-400'}`} /> Issue Credential Serializer
+                <Award className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-cyan-400'}`} /> Issue Certificate of Completion
               </h3>
 
               <BeautifulErrorDisplay errorText={certError} isLight={isLight} />
@@ -583,17 +586,16 @@ export default function TrainerDashboard({
                 <div className="grid grid-cols-2 gap-3 text-left">
                   {/* Custom Logo Upload */}
                   <div>
-                    <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Custom Issuer Logo</label>
+                    <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Custom Issuer Logo (Cloudinary)</label>
                     <div className="relative">
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const r = new FileReader();
-                            r.onloadend = () => setCertCustomLogoUrl(r.result as string);
-                            r.readAsDataURL(file);
+                            const res = await uploadMediaToCloudinary(file, 'image');
+                            setCertCustomLogoUrl(res.url);
                           }
                         }}
                         className="hidden"
@@ -623,17 +625,16 @@ export default function TrainerDashboard({
 
                   {/* Custom Seal Upload */}
                   <div>
-                    <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Custom Seal Image</label>
+                    <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Custom Seal Image (Cloudinary)</label>
                     <div className="relative">
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const r = new FileReader();
-                            r.onloadend = () => setCertCustomSealUrl(r.result as string);
-                            r.readAsDataURL(file);
+                            const res = await uploadMediaToCloudinary(file, 'image');
+                            setCertCustomSealUrl(res.url);
                           }
                         }}
                         className="hidden"
@@ -681,17 +682,16 @@ export default function TrainerDashboard({
 
                   {certTrainingPartnerName && (
                     <div>
-                      <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Partner Logo (Optional)</label>
+                      <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Partner Logo (Cloudinary)</label>
                       <div className="relative">
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const r = new FileReader();
-                              r.onloadend = () => setCertTrainingPartnerLogoUrl(r.result as string);
-                              r.readAsDataURL(file);
+                              const res = await uploadMediaToCloudinary(file, 'image');
+                              setCertTrainingPartnerLogoUrl(res.url);
                             }
                           }}
                           className="hidden"
@@ -737,7 +737,7 @@ export default function TrainerDashboard({
                     : 'bg-cyan-500 hover:bg-cyan-450 border-cyan-500 text-slate-950'
                 }`}
               >
-                Sign & Emit Digital Certificate
+                Sign & Issue Certificate of Completion
               </button>
             </form>
 
@@ -753,7 +753,7 @@ export default function TrainerDashboard({
                 {certificates.map(cert => (
                   <div 
                     key={cert.id}
-                    className={`p-3 rounded-xl border text-left text-2xs space-y-1 ${
+                    className={`p-3 rounded-xl border text-left text-2xs space-y-1.5 ${
                       isLight 
                         ? 'bg-slate-50/50 border-slate-200/60' 
                         : 'bg-[#111]/45 border-cyan-500/5'
@@ -765,6 +765,16 @@ export default function TrainerDashboard({
                     </div>
                     <div className={`font-semibold ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>{cert.studentName}</div>
                     <div className={`text-3xs block italic ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Project: "{cert.projectTitle}"</div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setViewCertModal(cert)}
+                      className={`inline-flex items-center gap-1 text-3xs font-bold font-mono px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                        isLight ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300' : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20'
+                      }`}
+                    >
+                      <Eye className="w-3 h-3" /> View Certificate of Completion
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1101,6 +1111,21 @@ export default function TrainerDashboard({
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Official Certificate Modal */}
+      {viewCertModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md" onClick={() => setViewCertModal(null)} />
+          <div className="bg-[#050b14] border border-amber-500/30 rounded-3xl max-w-5xl w-full relative z-10 p-4 md:p-7 space-y-4 text-center max-h-[96vh] overflow-y-auto shadow-[0_0_60px_rgba(0,0,0,0.8)]">
+            <OfficialCertificate
+              certificate={viewCertModal}
+              onClose={() => setViewCertModal(null)}
+              showControls={true}
+              theme={theme}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

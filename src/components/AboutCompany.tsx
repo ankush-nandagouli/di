@@ -19,15 +19,15 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
   // Aesthetic color maps
   const textTitle = isLight ? 'text-slate-900' : 'text-white';
   const textMuted = isLight ? 'text-slate-600 font-medium' : 'text-slate-400';
-  const badgeClass = isLight ? 'border-amber-500/15 bg-amber-50 text-amber-700' : 'border-cyan-500/15 bg-cyan-950/20 text-cyan-400';
-  const cardBg = isLight ? 'bg-white border-amber-500/15 hover:border-amber-500/25 hover:shadow-md' : 'bg-black/60 border-cyan-500/10 hover:border-cyan-500/20';
+  const badgeClass = isLight ? 'border-blue-900/15 bg-blue-50 text-blue-950' : 'border-blue-700/40 bg-blue-950/40 text-sky-300';
+  const cardBg = isLight ? 'bg-white border-blue-900/10 hover:border-blue-900/25 hover:shadow-md' : 'bg-[#0d1f38]/60 border-blue-800/30 hover:border-blue-500/30';
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-12 select-text text-left font-sans">
       
       {/* Banner / Title Header Section */}
       <div className={`p-8 rounded-3xl border relative overflow-hidden transition-all duration-300 ${
-        isLight ? 'border-amber-500/20 bg-amber-500/5 shadow-3xs' : 'border-cyan-500/15 bg-[#050505]/75 shadow-2xl'
+        isLight ? 'border-blue-900/15 bg-blue-50/40 shadow-xs' : 'border-blue-800/30 bg-[#0a192f]/90 shadow-2xl'
       }`}>
         <div className="max-w-2xl space-y-3 relative z-10">
           <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-mono font-black uppercase tracking-widest ${badgeClass}`}>
@@ -50,7 +50,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
         
         {/* Mission Card */}
         <div className={`p-6 rounded-2xl border transition-all space-y-3.5 ${cardBg}`}>
-          <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-amber-600/10 text-amber-700 border-amber-500/20' : 'bg-cyan-950/30 border-cyan-500/10 text-cyan-400'}`}>
+          <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-blue-900/10 text-blue-950 border-blue-900/15' : 'bg-blue-950/60 border-blue-700/40 text-sky-400'}`}>
             <Compass className="w-5 h-5 animate-pulse" />
           </div>
           <h3 className={`text-xs font-bold uppercase tracking-wider ${textTitle}`}>Our Eternal Mission</h3>
@@ -61,7 +61,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
 
         {/* Vision Card */}
         <div className={`p-6 rounded-2xl border transition-all space-y-3.5 ${cardBg}`}>
-          <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-amber-600/10 text-amber-700 border-amber-500/20' : 'bg-cyan-950/30 border-cyan-500/10 text-cyan-400'}`}>
+          <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-blue-900/10 text-blue-950 border-blue-900/15' : 'bg-blue-950/60 border-blue-700/40 text-sky-400'}`}>
             <Eye className="w-5 h-5" />
           </div>
           <h3 className={`text-xs font-bold uppercase tracking-wider ${textTitle}`}>Our Long-term Vision</h3>
@@ -72,7 +72,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
 
         {/* Office Location Card */}
         <div className={`p-6 rounded-2xl border transition-all space-y-3.5 ${cardBg}`}>
-          <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-amber-600/10 text-amber-700 border-amber-500/20' : 'bg-cyan-950/30 border-cyan-500/10 text-cyan-400'}`}>
+          <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-blue-900/10 text-blue-950 border-blue-900/15' : 'bg-blue-950/60 border-blue-700/40 text-sky-400'}`}>
             <MapPin className="w-5 h-5 text-rose-400" />
           </div>
           <h3 className={`text-xs font-bold uppercase tracking-wider ${textTitle}`}>Global Headquarters</h3>
@@ -80,10 +80,10 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
             {aboutState.officeLocation}
           </p>
           <div className={`pt-1.5 border-t flex items-center justify-between text-2xs font-mono ${
-            isLight ? 'border-slate-200 text-slate-500' : 'border-cyan-500/5 text-slate-400'
+            isLight ? 'border-slate-200 text-slate-500' : 'border-blue-900/20 text-slate-400'
           }`}>
             <span>Waraseoni, Balaghat District</span>
-            <span className={isLight ? 'text-amber-850 font-bold' : 'text-cyan-400'}>MP, India</span>
+            <span className={isLight ? 'text-blue-950 font-bold' : 'text-sky-400'}>MP, India</span>
           </div>
         </div>
 
@@ -91,9 +91,9 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
 
       {/* STEM Education Framework Section */}
       <div className="space-y-6">
-        <div className={`border-l-2 pl-4 ${isLight ? 'border-amber-600' : 'border-cyan-400'}`}>
+        <div className={`border-l-2 pl-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
           <span className={`text-[10px] font-mono tracking-widest uppercase font-bold ${
-            isLight ? 'text-amber-700' : 'text-cyan-400'
+            isLight ? 'text-blue-950' : 'text-sky-400'
           }`}>NEP 2020 Aligned</span>
           <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Our STEM Education Framework</h2>
           <p className={`text-xs font-sans font-medium ${textMuted}`}>
@@ -105,7 +105,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
           
           {/* Science Card */}
           <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex gap-4 ${cardBg}`}>
-            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-amber-600/10 text-amber-700 border-amber-500/20' : 'bg-cyan-950/40 border-cyan-500/15 text-[#22d3ee]'}`}>
+            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-blue-900/10 text-blue-950 border-blue-900/15' : 'bg-blue-950/60 border-blue-700/40 text-sky-400'}`}>
               <Atom className="w-5 h-5 animate-pulse" />
             </div>
             <div className="space-y-2">
@@ -113,7 +113,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
               <p className={`text-3xs leading-relaxed font-sans font-medium ${textMuted}`}>
                 Hands-on validation of environmental physics. Students configure analog soil hygrometers, calibrate photo-resistors, and measure thermodynamic behavior on live microcontrollers.
               </p>
-              <div className={`text-[8px] font-mono uppercase tracking-widest pt-1 ${isLight ? 'text-amber-855 font-bold' : 'text-cyan-400'}`}>
+              <div className={`text-[8px] font-mono uppercase tracking-widest pt-1 ${isLight ? 'text-blue-950 font-bold' : 'text-sky-300'}`}>
                 🔬 Live Telemetry & Calibration
               </div>
             </div>
@@ -121,7 +121,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
 
           {/* Technology Card */}
           <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex gap-4 ${cardBg}`}>
-            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-amber-600/10 text-amber-700 border-amber-500/20' : 'bg-cyan-950/40 border-cyan-500/15 text-[#22d3ee]'}`}>
+            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-blue-900/10 text-blue-950 border-blue-900/15' : 'bg-blue-950/60 border-blue-700/40 text-sky-400'}`}>
               <Cpu className="w-5 h-5" />
             </div>
             <div className="space-y-2">
@@ -129,7 +129,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
               <p className={`text-3xs leading-relaxed font-sans font-medium ${textMuted}`}>
                 Learning production software development. Programming ESP32 firmware in Embedded C, designing secure Django API controllers, and rendering high-speed real-time React web dashboards.
               </p>
-              <div className={`text-[8px] font-mono uppercase tracking-widest pt-1 ${isLight ? 'text-amber-855 font-bold' : 'text-cyan-400'}`}>
+              <div className={`text-[8px] font-mono uppercase tracking-widest pt-1 ${isLight ? 'text-blue-950 font-bold' : 'text-sky-300'}`}>
                 💻 Embedded C, React, & Django
               </div>
             </div>
@@ -137,7 +137,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
 
           {/* Engineering Card */}
           <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex gap-4 ${cardBg}`}>
-            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-amber-600/10 text-amber-700 border-amber-500/20' : 'bg-cyan-950/40 border-cyan-500/15 text-[#22d3ee]'}`}>
+            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-blue-900/10 text-blue-950 border-blue-900/15' : 'bg-blue-950/60 border-blue-700/40 text-sky-400'}`}>
               <Wrench className="w-5 h-5" />
             </div>
             <div className="space-y-2">
@@ -145,7 +145,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
               <p className={`text-3xs leading-relaxed font-sans font-medium ${textMuted}`}>
                 Constructing autonomous mechanisms. Calibrating H-bridge dual-motor drivers, designing mechanical chassis structures, and tuning high-speed servo actuators over Bluetooth links.
               </p>
-              <div className={`text-[8px] font-mono uppercase tracking-widest pt-1 ${isLight ? 'text-amber-855 font-bold' : 'text-cyan-400'}`}>
+              <div className={`text-[8px] font-mono uppercase tracking-widest pt-1 ${isLight ? 'text-blue-950 font-bold' : 'text-sky-300'}`}>
                 ⚙️ Kinematics & Circuit Assembly
               </div>
             </div>
@@ -153,7 +153,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
 
           {/* Mathematics Card */}
           <div className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex gap-4 ${cardBg}`}>
-            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-amber-600/10 text-amber-700 border-amber-500/20' : 'bg-cyan-950/40 border-cyan-500/15 text-[#22d3ee]'}`}>
+            <div className={`p-3 rounded-xl border h-fit shrink-0 ${isLight ? 'bg-blue-900/10 text-blue-950 border-blue-900/15' : 'bg-blue-950/60 border-blue-700/40 text-sky-400'}`}>
               <Percent className="w-5 h-5" />
             </div>
             <div className="space-y-2">
@@ -161,7 +161,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
               <p className={`text-3xs leading-relaxed font-sans font-medium ${textMuted}`}>
                 Applying math to code logic. Resolving obstacle avoidance avoidance vectors, calculating moving sensor value averages, evaluating solar conversion efficiency coefficients, and scaling telemetry ranges.
               </p>
-              <div className={`text-[8px] font-mono uppercase tracking-widest pt-1 ${isLight ? 'text-amber-855 font-bold' : 'text-cyan-400'}`}>
+              <div className={`text-[8px] font-mono uppercase tracking-widest pt-1 ${isLight ? 'text-blue-950 font-bold' : 'text-sky-300'}`}>
                 📐 Algorithmic Pathfinding & Scaling
               </div>
             </div>
@@ -172,8 +172,8 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
 
       {/* Co-Founders Team Dashboard Section */}
       <div className="space-y-6">
-        <div className={`border-l-2 pl-4 ${isLight ? 'border-amber-600' : 'border-cyan-400'}`}>
-          <span className={`text-[10px] font-mono tracking-widest uppercase font-bold ${isLight ? 'text-amber-700' : 'text-cyan-400'}`}>Directorship & Team</span>
+        <div className={`border-l-2 pl-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
+          <span className={`text-[10px] font-mono tracking-widest uppercase font-bold ${isLight ? 'text-blue-950' : 'text-sky-400'}`}>Directorship & Team</span>
           <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Our Founders & Co-Founders</h2>
           <p className={`text-xs font-sans ${textMuted}`}>
             Dakshyam Innovations is led by a collaborative team of hardware architects and full-stack software engineers dedicated to high-fidelity physical training models.
@@ -192,8 +192,8 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
                 <div className="flex items-center gap-3.5">
                   <div className={`w-11 h-11 rounded-full border flex items-center justify-center font-mono text-sm font-black tracking-wider shadow-lg ${
                     isLight 
-                      ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white border-amber-500/20 shadow-amber-600/10' 
-                      : 'bg-gradient-to-br from-cyan-950/60 to-black/80 text-cyan-400 border-cyan-500/25 shadow-cyan-950/30'
+                      ? 'bg-blue-950 text-white border-blue-900/30 shadow-blue-950/20' 
+                      : 'bg-gradient-to-br from-blue-900 to-black/80 text-sky-300 border-blue-500/30 shadow-blue-950/50'
                   }`}>
                     {founder.avatarText || founder.name.split(' ').map(l => l[0]).join('')}
                   </div>
@@ -202,7 +202,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
                       {founder.name}
                     </h4>
                     <span className={`font-mono text-[9px] font-bold uppercase tracking-wider block px-1.5 py-0.5 rounded ${
-                      isLight ? 'bg-amber-500/10 text-amber-800' : 'bg-cyan-500/5 text-cyan-400'
+                      isLight ? 'bg-blue-50 text-blue-950' : 'bg-blue-950/40 text-sky-300'
                     }`}>
                       {founder.role}
                     </span>
@@ -217,7 +217,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
 
               {/* Decorative base layout */}
               <div className={`pt-2 border-t flex items-center justify-between text-4xs font-mono uppercase tracking-widest ${
-                isLight ? 'border-amber-500/10 text-slate-500' : 'border-cyan-500/5 text-slate-500'
+                isLight ? 'border-slate-200 text-slate-500' : 'border-blue-900/20 text-slate-500'
               }`}>
                 <span>Executive Council</span>
                 <span className={isLight ? 'text-emerald-700 font-bold' : 'text-emerald-400'}>✓ Active Seat</span>
@@ -229,7 +229,7 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
 
       {/* Social Media Link Connect Section */}
       <div className={`p-6 rounded-2xl border text-center space-y-4 ${
-        isLight ? 'bg-amber-500/5 border-amber-500/10' : 'bg-black/40 border-cyan-500/5'
+        isLight ? 'bg-blue-50/40 border-blue-900/10' : 'bg-[#0a192f]/60 border-blue-800/30'
       }`}>
         <h4 className={`text-2xs font-mono font-extrabold uppercase tracking-widest ${textTitle}`}>
           Join the Dakshyam Network

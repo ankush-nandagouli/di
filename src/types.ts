@@ -123,7 +123,8 @@ export interface VideoPost {
   groupName: string;
   title: string;
   description: string;
-  videoUrl: string; // exhibition category identifier
+  videoUrl: string; // URL of the video or image hosted in Cloudinary or fallback focus track ID
+  mediaType?: 'video' | 'image'; // Decides whether it's a demonstration video or a photographic showcase
   likes: number;
   likedByUserIds: string[];
   views: number;
@@ -195,6 +196,21 @@ export interface AppLog {
   userEmail: string;
   role: string;
   status: 'SUCCESS' | 'ERROR' | 'INFO';
+}
+
+export interface PageLoaderConfig {
+  enabled: boolean;
+  videoUrl: string; // Remote URL, Cloudinary URL, or blob reference
+  mediaType: 'video' | 'gif' | 'auto';
+  showOnTabChange: boolean;
+  minDurationMs: number; // e.g. 800 - 2500ms
+  title: string;
+  subtitle: string;
+  overlayTheme: 'dark' | 'glass' | 'adaptive';
+  soundEnabled: boolean;
+  showProgress: boolean;
+  videoFit: 'contain' | 'cover';
+  updatedAt?: string;
 }
 
 

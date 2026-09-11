@@ -159,13 +159,13 @@ export default function DakshyamLogo({
     <div 
       ref={containerRef}
       className={`relative inline-flex flex-col items-center justify-center transition-all duration-300 ${
-        interactive ? 'cursor-pointer hover:shadow-2xl hover:shadow-cyan-500/5' : ''
+        interactive ? 'cursor-pointer hover:shadow-2xl hover:shadow-blue-500/10' : ''
       }`}
     >
       {/* 1. Pulse glowing background elements if prompted */}
       {pulseGlow && (
         <div className={`absolute -inset-10 bg-radial via-transparent to-transparent opacity-80 blur-3xl animate-[pulse_6s_infinite_ease-in-out] -z-10 ${
-          theme === 'light' ? 'from-amber-500/15' : 'from-cyan-500/20'
+          theme === 'light' ? 'from-blue-600/15' : 'from-sky-500/20'
         }`} />
       )}
       
@@ -182,35 +182,35 @@ export default function DakshyamLogo({
         className="w-full h-auto select-none"
       >
         <defs>
-          {/* Deep Space Cyan/Teal Gradients for Shield */}
+          {/* Deep Navy Blue Gradients for Shield */}
           <linearGradient id="shieldGrad" x1="80" y1="50" x2="380" y2="350" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#052e3d" />
-            <stop offset="35%" stopColor="#0891b2" />
-            <stop offset="70%" stopColor="#22d3ee" />
-            <stop offset="100%" stopColor="#022e3c" />
+            <stop offset="0%" stopColor="#0a192f" />
+            <stop offset="35%" stopColor="#1e3a8a" />
+            <stop offset="70%" stopColor="#2563eb" />
+            <stop offset="100%" stopColor="#0f172a" />
           </linearGradient>
 
           <linearGradient id="innerShieldGrad" x1="100" y1="80" x2="320" y2="300" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#22d3ee" />
-            <stop offset="100%" stopColor="#083344" />
+            <stop offset="0%" stopColor="#38bdf8" />
+            <stop offset="100%" stopColor="#0f172a" />
           </linearGradient>
 
-          {/* Ice Blue Gradients for Spear Arrow */}
+          {/* Ice Blue & White Gradients for Spear Arrow */}
           <linearGradient id="arrowGoldLight" x1="180" y1="320" x2="360" y2="40" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#0ea5e9" />
+            <stop offset="0%" stopColor="#0284c7" />
             <stop offset="50%" stopColor="#38bdf8" />
-            <stop offset="100%" stopColor="#e0f2fe" />
+            <stop offset="100%" stopColor="#f8fafc" />
           </linearGradient>
 
           <linearGradient id="arrowGoldShadow" x1="200" y1="360" x2="380" y2="80" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#0369a1" />
-            <stop offset="60%" stopColor="#025a7a" />
-            <stop offset="100%" stopColor="#0072e1" />
+            <stop offset="0%" stopColor="#0c4a6e" />
+            <stop offset="60%" stopColor="#075985" />
+            <stop offset="100%" stopColor="#1d4ed8" />
           </linearGradient>
 
           {/* Specular highlights & reflections */}
           <linearGradient id="specularGlow" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="white" stopOpacity="0.4" />
+            <stop offset="0%" stopColor="white" stopOpacity="0.5" />
             <stop offset="100%" stopColor="white" stopOpacity="0" />
           </linearGradient>
 
@@ -233,7 +233,7 @@ export default function DakshyamLogo({
             <path
               d="M 140 60 C 140 60 410 60 330 190 C 310 220 280 250 240 280 C 220 295 195 305 160 310 C 140 315 140 295 141 270 C 142 225 150 160 140 60 Z"
               fill="url(#shieldGrad)"
-              stroke="#0891b2"
+              stroke="#2563eb"
               strokeWidth="2.5"
             />
             {/* Swoosh Inner Wave (Making the stylized D glyph curve inside) */}
@@ -281,14 +281,14 @@ export default function DakshyamLogo({
             <path
               d="M 245 165 L 350 60 L 280 135 L 245 165 Z"
               fill="url(#arrowGoldLight)"
-              stroke="#22d3ee"
+              stroke="#38bdf8"
               strokeWidth="1"
             />
             {/* Symmetrical Right half (Dark Shaded Shadow side for high contrast 3D effect) */}
             <path
               d="M 245 165 L 350 60 V 95 L 285 165 Z"
               fill="url(#arrowGoldShadow)"
-              stroke="#015570"
+              stroke="#0369a1"
               strokeWidth="1"
             />
             
@@ -313,12 +313,12 @@ export default function DakshyamLogo({
           <motion.h1 
             variants={textLettersEntrance}
             className={`text-4xl md:text-5xl font-black tracking-[0.24em] font-sans text-center transition-all duration-300 ${
-              theme === 'light' ? 'text-amber-950' : 'text-white'
+              theme === 'light' ? 'text-blue-950' : 'text-white'
             }`}
             style={{ 
               textShadow: theme === 'light' 
-                ? '0 0 25px rgba(217,119,6,0.15)' 
-                : '0 0 25px rgba(34,211,238,0.22)' 
+                ? '0 0 25px rgba(30,58,138,0.15)' 
+                : '0 0 25px rgba(56,189,248,0.25)' 
             }}
           >
             DAKSHYAM
@@ -328,7 +328,7 @@ export default function DakshyamLogo({
           <motion.p 
             variants={textLettersEntrance}
             className={`mt-2 text-xs md:text-sm font-mono tracking-[0.62em] font-black uppercase translate-x-[0.31em] transition-all duration-300 ${
-              theme === 'light' ? 'text-[#b45309]' : 'text-cyan-400'
+              theme === 'light' ? 'text-blue-900 font-bold' : 'text-sky-400'
             }`}
           >
             INNOVATION

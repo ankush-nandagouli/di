@@ -5,13 +5,33 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import { MongoClient, Db } from 'mongodb';
 import nodemailer from 'nodemailer';
+import { v2 as cloudinary } from 'cloudinary';
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '100mb' }));
+
+// Lazy configuration function for Cloudinary to prevent startup crashes when keys are empty
+function getCloudinary() {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error('Cloudinary credentials are not configured. Please define CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in your settings.');
+  }
+
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret
+  });
+
+  return cloudinary;
+}
 
 let mongoClient: MongoClient | null = null;
 let mongoDb: Db | null = null;
@@ -27,6 +47,19 @@ const memoryDb: Record<string, any> = {
   applications: [],
   special_programs: [],
   special_enrollments: [],
+  page_loader_config: {
+    enabled: true,
+    videoUrl: '',
+    mediaType: 'auto',
+    showOnTabChange: true,
+    minDurationMs: 850,
+    title: 'DAKSHYAM INNOVATIONS',
+    subtitle: 'Initializing Advanced Engineering & Telemetry Platform...',
+    overlayTheme: 'glass',
+    soundEnabled: false,
+    showProgress: true,
+    videoFit: 'contain'
+  },
   company_about: {
     companyName: 'Dakshyam Innovations',
     description: 'Dakshyam Innovations is a premier engineering education technology developer and skill incubator. We specialize in physical-digital integrated vocational training, making modern embedded labs, microcontrollers, IoT equipment, and programming frameworks accessible directly to students, primary setups, and regional schools.',
@@ -47,9 +80,110 @@ const memoryDb: Record<string, any> = {
     ]
   },
   supervisor_pin: '427752',
-  courses: [],
-  banners: [],
-  gallery_images: [],
+  courses: [
+    {
+      id: 'CRS-IOT-101',
+      title: 'IoT & Smart Robotics Engineering',
+      duration: '3 Months',
+      description: 'Comprehensive vocational training in physical computing, ESP32 microcontroller programming, Wi-Fi telemetry pipelines, and autonomous robotic rovers.',
+      tags: ['ESP32', 'Robotics', 'Sensors', 'Telemetry', 'NEP-2020'],
+      features: [
+        'Hands-on ESP32 architecture & C++ firmware programming',
+        'Dual H-Bridge Motor Kinetics & Sensor Diagnostics',
+        'Real-time Telemetry Dashboard Deployment',
+        'Complete Leased Hardware Kit Included'
+      ],
+      mobileHardwareIncluded: true
+    },
+    {
+      id: 'CRS-WEB-201',
+      title: 'Full-Stack Web & Real-Time Telemetry',
+      duration: '8 Weeks',
+      description: 'Build scalable web applications, RESTful microservices, and live IoT dashboards using React, TypeScript, Node.js, and MongoDB.',
+      tags: ['React', 'TypeScript', 'Node.js', 'Express', 'MongoDB'],
+      features: [
+        'Modern Reactive Component Architecture',
+        'REST API Development with Express & Middleware',
+        'Real-time WebSockets & Telemetry Streaming',
+        'Production Deployment to Cloud Infrastructure'
+      ],
+      mobileHardwareIncluded: false
+    },
+    {
+      id: 'CRS-NEP-301',
+      title: 'NEP 2020 Computational Thinking & Coding',
+      duration: '1 Month',
+      description: 'Inquiry-based foundational coding aligned with the National Education Policy. Covers logical flowcharts, block coding to script transitions, and cyber safety.',
+      tags: ['NEP-2020', 'Computational-Thinking', 'Python', 'Logic', 'STEM'],
+      features: [
+        'Flowchart Architecture & Algorithmic Design',
+        'Interactive Simulator & Game Logic Development',
+        'Micro:bit & Arduino Physical Logic Demonstrations',
+        'Verifiable NEP 2020 Certificate of Completion'
+      ],
+      mobileHardwareIncluded: true
+    },
+    {
+      id: 'CRS-EMB-401',
+      title: 'Embedded Systems & Circuit Instrumentation',
+      duration: '6 Weeks',
+      description: 'Master electronic circuit schematics, analog-to-digital signal processing, bus protocols (I2C, SPI, UART), and industrial motor drives.',
+      tags: ['Embedded-C', 'Circuits', 'PCB-Basics', 'Sensors', 'Hardware'],
+      features: [
+        'Breadboard Prototyping & Multimeter Testing',
+        'Microcontroller Register-Level Interfacing',
+        'Pulse-Width Modulation & Motor Velocity Control',
+        'Diagnostic Telemetry Logging'
+      ],
+      mobileHardwareIncluded: true
+    }
+  ],
+  banners: [
+    {
+      id: 'ban-1',
+      title: 'Vocational STEM Laboratories Across Madhya Pradesh Schools',
+      subtitle: 'Equipping rural and urban students with leased high-performance hardware kits and hands-on robotics labs under NEP 2020 guidelines.',
+      imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=80',
+      actionUrl: '#services',
+      isActive: true,
+      createdAt: '2026-01-01'
+    },
+    {
+      id: 'ban-2',
+      title: 'Hands-on IoT & Embedded Systems Winter Bootcamp',
+      subtitle: '100% practical, project-driven engineering camps where students design, build, and deploy functional IoT telemetric products.',
+      imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80',
+      actionUrl: '#services',
+      isActive: true,
+      createdAt: '2026-01-02'
+    }
+  ],
+  gallery_images: [
+    {
+      id: 'gal-1',
+      title: 'Robotics Assembly & Telemetry Testing',
+      description: 'Students constructing autonomous wheeled robots with ultrasonic obstacle sensors and ESP32 microcontrollers.',
+      imageUrl: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=800&q=80',
+      category: 'iot_robotics',
+      createdAt: '2026-01-01'
+    },
+    {
+      id: 'gal-2',
+      title: 'School Lab Installation & Microcontroller Workshops',
+      description: 'Hands-on laboratory setup and diagnostic breadboard sessions conducted inside regional secondary schools.',
+      imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
+      category: 'school_programs',
+      createdAt: '2026-01-02'
+    },
+    {
+      id: 'gal-3',
+      title: 'Full-Stack Software Development & Cloud Dashboards',
+      description: 'Candidates designing real-time sensor dashboards and REST APIs using modern React and Node.js frameworks.',
+      imageUrl: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80',
+      category: 'mern_web',
+      createdAt: '2026-01-03'
+    }
+  ],
   app_logs: []
 };
 
@@ -258,7 +392,7 @@ app.get('/api/db/all', async (req, res) => {
     const collections = [
       'students', 'trainers', 'groups', 'videos', 'certificates', 
       'applications', 'special_programs', 'special_enrollments', 
-      'company_about', 'supervisor_pin', 'courses', 'banners', 'gallery_images', 'app_logs', 'admins'
+      'company_about', 'supervisor_pin', 'page_loader_config', 'courses', 'banners', 'gallery_images', 'app_logs', 'admins'
     ];
     
     const dbData: Record<string, any> = { connected: isMongoConnected };
@@ -266,7 +400,7 @@ app.get('/api/db/all', async (req, res) => {
 
     if (db) {
       for (const name of collections) {
-        if (name === 'company_about' || name === 'supervisor_pin') {
+        if (name === 'company_about' || name === 'supervisor_pin' || name === 'page_loader_config') {
           const settingsCol = db.collection('settings');
           const doc = await settingsCol.findOne({ id: name });
           dbData[name] = doc ? doc.value : memoryDb[name];
@@ -316,6 +450,35 @@ app.post('/api/db/clear', async (req, res) => {
   }
 });
 
+// POST to upload a media file (photo or video) to Cloudinary
+app.post('/api/upload', async (req, res) => {
+  const { file, resourceType } = req.body;
+  if (!file) {
+    return res.status(400).json({ error: 'No file data received.' });
+  }
+
+  try {
+    const cSdk = getCloudinary();
+    // Cloudinary uploader supports base64 strings directly!
+    const uploadResponse = await cSdk.uploader.upload(file, {
+      resource_type: resourceType || 'auto',
+      folder: 'dakshyam_media'
+    });
+
+    res.json({
+      success: true,
+      url: uploadResponse.secure_url,
+      public_id: uploadResponse.public_id,
+      duration: uploadResponse.duration || 0
+    });
+  } catch (error: any) {
+    console.error('Error uploading to Cloudinary:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to upload to Cloudinary. Check your environment settings.' 
+    });
+  }
+});
+
 // POST to update a collection in Database
 app.post('/api/db/:key', async (req, res) => {
   const { key } = req.params;
@@ -324,7 +487,7 @@ app.post('/api/db/:key', async (req, res) => {
     const db = await getMongoDb();
 
     if (db) {
-      if (key === 'company_about' || key === 'supervisor_pin') {
+      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config') {
         const settingsCol = db.collection('settings');
         await settingsCol.updateOne(
           { id: key },
@@ -342,7 +505,7 @@ app.post('/api/db/:key', async (req, res) => {
       }
     } else {
       // Fallback local memory store
-      if (key === 'company_about' || key === 'supervisor_pin') {
+      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config') {
         memoryDb[key] = data;
       } else if (Array.isArray(data)) {
         memoryDb[key] = data;

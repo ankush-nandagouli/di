@@ -24,6 +24,12 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
   const [groupId, setGroupId] = useState('');
   const [videoTechTrack, setVideoTechTrack] = useState('ROBOTICS_DEMO');
   
+  // Cloudinary media states
+  const [selectedMediaType, setSelectedMediaType] = useState<'video' | 'image'>('video');
+  const [mediaFileBase64, setMediaFileBase64] = useState<string>('');
+  const [mediaFileName, setMediaFileName] = useState<string>('');
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+
   const [errorText, setErrorText] = useState('');
   const [successText, setSuccessText] = useState('');
 
@@ -79,8 +85,62 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
     }
   };
 
-  // Student Project upload
-  const handleUploadProject = (e: React.FormEvent) => {
+  // Handle File change with HTML5 video length validation (60 seconds)
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setErrorText('');
+    setSuccessText('');
+    setMediaFileBase64('');
+    setMediaFileName('');
+
+    if (selectedMediaType === 'video') {
+      if (!file.type.startsWith('video/')) {
+        setErrorText('❌ Please select a valid video file.');
+        e.target.value = '';
+        return;
+      }
+
+      // Read duration in browser first
+      const videoElement = document.createElement('video');
+      videoElement.preload = 'metadata';
+      videoElement.src = URL.createObjectURL(file);
+      
+      videoElement.onloadedmetadata = () => {
+        URL.revokeObjectURL(videoElement.src);
+        if (videoElement.duration > 61) { // 61 sec tolerance for precision
+          setErrorText(`❌ Selected video duration is ${Math.round(videoElement.duration)} seconds. Demonstration video must be 60 seconds or less.`);
+          e.target.value = '';
+          return;
+        }
+
+        // Convert to Base64
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setMediaFileBase64(reader.result as string);
+          setMediaFileName(file.name);
+        };
+        reader.readAsDataURL(file);
+      };
+    } else {
+      if (!file.type.startsWith('image/')) {
+        setErrorText('❌ Please select a valid image file.');
+        e.target.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setMediaFileBase64(reader.result as string);
+        setMediaFileName(file.name);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Student Project upload (to Cloudinary proxy)
+  const handleUploadProject = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorText('');
     setSuccessText('');
@@ -90,7 +150,38 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
       return;
     }
 
+    if (!mediaFileBase64) {
+      setErrorText('Please select a demonstration video or photo to upload first.');
+      return;
+    }
+
     try {
+      setIsUploadingMedia(true);
+      let finalMediaUrl = mediaFileBase64;
+      let isCloudinaryStored = false;
+
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file: mediaFileBase64,
+            resourceType: selectedMediaType
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          finalMediaUrl = data.url;
+          isCloudinaryStored = true;
+        } else {
+          const errData = await res.json();
+          console.warn('Cloudinary upload warning:', errData.error);
+        }
+      } catch (uploadErr: any) {
+        console.warn('Cloudinary proxy warning:', uploadErr.message);
+      }
+
       const allVideos = DakshyamDatabase.getVideos();
       const groups = DakshyamDatabase.getGroups();
       const matchGroup = groups.find(g => g.id === groupId);
@@ -101,10 +192,11 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
         groupName: matchGroup ? matchGroup.name : 'Independent Lab Node',
         title,
         description,
-        videoUrl: videoTechTrack,
+        videoUrl: finalMediaUrl,
+        mediaType: selectedMediaType,
         likes: 0,
         likedByUserIds: [],
-        views: 12,
+        views: 1,
         comments: [],
         createdAt: new Date().toISOString().split('T')[0]
       };
@@ -112,9 +204,16 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
       allVideos.unshift(newVideo);
       DakshyamDatabase.saveVideos(allVideos);
 
-      setSuccessText('🚀 Project Video uploaded successfully to the Social Stream!');
+      if (isCloudinaryStored) {
+        setSuccessText('🚀 Project media successfully uploaded to Cloudinary and registered in MongoDB!');
+      } else {
+        setSuccessText('🚀 Project media published! (Add CLOUDINARY credentials in settings for external cloud CDN)');
+      }
+
       setTitle('');
       setDescription('');
+      setMediaFileBase64('');
+      setMediaFileName('');
       
       setTimeout(() => {
         setShowUpload(false);
@@ -123,7 +222,9 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
       }, 1500);
 
     } catch (err: any) {
-      setErrorText(err?.message || 'Transaction aborted.');
+      setErrorText(err?.message || 'Media transfer failed. Please make sure Cloudinary environment variables are configured.');
+    } finally {
+      setIsUploadingMedia(false);
     }
   };
 
@@ -230,31 +331,64 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
                 </div>
 
                 <div>
-                  <label className={`block text-3xs font-mono tracking-wider uppercase mb-1 ${isLight ? 'text-slate-600 font-bold' : 'text-cyan-400'}`}>Technology Focus Track</label>
+                  <label className={`block text-3xs font-mono tracking-wider uppercase mb-1 ${isLight ? 'text-slate-600 font-bold' : 'text-cyan-400'}`}>Media Demonstration Type</label>
                   <select
-                    value={videoTechTrack}
-                    onChange={(e) => setVideoTechTrack(e.target.value)}
+                    value={selectedMediaType}
+                    onChange={(e) => {
+                      setSelectedMediaType(e.target.value as 'video' | 'image');
+                      setMediaFileBase64('');
+                      setMediaFileName('');
+                      setErrorText('');
+                    }}
+                    disabled={isUploadingMedia}
                     className={`w-full rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 ${
                       isLight 
                         ? 'bg-slate-50 border border-slate-200 text-slate-800 focus:border-amber-500 focus:ring-amber-500/20' 
                         : 'bg-[#111]/80 border border-cyan-500/10 text-white focus:border-cyan-450 focus:ring-cyan-500/20'
                     }`}
                   >
-                    <option value="ESP32_AGRIBOT">ESP32 Soil Telemetry System</option>
-                    <option value="DJANGO_CORE">Django DRF Endpoint Integration</option>
-                    <option value="ROBOTICS_DEMO">Autonomous Kinematics Module</option>
-                    <option value="SCHOOL_CLASS">Physical Lab Hardware Assembly</option>
+                    <option value="video">Project Video Demonstration (Max 60 Seconds)</option>
+                    <option value="image">Project Photo Snapshot Showcase</option>
                   </select>
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className={`block text-3xs font-mono tracking-wider uppercase mb-1 ${isLight ? 'text-slate-600 font-bold' : 'text-cyan-400'}`}>Video Exhibition Title</label>
+                  <label className={`block text-3xs font-mono tracking-wider uppercase mb-1 ${isLight ? 'text-slate-600 font-bold' : 'text-cyan-400'}`}>
+                    Select {selectedMediaType === 'video' ? 'Demonstration Video' : 'Photo Snapshot'} (Cloudinary Storage)
+                  </label>
+                  <input
+                    type="file"
+                    accept={selectedMediaType === 'video' ? 'video/*' : 'image/*'}
+                    onChange={handleFileChange}
+                    disabled={isUploadingMedia}
+                    required
+                    className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-4xs file:font-semibold ${
+                      isLight 
+                        ? 'bg-slate-50 border border-slate-200 text-slate-800 file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 focus:border-amber-500 focus:ring-amber-500/20' 
+                        : 'bg-[#111]/80 border border-cyan-500/10 text-white file:bg-cyan-950 file:text-cyan-400 hover:file:bg-cyan-900 focus:border-cyan-450 focus:ring-cyan-500/20'
+                    }`}
+                  />
+                  {mediaFileName && (
+                    <div className="mt-1 text-4xs font-mono text-slate-500">
+                      ✓ Loaded: {mediaFileName} ({Math.round(mediaFileBase64.length / 1024)} KB)
+                    </div>
+                  )}
+                  {selectedMediaType === 'video' && (
+                    <p className={`text-[10px] mt-1 font-mono ${isLight ? 'text-amber-800' : 'text-amber-400'}`}>
+                      ⚠️ Absolute limit: 60 seconds video file. Ensure file is trimmed properly.
+                    </p>
+                  )}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className={`block text-3xs font-mono tracking-wider uppercase mb-1 ${isLight ? 'text-slate-600 font-bold' : 'text-cyan-400'}`}>Project Exhibition Title</label>
                   <input
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g. Ultrasonic Distance Mapping with micro motors"
                     required
+                    disabled={isUploadingMedia}
                     className={`w-full rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 ${
                       isLight 
                         ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500 focus:ring-amber-500/20' 
@@ -271,6 +405,7 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
                     placeholder="Describe variables, code libraries, microcontroller setups, or and performance stats..."
                     rows={2}
                     required
+                    disabled={isUploadingMedia}
                     className={`w-full rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 ${
                       isLight 
                         ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500 focus:ring-amber-500/20' 
@@ -284,6 +419,7 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
                 <button
                   type="button"
                   onClick={() => setShowUpload(false)}
+                  disabled={isUploadingMedia}
                   className={`text-3xs font-mono uppercase px-4 py-2 rounded-xl cursor-pointer border transition-colors ${
                     isLight 
                       ? 'bg-transparent hover:bg-slate-100 border-slate-300 text-slate-600' 
@@ -294,13 +430,19 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
                 </button>
                 <button
                   type="submit"
-                  className={`text-3xs font-bold uppercase px-5 py-2.5 rounded-xl cursor-pointer shadow-sm active:scale-95 transition-all ${
+                  disabled={isUploadingMedia}
+                  className={`text-3xs font-bold uppercase px-5 py-2.5 rounded-xl cursor-pointer shadow-sm active:scale-95 transition-all flex items-center gap-1.5 ${
                     isLight 
-                      ? 'bg-amber-600 hover:bg-amber-700 text-white' 
-                      : 'bg-cyan-500 hover:bg-cyan-450 text-slate-950'
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white disabled:bg-amber-300' 
+                      : 'bg-cyan-500 hover:bg-cyan-450 text-slate-950 disabled:bg-cyan-800'
                   }`}
                 >
-                  Confirm Upload
+                  {isUploadingMedia ? (
+                    <>
+                      <span className="w-2.5 h-2.5 border-2 border-t-transparent rounded-full animate-spin border-current" />
+                      Uploading to Cloudinary...
+                    </>
+                  ) : 'Confirm Upload'}
                 </button>
               </div>
             </form>
@@ -328,49 +470,85 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
                 <div className={`w-full md:w-56 h-36 border rounded-xl relative overflow-hidden flex flex-col items-center justify-center font-mono text-2xs mb-2 md:mb-0 select-none ${
                   isLight ? 'bg-amber-950 border-amber-500/15' : 'bg-[#000] border-cyan-500/10'
                 }`}>
-                  <div className={`absolute inset-0 pointer-events-none ${
-                    isLight ? 'bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.15),transparent)]' : 'bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15),transparent)]'
-                  }`} />
-                  
-                  {/* Decorative Scanlines */}
-                  <div className={`absolute inset-0 bg-gradient-to-b from-transparent bg-[length:100%_4px] pointer-events-none opacity-40 ${
-                    isLight ? 'via-amber-500/5' : 'via-cyan-500/5'
-                  }`} />
+                  {video.videoUrl && (video.videoUrl.startsWith('http://') || video.videoUrl.startsWith('https://')) ? (
+                    video.mediaType === 'image' ? (
+                      <img 
+                        src={video.videoUrl} 
+                        className="w-full h-full object-cover rounded-xl" 
+                        alt={video.title} 
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <video 
+                        src={video.videoUrl} 
+                        controls 
+                        preload="metadata"
+                        className="w-full h-full object-cover rounded-xl bg-black" 
+                      />
+                    )
+                  ) : (
+                    <>
+                      <div className={`absolute inset-0 pointer-events-none ${
+                        isLight ? 'bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.15),transparent)]' : 'bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15),transparent)]'
+                      }`} />
+                      
+                      {/* Decorative Scanlines */}
+                      <div className={`absolute inset-0 bg-gradient-to-b from-transparent bg-[length:100%_4px] pointer-events-none opacity-40 ${
+                        isLight ? 'via-amber-500/5' : 'via-cyan-500/5'
+                      }`} />
 
-                  {/* Icon depending on metadata */}
-                  <div className={`p-3 border rounded-full animate-pulse mb-1.5 ${
-                    isLight ? 'bg-amber-900/40 border-amber-400/20 text-amber-300' : 'bg-cyan-950/40 border-cyan-400/20 text-cyan-400'
-                  }`}>
-                    <Film className="w-5 h-5" />
-                  </div>
+                      {/* Icon depending on metadata */}
+                      <div className={`p-3 border rounded-full animate-pulse mb-1.5 ${
+                        isLight ? 'bg-amber-900/40 border-amber-400/20 text-amber-300' : 'bg-cyan-950/40 border-cyan-400/20 text-cyan-400'
+                      }`}>
+                        <Film className="w-5 h-5" />
+                      </div>
 
-                  {/* Tech Track Code Name */}
-                  <span className={`text-[9px] font-bold tracking-wider font-mono ${
-                    isLight ? 'text-amber-350' : 'text-cyan-400'
-                  }`}>
-                    [{video.videoUrl}]
-                  </span>
-                  
-                  <span className={`text-3xs mt-1 uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                    SYSTEM MONITOR: ACTIVE
-                  </span>
+                      {/* Tech Track Code Name */}
+                      <span className={`text-[9px] font-bold tracking-wider font-mono ${
+                        isLight ? 'text-amber-350' : 'text-cyan-400'
+                      }`}>
+                        [{video.videoUrl}]
+                      </span>
+                      
+                      <span className={`text-3xs mt-1 uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                        SYSTEM MONITOR: ACTIVE
+                      </span>
 
-                  {/* Corner aesthetic markers */}
-                  <div className="absolute top-1.5 left-1.5 w-1 h-1 bg-red-500 rounded-full animate-ping" />
-                  <div className="absolute bottom-1.5 right-1.5 text-[8px] text-slate-500">
-                    HD 1080P
-                  </div>
+                      {/* Corner aesthetic markers */}
+                      <div className="absolute top-1.5 left-1.5 w-1 h-1 bg-red-500 rounded-full animate-ping" />
+                      <div className="absolute bottom-1.5 right-1.5 text-[8px] text-slate-500">
+                        HD 1080P
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Content Block */}
                 <div className="flex-1 flex flex-col justify-between space-y-2">
                   <div className="text-left space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className={`text-3xs font-mono uppercase tracking-widest ${
-                        isLight ? 'text-amber-800 font-bold' : 'text-[#22d3ee]/85'
-                      }`}>
-                        Group Name: {video.groupName}
-                      </span>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-3xs font-mono uppercase tracking-widest ${
+                          isLight ? 'text-amber-800 font-bold' : 'text-[#22d3ee]/85'
+                        }`}>
+                          Group: {video.groupName}
+                        </span>
+                        {video.mediaType === 'image' ? (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-400 font-semibold">
+                            Photo Snapshot
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-semibold">
+                            60s Video Demo
+                          </span>
+                        )}
+                        {video.videoUrl && (video.videoUrl.includes('cloudinary.com') || video.videoUrl.startsWith('http')) && (
+                          <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            Cloudinary Stored
+                          </span>
+                        )}
+                      </div>
                       <span className={`text-4xs font-mono ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                         {video.createdAt}
                       </span>

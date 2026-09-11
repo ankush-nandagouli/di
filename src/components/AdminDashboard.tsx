@@ -4,12 +4,16 @@ import {
   Plus, Trash, BookOpen, Layers, Users, Calendar, 
   Settings, CheckCircle, HelpCircle, Activity, Award, Check, 
   ShieldCheck, Sparkles, Image as ImageIcon, ToggleLeft, ToggleRight, X,
-  Download, FileSpreadsheet, Printer, RotateCcw
+  Download, FileSpreadsheet, Printer, RotateCcw, Eye
 } from 'lucide-react';
 import { Course, CourseApplication, StudentGroup, StudentUser, TrainerUser, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, Certificate, CompanyAbout } from '../types';
 import { DakshyamDatabase } from '../utils/db';
+import { uploadMediaToCloudinary } from '../utils/mediaUpload';
 import AnalyticsCharts from './AnalyticsCharts';
 import { AboutEditorTab } from './AboutEditorTab';
+import OfficialCertificate from './OfficialCertificate';
+import PageLoaderSettingsTab from './PageLoaderSettingsTab';
+import Home3DArtSettingsTab from './Home3DArtSettingsTab';
 
 interface AdminDashboardProps {
   courses: Course[];
@@ -19,6 +23,7 @@ interface AdminDashboardProps {
   onRefresh: () => void;
   theme?: 'light' | 'dark';
   isDbConnected?: boolean;
+  onTestLoader?: () => void;
 }
 
 export default function AdminDashboard({
@@ -28,11 +33,12 @@ export default function AdminDashboard({
   students,
   onRefresh,
   theme = 'dark',
-  isDbConnected = false
+  isDbConnected = false,
+  onTestLoader
 }: AdminDashboardProps) {
   const isLight = theme === 'light';
   // Navigation tabs
-  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'promotions' | 'gallery' | 'special_training' | 'certificates' | 'about_editor' | 'logs';
+  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'promotions' | 'gallery' | 'special_training' | 'certificates' | 'about_editor' | 'page_loader' | 'home_3d_art' | 'logs';
   const [adminTab, setAdminTab] = useState<TabType>('analytics');
 
   // Audit Logs Filtering States
@@ -67,6 +73,41 @@ export default function AdminDashboard({
   const [galCategory, setGalCategory] = useState<'school_programs' | 'iot_robotics' | 'mern_web' | 'lab_setups'>('school_programs');
   const [galError, setGalError] = useState('');
   const [galSuccess, setGalSuccess] = useState('');
+  const [isUploadingGalImage, setIsUploadingGalImage] = useState(false);
+
+  const handleGalFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setGalError('Please select a valid image file.');
+      return;
+    }
+    setGalError('');
+    setIsUploadingGalImage(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: reader.result, resourceType: 'image' })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setGalImageUrl(data.url);
+          setGalSuccess('✓ Exhibition snapshot successfully uploaded to Cloudinary!');
+        } else {
+          const err = await res.json();
+          setGalError(err.error || 'Failed to upload image to Cloudinary.');
+        }
+      } catch (err: any) {
+        setGalError('Cloudinary upload failed: ' + err.message);
+      } finally {
+        setIsUploadingGalImage(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Sourced active state data
   const trainersList = DakshyamDatabase.getTrainers();
@@ -884,7 +925,7 @@ export default function AdminDashboard({
       <div className={`flex flex-wrap gap-1.5 border-b pb-0.5 font-mono text-3xs uppercase font-extrabold scrollbar-none overflow-x-auto ${
         isLight ? 'border-slate-200' : 'border-cyan-500/10'
       }`}>
-        {(['analytics', 'courses', 'applications', 'trainers', 'promotions', 'gallery', 'special_training', 'certificates', 'about_editor', 'logs'] as const).map(tab => (
+        {(['analytics', 'courses', 'applications', 'trainers', 'promotions', 'gallery', 'special_training', 'certificates', 'about_editor', 'page_loader', 'home_3d_art', 'logs'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setAdminTab(tab)}
@@ -903,6 +944,8 @@ export default function AdminDashboard({
             {tab === 'special_training' && '🎓 Special Training Forms'}
             {tab === 'certificates' && '🎖 Certificate Dashboard'}
             {tab === 'about_editor' && '✏️ About Page Editor'}
+            {tab === 'page_loader' && '🎬 Video Page Loader'}
+            {tab === 'home_3d_art' && '🧊 Home 3D Art (.obj)'}
             {tab === 'logs' && '🛡️ System Audit Logs'}
           </button>
         ))}
@@ -1621,23 +1664,59 @@ export default function AdminDashboard({
                 />
               </div>
 
-              <div>
-                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Stock Portfolio Image URL</label>
+              <div className="space-y-2">
+                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Exhibition Snapshot Image (Cloudinary or Direct URL)</label>
+                
+                {/* Cloudinary Upload Option */}
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleGalFileUpload}
+                    disabled={isUploadingGalImage}
+                    className={`block w-full text-4xs cursor-pointer file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-4xs file:font-semibold disabled:opacity-50 ${
+                      isLight 
+                        ? 'text-slate-500 file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200' 
+                        : 'text-slate-400 file:bg-cyan-950 file:text-cyan-400 hover:file:bg-cyan-900'
+                    }`}
+                  />
+                  {isUploadingGalImage && (
+                    <span className="text-[9px] font-mono text-cyan-400 animate-pulse whitespace-nowrap">
+                      Uploading to Cloudinary...
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-[8px] font-mono text-slate-500 flex items-center gap-2">
+                  <span>OR paste direct/Cloudinary image URL:</span>
+                </div>
+
                 <input
                   type="url"
                   required
                   value={galImageUrl}
                   onChange={(e) => setGalImageUrl(e.target.value)}
-                  placeholder="Paste Unsplash photo URL"
+                  placeholder="https://res.cloudinary.com/... or https://images.unsplash.com/..."
                   className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
                     isLight 
                       ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-455' 
                       : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
                   }`}
                 />
-                <span className={`text-[8px] block mt-0.5 font-mono ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
-                  Example: <code className={isLight ? 'bg-slate-100 text-amber-900 px-1 py-0.5 rounded' : 'text-cyan-400'}>https://images.unsplash.com/photo-1509062522246-3755977927d7</code>
-                </span>
+
+                {galImageUrl && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <img 
+                      src={galImageUrl} 
+                      alt="Exhibition preview" 
+                      className="w-12 h-12 object-cover rounded-lg border border-slate-500/20" 
+                      referrerPolicy="no-referrer"
+                    />
+                    <span className="text-[9px] font-mono text-emerald-400 flex items-center gap-1">
+                      ✓ Snapshot Image Loaded {galImageUrl.includes('cloudinary.com') ? '(Cloudinary Hosted)' : ''}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -2269,7 +2348,7 @@ export default function AdminDashboard({
                 <div className="bg-[#050505]/75 border border-cyan-500/10 rounded-2xl p-5 space-y-4 lg:col-span-1">
                   <div className="border-b border-cyan-500/15 pb-2">
                     <h3 className="text-xs font-bold text-[#22d3ee] font-mono tracking-wider uppercase flex items-center gap-1.5">
-                      <Award className="w-4 h-4" /> Certificate Engine Config
+                      <Award className="w-4 h-4" /> Certificate of Completion Engine
                     </h3>
                     <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
                       Calibrate custom parameters for instant high-fidelity vector generation. Handlers automatically pull coordinates, roll data, and verify keys.
@@ -2346,17 +2425,16 @@ export default function AdminDashboard({
                       <div className="grid grid-cols-2 gap-3">
                         {/* Custom Logo Upload */}
                         <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Custom Issuer Logo</label>
+                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Custom Issuer Logo (Cloudinary)</label>
                           <div className="relative">
                             <input
                               type="file"
                               accept="image/*"
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  const r = new FileReader();
-                                  r.onloadend = () => setCertCustomLogoUrl(r.result as string);
-                                  r.readAsDataURL(file);
+                                  const res = await uploadMediaToCloudinary(file, 'image');
+                                  setCertCustomLogoUrl(res.url);
                                 }
                               }}
                               className="hidden"
@@ -2382,17 +2460,16 @@ export default function AdminDashboard({
 
                         {/* Custom Seal Upload */}
                         <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Custom Seal Image</label>
+                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Custom Seal Image (Cloudinary)</label>
                           <div className="relative">
                             <input
                               type="file"
                               accept="image/*"
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  const r = new FileReader();
-                                  r.onloadend = () => setCertCustomSealUrl(r.result as string);
-                                  r.readAsDataURL(file);
+                                  const res = await uploadMediaToCloudinary(file, 'image');
+                                  setCertCustomSealUrl(res.url);
                                 }
                               }}
                               className="hidden"
@@ -2432,17 +2509,16 @@ export default function AdminDashboard({
 
                         {certTrainingPartnerName && (
                           <div>
-                            <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Partner Logo (Optional)</label>
+                            <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Partner Logo (Cloudinary)</label>
                             <div className="relative">
                               <input
                                 type="file"
                                 accept="image/*"
-                                onChange={(e) => {
+                                onChange={async (e) => {
                                   const file = e.target.files?.[0];
                                   if (file) {
-                                    const r = new FileReader();
-                                    r.onloadend = () => setCertTrainingPartnerLogoUrl(r.result as string);
-                                    r.readAsDataURL(file);
+                                    const res = await uploadMediaToCloudinary(file, 'image');
+                                    setCertTrainingPartnerLogoUrl(res.url);
                                   }
                                 }}
                                 className="hidden"
@@ -2483,6 +2559,28 @@ export default function AdminDashboard({
                         <Award className="w-4 h-4" /> Bulk Generate {registeredStudents.length} Certificates
                       </button>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCertPreviewObj({
+                          id: `DKM-2026-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+                          studentName: registeredStudents[0]?.name || "Alex M. Sharma",
+                          studentEmail: registeredStudents[0]?.email || "alex.sharma@dakshyam.edu",
+                          courseTitle: selectedOption?.title || "Industrial IoT & Edge Computing Systems",
+                          projectTitle: certProjectTitle || registeredStudents[0]?.defaultProject || "Smart Autonomous Telemetry Node",
+                          issueDate: certIssueDate || new Date().toISOString().split('T')[0],
+                          trainerName: certTrainerName || "Er. Aniket Sharma, M.Tech",
+                          customLogoUrl: certCustomLogoUrl || undefined,
+                          customSealUrl: certCustomSealUrl || undefined,
+                          trainingPartnerName: certTrainingPartnerName || undefined,
+                          trainingPartnerLogoUrl: certTrainingPartnerLogoUrl || undefined
+                        });
+                      }}
+                      className="w-full bg-slate-900/90 hover:bg-slate-800 border border-amber-500/30 hover:border-amber-400 text-amber-300 font-bold text-xs py-2 rounded-xl transition-all cursor-pointer uppercase font-mono tracking-wider flex items-center justify-center gap-1.5 mt-2"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> Preview Certificate of Completion
+                    </button>
                   </div>
                 </div>
 
@@ -2658,127 +2756,28 @@ export default function AdminDashboard({
 
               {/* Dynamic SVG Certificate Preview / Generator Preview Modal Overlay */}
               {certPreviewObj && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
                   <div 
                     onClick={() => setCertPreviewObj(null)}
-                    className="absolute inset-0 bg-black/90 backdrop-blur-xs cursor-pointer"
+                    className="fixed inset-0 bg-black/85 backdrop-blur-md cursor-pointer"
                   />
 
-                  <div className="bg-[#040d12] border-2 border-[#d97706] rounded-2.5xl max-w-4xl w-full relative z-10 p-5 md:p-8 space-y-4 text-center max-h-[95vh] overflow-y-auto shadow-2xl">
-                    <div className="absolute top-4 right-4 flex gap-2">
-                      <button
-                        onClick={() => window.print()}
-                        className="bg-[#22d3ee] hover:bg-cyan-400 text-slate-950 font-black text-3xs px-3.5 py-1.5 rounded-lg flex items-center gap-1 uppercase transition-all"
-                      >
-                        <Printer className="w-3 h-3" /> Print PDF
-                      </button>
-                      <button
-                        onClick={() => setCertPreviewObj(null)}
-                        className="text-slate-400 hover:text-white font-mono text-2xs px-3 py-1.5 rounded-lg border border-slate-500/10 cursor-pointer"
-                      >
-                        ✕ Close
-                      </button>
-                    </div>
+                  <div className="bg-[#050b14] border border-amber-500/30 rounded-3xl max-w-5xl w-full relative z-10 p-4 md:p-7 space-y-4 text-center max-h-[96vh] overflow-y-auto shadow-[0_0_60px_rgba(0,0,0,0.8)]">
+                    <OfficialCertificate 
+                      certificate={certPreviewObj}
+                      onClose={() => setCertPreviewObj(null)}
+                      showControls={true}
+                      theme={theme}
+                    />
 
-                    {/* Vector SVG Generator builder inside container */}
-                    <div className="w-full bg-[#040d12] rounded-xl overflow-hidden shadow-2xl border border-cyan-500/15 flex items-center justify-center relative my-4">
-                      
-                      {/* Interactive live SVG model */}
-                      <svg viewBox="0 0 1000 700" width="100%" height="100%" className="w-full font-sans rounded-xl bg-[#040d12]">
-                        {/* Outer Border Design */}
-                        <rect x="15" y="15" width="970" height="670" fill="#040d12" stroke="#d97706" strokeWidth="6" rx="10" />
-                        <rect x="25" y="25" width="950" height="650" fill="none" stroke="#22d3ee" strokeWidth="1.5" strokeDasharray="8 4" rx="8" />
-                        
-                        {/* Subtle Ornamental Corner Borders */}
-                        <path d="M 40 100 L 40 40 L 100 40" fill="none" stroke="#d97706" strokeWidth="3" />
-                        <path d="M 960 100 L 960 40 L 900 40" fill="none" stroke="#d97706" strokeWidth="3" />
-                        <path d="M 40 600 L 40 660 L 100 660" fill="none" stroke="#d97706" strokeWidth="3" />
-                        <path d="M 960 600 L 960 660 L 900 660" fill="none" stroke="#d97706" strokeWidth="3" />
-
-                        {/* Decorative watermarks */}
-                        <circle cx="500" cy="350" r="180" fill="none" stroke="#22d3ee" strokeOpacity="0.04" strokeWidth="1" />
-                        <circle cx="500" cy="350" r="220" fill="none" stroke="#d97706" strokeOpacity="0.03" strokeWidth="1.5" strokeDasharray="15 5" />
-                        
-                        {/* Header Text & Custom Logo */}
-                        {certPreviewObj.customLogoUrl ? (
-                          <image href={certPreviewObj.customLogoUrl} x="375" y="40" width="250" height="55" />
-                        ) : (
-                          <g>
-                            <text x="500" y="80" fontFamily="sans-serif" fontSize="26" fontWeight="900" fill="#ffffff" textAnchor="middle" letterSpacing="4">DAKSHYAM INNOVATION</text>
-                            <text x="500" y="105" fontFamily="monospace" fontSize="9" fontWeight="bold" fill="#22d3ee" textAnchor="middle" letterSpacing="2">CREDENTIAL CERTIFICATION CELL</text>
-                          </g>
-                        )}
-
-                        {/* Partner Integration Banner */}
-                        {certPreviewObj.trainingPartnerName && (
-                          <g transform="translate(500, 130)">
-                            <text x="0" y="0" fontFamily="sans-serif" fontSize="10" fontWeight="bold" fill="#34d399" textAnchor="middle" letterSpacing="1">
-                              IN PARTNERSHIP WITH: {certPreviewObj.trainingPartnerName.toUpperCase()}
-                            </text>
-                            {certPreviewObj.trainingPartnerLogoUrl && (
-                              <image href={certPreviewObj.trainingPartnerLogoUrl} x="-10" y="8" width="20" height="20" />
-                            )}
-                          </g>
-                        )}
-                        
-                        {/* Main Title */}
-                        <text x="500" y="235" fontFamily="sans-serif" fontSize="42" fontWeight="900" fill="#ffffff" textAnchor="middle" letterSpacing="2">CERTIFICATE OF MERIT</text>
-                        <text x="500" y="275" fontFamily="monospace" fontSize="11" fontWeight="bold" fill="#475569" textAnchor="middle">THIS OFFICIAL SECURED PROTOCOL DOCUMENT IS GRANTED TO</text>
-                        
-                        {/* Student Name */}
-                        <rect x="250" y="295" width="500" height="60" fill="#091e25" stroke="#22d3ee" strokeWidth="1" strokeOpacity="0.25" rx="6" />
-                        <text x="500" y="337" fontFamily="sans-serif" fontSize="28" fontWeight="bold" fill="#fbbf24" textAnchor="middle">{certPreviewObj.studentName}</text>
-                        
-                        {/* Course parameters */}
-                        <text x="500" y="395" fontFamily="sans-serif" fontSize="13" fill="#94a3b8" textAnchor="middle">has successfully completed the specialized industry-oriented curriculum and physical laboratory training program in</text>
-                        <text x="500" y="430" fontFamily="sans-serif" fontSize="22" fontWeight="bold" fill="#ffffff" textAnchor="middle" letterSpacing="0.5">{certPreviewObj.courseTitle}</text>
-                        <text x="500" y="465" fontFamily="sans-serif" fontSize="11" fill="#64748b" textAnchor="middle">with specialized project telemetry mapping:</text>
-                        <text x="500" y="492" fontFamily="sans-serif" fontSize="14" fontWeight="bold" fill="#e2e8f0" textAnchor="middle" fontStyle="italic">"{certPreviewObj.projectTitle}"</text>
-                        
-                        <line x1="300" y1="520" x2="700" y2="520" stroke="#d97706" strokeWidth="1" strokeOpacity="0.3" />
- 
-                        {/* Footnotes starting metadata */}
-                        <g transform="translate(110, 560)">
-                          <text x="0" y="15" fontFamily="monospace" fontSize="11" fill="#475569" fontWeight="bold">DATE AUTHORIZED</text>
-                          <text x="0" y="35" fontFamily="sans-serif" fontSize="13" fill="#e2e8f0" fontWeight="bold">{certPreviewObj.issueDate}</text>
-                          <line x1="0" y1="2" x2="160" y2="2" stroke="#22d3ee" strokeWidth="1" strokeOpacity="0.4" />
-                        </g>
- 
-                        <g transform="translate(500, 550)" textAnchor="middle">
-                           {certPreviewObj.customSealUrl ? (
-                             <g>
-                               <image href={certPreviewObj.customSealUrl} x="-30" y="-12" width="60" height="60" />
-                               <text x="0" y="60" fontFamily="monospace" fontSize="9" fill="#22d3ee" fontWeight="bold" letterSpacing="1">OFFICIAL SEAL</text>
-                             </g>
-                           ) : (
-                             <g>
-                               <circle cx="0" cy="18" r="28" fill="#1e293b" stroke="#d97706" strokeWidth="1.5" />
-                               <path d="M -10 18 L 0 8 L 10 18 L 5 18 L 5 28 L -5 28 L -5 18 Z" fill="#22d3ee" />
-                               <text x="0" y="60" fontFamily="monospace" fontSize="9" fill="#22d3ee" fontWeight="bold" letterSpacing="1">DAKSHYAM SEAL</text>
-                             </g>
-                           )}
-                        </g>
-
-                        <g transform="translate(730, 560)" textAnchor="end">
-                          <text x="0" y="15" fontFamily="monospace" fontSize="11" fill="#475569" fontWeight="bold">SECURE VERIFIED KEY</text>
-                          <text x="0" y="35" fontFamily="sans-serif" fontSize="12" fill="#fbbf24" fontWeight="bold" letterSpacing="1">{certPreviewObj.id}</text>
-                          <line x1="-160" y1="2" x2="0" y2="2" stroke="#22d3ee" strokeWidth="1" strokeOpacity="0.4" />
-                        </g>
-
-                        {/* Location node indicator footer */}
-                        <text x="500" y="655" fontFamily="monospace" fontSize="8.5" fill="#475569" textAnchor="middle" letterSpacing="1.5">REGIONAL HUB: WARASEONI, BALAGHAT, CENTRAL MP • SYSTEM LOG VERIFICATION VERIFIED</text>
-                      </svg>
-
-                    </div>
-
-                    <div className="flex justify-between items-center bg-black/40 border border-cyan-500/10 p-3 rounded-xl max-w-lg mx-auto text-left font-mono text-[10px]">
+                    <div className="flex flex-wrap justify-between items-center bg-black/50 border border-slate-700/40 px-4 py-2.5 rounded-xl max-w-3xl mx-auto text-left font-mono text-[11px] gap-2">
                       <div className="space-y-0.5">
-                        <span className="text-slate-500 uppercase block">Issuer Reference</span>
-                        <span className="text-slate-300 font-bold block">{certPreviewObj.trainerName}</span>
+                        <span className="text-slate-400 uppercase text-[9px] block">Verified Authorizing Issuer</span>
+                        <span className="text-slate-200 font-bold block">{certPreviewObj.trainerName || 'Dakshyam Innovations Board'}</span>
                       </div>
-                      <div className="text-right">
-                        <span className="text-cyan-400 font-extrabold uppercase font-mono block">Status: 100% SECURE MATCH</span>
-                        <span className="text-emerald-400 font-bold tracking-wider">{certPreviewObj.id}</span>
+                      <div className="space-y-0.5 text-right">
+                        <span className="text-emerald-400 font-black uppercase text-[9px] block">Ledger Status: 100% Cryptographic Match</span>
+                        <span className="text-amber-300 font-mono font-bold tracking-wider">{certPreviewObj.id}</span>
                       </div>
                     </div>
                   </div>
@@ -2794,7 +2793,24 @@ export default function AdminDashboard({
           <AboutEditorTab onRefresh={onRefresh} theme="" />
         )}
 
-        {/* TAB 10: ADMINISTRATIVE LOG CONTROL */}
+        {/* TAB 10: ANIMATED VIDEO PAGE LOADER SETTINGS */}
+        {adminTab === 'page_loader' && (
+          <PageLoaderSettingsTab 
+            theme={theme}
+            onTestLoader={() => {
+              if (onTestLoader) {
+                onTestLoader();
+              }
+            }}
+          />
+        )}
+
+        {/* TAB 11: HOME PAGE 3D ART & OBJ MODEL */}
+        {adminTab === 'home_3d_art' && (
+          <Home3DArtSettingsTab theme={theme} />
+        )}
+
+        {/* TAB 11: ADMINISTRATIVE LOG CONTROL */}
         {adminTab === 'logs' && (() => {
           const rawLogs = DakshyamDatabase.getAppLogs();
           const filteredLogs = rawLogs.filter(log => {

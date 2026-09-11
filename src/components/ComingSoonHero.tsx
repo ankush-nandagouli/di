@@ -94,9 +94,9 @@ export default function ComingSoonHero() {
     >
       {/* Absolute floating micro particles */}
       <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
-        <div className="absolute top-[20%] left-[10%] w-2 h-2 rounded-full bg-cyan-400 opacity-25 animate-ping duration-[3000ms]" />
-        <div className="absolute top-[80%] right-[15%] w-3.5 h-3.5 rounded-full bg-cyan-400 opacity-30 blur-[1px] animate-[pulse_4s_infinite_ease-in-out]" />
-        <div className="absolute bottom-[30%] left-[18%] w-1.5 h-1.5 rounded-full bg-[#0ea5e9] opacity-30 animate-pulse duration-[2500ms]" />
+        <div className="absolute top-[20%] left-[10%] w-2 h-2 rounded-full bg-blue-400 opacity-25 animate-ping duration-[3000ms]" />
+        <div className="absolute top-[80%] right-[15%] w-3.5 h-3.5 rounded-full bg-sky-400 opacity-30 blur-[1px] animate-[pulse_4s_infinite_ease-in-out]" />
+        <div className="absolute bottom-[30%] left-[18%] w-1.5 h-1.5 rounded-full bg-blue-600 opacity-30 animate-pulse duration-[2500ms]" />
       </div>
 
       {/* 3D Tilted Wrapper Container responding to Gyroscope or Mouse coordinates */}
@@ -119,17 +119,17 @@ export default function ComingSoonHero() {
         >
           {CUSTOM_LOGO_PATH ? (
             <div className="relative group select-none flex flex-col items-center justify-center">
-              <div className="absolute -inset-10 bg-radial from-cyan-500/20 via-transparent to-transparent opacity-80 blur-3xl animate-[pulse_6s_infinite_ease-in-out] -z-10" />
+              <div className="absolute -inset-10 bg-radial from-blue-600/20 via-transparent to-transparent opacity-80 blur-3xl animate-[pulse_6s_infinite_ease-in-out] -z-10" />
               <img 
                 src={CUSTOM_LOGO_PATH} 
                 alt="Dakshyam Logo" 
                 referrerPolicy="no-referrer"
-                className="max-h-24 sm:max-h-32 object-contain filter drop-shadow-[0_0_20px_rgba(34,211,238,0.25)]" 
+                className="max-h-24 sm:max-h-32 object-contain filter drop-shadow-[0_0_20px_rgba(59,130,246,0.25)]" 
               />
-              <h1 className="text-4xl md:text-5xl font-black tracking-[0.24em] text-white font-sans text-center mt-6" style={{ textShadow: '0 0 25px rgba(34,211,238,0.22)' }}>
+              <h1 className="text-4xl md:text-5xl font-black tracking-[0.24em] text-white font-sans text-center mt-6" style={{ textShadow: '0 0 25px rgba(59,130,246,0.22)' }}>
                 DAKSHYAM
               </h1>
-              <p className="mt-2 text-xs md:text-sm font-mono text-cyan-400 tracking-[0.62em] font-medium uppercase translate-x-[0.31em]">
+              <p className="mt-2 text-xs md:text-sm font-mono text-sky-400 tracking-[0.62em] font-medium uppercase translate-x-[0.31em]">
                 INNOVATION
               </p>
             </div>
@@ -143,7 +143,7 @@ export default function ComingSoonHero() {
           className="mt-2 mb-2 overflow-hidden py-1"
           style={{ transform: 'translateZ(30px)' }}
         >
-          <span className="inline-flex gap-[0.18em] font-sans text-xs sm:text-sm md:text-base font-bold tracking-[0.6em] text-cyan-400/80 [text-shadow:0_0_12px_rgba(34,211,238,0.2)] uppercase">
+          <span className="inline-flex gap-[0.18em] font-sans text-xs sm:text-sm md:text-base font-bold tracking-[0.6em] text-sky-400/90 [text-shadow:0_0_12px_rgba(56,189,248,0.2)] uppercase">
             {textToReveal.split("").map((char, index) => (
               <span 
                 key={index} 
@@ -160,21 +160,21 @@ export default function ComingSoonHero() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, delay: 0.6, type: 'spring' }}
-          className="relative px-8 py-5 rounded-2xl bg-[#050505]/45 border border-cyan-500/10 backdrop-blur-md flex flex-col items-center justify-center overflow-hidden group hover:border-cyan-400/40 hover:shadow-[0_0_25px_rgba(34,211,238,0.15)] transition-all duration-500 max-w-sm mt-3"
+          className="relative px-8 py-5 rounded-2xl bg-[#0a192f]/60 border border-blue-800/40 backdrop-blur-md flex flex-col items-center justify-center overflow-hidden group hover:border-blue-500/50 hover:shadow-[0_0_25px_rgba(30,58,138,0.25)] transition-all duration-500 max-w-sm mt-3"
           style={{ transform: 'translateZ(50px)' }}
         >
           {/* Neon micro-corner accents */}
-          <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-cyan-400/40" />
-          <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-cyan-400/40" />
-          <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-cyan-400/40" />
-          <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-cyan-400/40" />
+          <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-blue-400/40" />
+          <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-blue-400/40" />
+          <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-blue-400/40" />
+          <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-blue-400/40" />
           
-          <span className="text-3xl sm:text-4xl font-black tracking-[0.3em] text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-cyan-400 font-sans text-center drop-shadow-[0_0_15px_rgba(34,211,238,0.3)] select-none">
+          <span className="text-3xl sm:text-4xl font-black tracking-[0.3em] text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-sky-300 font-sans text-center drop-shadow-[0_0_15px_rgba(56,189,248,0.2)] select-none">
             THIS AUGUST
           </span>
           
-          <div className="mt-2.5 flex items-center gap-1.5 text-[9px] font-mono tracking-[0.25em] text-cyan-400/80 uppercase">
-            <span className="w-1 h-1 rounded-full bg-cyan-400 animate-ping" />
+          <div className="mt-2.5 flex items-center gap-1.5 text-[9px] font-mono tracking-[0.25em] text-sky-400/80 uppercase">
+            <span className="w-1 h-1 rounded-full bg-sky-400 animate-ping" />
             
           </div>
         </motion.div>

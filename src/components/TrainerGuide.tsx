@@ -31,14 +31,14 @@ function GuideBlock({ title, desc, commands, code, language = 'javascript', expl
   return (
     <div className={`border rounded-2xl p-5 space-y-4 text-left transition-all duration-300 ${
       isLight 
-        ? 'bg-slate-50/50 border-slate-200 hover:border-amber-500/20' 
-        : 'bg-[#050505]/85 border-cyan-500/10 hover:border-cyan-500/20'
+        ? 'bg-slate-50/50 border-slate-200 hover:border-blue-900/20' 
+        : 'bg-[#0a192f]/85 border-blue-800/40 hover:border-blue-700/60'
     }`}>
-      <div className={`border-b pb-2 ${isLight ? 'border-slate-200/60' : 'border-cyan-500/15'}`}>
+      <div className={`border-b pb-2 ${isLight ? 'border-slate-200/60' : 'border-blue-900/30'}`}>
         <h4 className={`text-xs font-black font-mono tracking-wide uppercase flex items-center gap-1.5 ${
           isLight ? 'text-slate-900' : 'text-white'
         }`}>
-          <ChevronRight className={`w-4 h-4 ${isLight ? 'text-amber-700' : 'text-cyan-400'}`} /> {title}
+          <ChevronRight className={`w-4 h-4 ${isLight ? 'text-blue-950' : 'text-sky-400'}`} /> {title}
         </h4>
         <p className={`text-[10px] mt-1 leading-relaxed font-sans ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{desc}</p>
       </div>
@@ -46,21 +46,21 @@ function GuideBlock({ title, desc, commands, code, language = 'javascript', expl
       {commands && commands.length > 0 && (
         <div className="space-y-1.5">
           <span className={`text-[8px] font-mono uppercase tracking-wider block ${
-            isLight ? 'text-amber-850 font-extrabold' : 'text-cyan-400/80'
+            isLight ? 'text-blue-950 font-extrabold' : 'text-sky-400'
           }`}>Terminal / Installation Commands:</span>
           <div className="space-y-1">
             {commands.map((cmd, idx) => (
               <div key={idx} className={`flex items-center justify-between border px-3 py-1.5 rounded-xl font-mono text-[10px] ${
                 isLight 
                   ? 'bg-slate-100 border-slate-200 text-slate-750' 
-                  : 'bg-black/60 border-cyan-500/5 text-slate-350'
+                  : 'bg-[#071326] border-blue-900/30 text-slate-300'
               }`}>
                 <span className="select-all">$ {cmd}</span>
                 <button
                   type="button"
                   onClick={() => copyToClipboard(cmd, false, idx)}
                   className={`cursor-pointer p-0.5 transition-colors ${
-                    isLight ? 'text-slate-400 hover:text-amber-700' : 'text-slate-500 hover:text-cyan-400'
+                    isLight ? 'text-slate-400 hover:text-blue-950' : 'text-slate-500 hover:text-sky-300'
                   }`}
                   title="Copy command"
                 >
@@ -76,15 +76,15 @@ function GuideBlock({ title, desc, commands, code, language = 'javascript', expl
         <div className="space-y-1.5 relative">
           <div className={`flex justify-between items-center border-b px-3.5 py-1.5 rounded-t-xl ${
             isLight 
-              ? 'bg-amber-50/70 border-slate-200 text-amber-900' 
-              : 'bg-cyan-950/20 border-cyan-500/10 text-cyan-400/80'
+              ? 'bg-blue-50 border-slate-200 text-blue-950' 
+              : 'bg-blue-950/40 border-blue-900/40 text-sky-300'
           }`}>
             <span className="text-[8px] font-mono uppercase tracking-wider">Code Snippet ({language})</span>
             <button
               type="button"
               onClick={() => copyToClipboard(code, true)}
               className={`flex items-center gap-1 text-[9px] font-mono cursor-pointer transition-colors ${
-                isLight ? 'text-slate-600 hover:text-amber-800' : 'text-slate-400 hover:text-cyan-400'
+                isLight ? 'text-slate-600 hover:text-blue-950' : 'text-slate-400 hover:text-sky-300'
               }`}
             >
               {copiedCode ? (
@@ -103,7 +103,7 @@ function GuideBlock({ title, desc, commands, code, language = 'javascript', expl
           <pre className={`p-4 rounded-b-xl border border-t-0 font-mono text-[10px] overflow-x-auto max-h-72 select-text ${
             isLight 
               ? 'bg-slate-900 border-slate-200 text-emerald-300' 
-              : 'bg-black/90 border-cyan-500/10 text-emerald-400'
+              : 'bg-[#050d1a] border-blue-900/40 text-emerald-400'
           }`}>
             <code>{code}</code>
           </pre>
@@ -112,10 +112,10 @@ function GuideBlock({ title, desc, commands, code, language = 'javascript', expl
 
       <div className={`border rounded-xl p-3 text-3xs leading-relaxed font-mono ${
         isLight 
-          ? 'bg-amber-500/5 border-amber-500/10 text-slate-650' 
-          : 'bg-cyan-500/5 border-cyan-500/10 text-slate-400'
+          ? 'bg-blue-50/50 border-blue-900/10 text-slate-650' 
+          : 'bg-blue-950/20 border-blue-900/30 text-slate-400'
       }`}>
-        <strong className={`font-bold block uppercase mb-1 ${isLight ? 'text-amber-850' : 'text-slate-300'}`}>Architecture & Implementation Insights:</strong>
+        <strong className={`font-bold block uppercase mb-1 ${isLight ? 'text-blue-950' : 'text-slate-300'}`}>Architecture & Implementation Insights:</strong>
         <p>{explanation}</p>
       </div>
     </div>

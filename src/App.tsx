@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Trophy, BookOpen, ShieldCheck, Play, UserCircle, 
   LogOut, LogIn, ChevronRight, HelpCircle, Activity, Sparkles, School,
-  Sun, Moon, Menu, X, Eye, EyeOff, Lock, Settings, Key, Info, Cpu, Compass
+  Sun, Moon, Menu, X, Eye, EyeOff, Lock, Settings, Key, Info, Cpu, Compass,
+  UserPlus, ShieldAlert, CheckCircle2, Check
 } from 'lucide-react';
 
 import ThreeBackground from './components/ThreeBackground';
@@ -17,10 +18,12 @@ import TrainerDashboard from './components/TrainerDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AboutCompany from './components/AboutCompany';
 import ContactUs from './components/ContactUs';
+import PageLoader from './components/PageLoader';
 
 import { DakshyamDatabase } from './utils/db';
-import { Course, CourseApplication, StudentGroup, StudentUser, Certificate, VideoPost, PromoBanner, GalleryImage } from './types';
+import { Course, CourseApplication, StudentGroup, StudentUser, Certificate, VideoPost, PromoBanner, GalleryImage, PageLoaderConfig } from './types';
 import { BeautifulErrorDisplay } from './utils/errorShield';
+import { getVideoBlob } from './utils/videoStorage';
 
 // Firebase Auth SDK imports for secure password resetting
 import { 
@@ -66,6 +69,103 @@ export default function App() {
     return 'home';
   });
   const [preselectedCourseId, setPreselectedCourseId] = useState<string | null>(null);
+
+  // --- ANIMATED VIDEO LAZY LOADER STATES ---
+  const [pageLoaderConfig, setPageLoaderConfig] = useState<PageLoaderConfig>(() => {
+    return DakshyamDatabase.getPageLoaderConfig();
+  });
+  const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
+  const [loadingTargetTab, setLoadingTargetTab] = useState<string>('home');
+  const [localVideoUrl, setLocalVideoUrl] = useState<string>('');
+
+  // Hydrate local video from IndexedDB if uploaded locally
+  useEffect(() => {
+    let activeObjUrl: string | null = null;
+    async function loadCachedVideoBlob() {
+      try {
+        const blob = await getVideoBlob('page_loader_video');
+        if (blob) {
+          activeObjUrl = URL.createObjectURL(blob);
+          setLocalVideoUrl(activeObjUrl);
+        }
+      } catch (err) {
+        console.warn('Could not read cached video blob from IndexedDB:', err);
+      }
+    }
+    loadCachedVideoBlob();
+
+    return () => {
+      if (activeObjUrl) {
+        URL.revokeObjectURL(activeObjUrl);
+      }
+    };
+  }, [pageLoaderConfig.updatedAt]);
+
+  // Initial page load lazy animation
+  useEffect(() => {
+    if (pageLoaderConfig.enabled) {
+      const timer = setTimeout(() => {
+        setIsPageLoading(false);
+      }, Math.max(pageLoaderConfig.minDurationMs || 850, 700));
+      return () => clearTimeout(timer);
+    } else {
+      setIsPageLoading(false);
+    }
+  }, []);
+
+  // Compute active loader configuration with local video preference
+  const activeLoaderConfig: PageLoaderConfig = {
+    ...pageLoaderConfig,
+    videoUrl: localVideoUrl || pageLoaderConfig.videoUrl || ''
+  };
+
+  // Safe navigation function triggering the animated lazy loader on every page change
+  const navigateToTab = (
+    newTab: 'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact',
+    preselectCourse: string | null = null
+  ) => {
+    if (preselectCourse !== undefined) {
+      setPreselectedCourseId(preselectCourse);
+    }
+    setMenuOpen(false);
+
+    if (newTab === activeTab) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (pageLoaderConfig.enabled && pageLoaderConfig.showOnTabChange) {
+      setLoadingTargetTab(newTab);
+      setIsPageLoading(true);
+
+      const switchTimer = setTimeout(() => {
+        setActiveTab(newTab);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }, 120);
+
+      const finishTimer = setTimeout(() => {
+        setIsPageLoading(false);
+      }, Math.max(pageLoaderConfig.minDurationMs || 850, 600));
+
+      return () => {
+        clearTimeout(switchTimer);
+        clearTimeout(finishTimer);
+      };
+    } else {
+      setActiveTab(newTab);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const [pendingApplyCourseId, setPendingApplyCourseId] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem('dakshyam_pending_course_apply') || null;
+    } catch {
+      return null;
+    }
+  });
+  const [showApplyAuthPrompt, setShowApplyAuthPrompt] = useState(false);
+  const [applicationSuccessBanner, setApplicationSuccessBanner] = useState<string | null>(null);
   const [logoError, setLogoError] = useState(false);
 
   // Authentication UI Modal
@@ -346,6 +446,7 @@ export default function App() {
       setGalleryImages(DakshyamDatabase.getGalleryImages());
       setCurrentUser(DakshyamDatabase.getLoggedInUser());
       setAboutState(DakshyamDatabase.getCompanyAbout());
+      setPageLoaderConfig(DakshyamDatabase.getPageLoaderConfig());
     } catch (e) {
       console.error('Error synchronizing dataset:', e);
     }
@@ -588,8 +689,19 @@ export default function App() {
         setOtpInput('');
         setOtpStatusMsg('');
         setShowAuthModal(false);
+        setShowApplyAuthPrompt(false);
         refreshDb();
-        setActiveTab('portal'); // Take directly to workspace
+
+        if (pendingApplyCourseId) {
+          const targetCourse = courses.find(c => c.id === pendingApplyCourseId);
+          setPreselectedCourseId(pendingApplyCourseId);
+          setApplicationSuccessBanner(`Welcome, ${nameClean}! Your candidate profile is verified. Complete your application for "${targetCourse?.title || 'Selected Course'}" below.`);
+          navigateToTab('services');
+          setPendingApplyCourseId(null);
+          try { sessionStorage.removeItem('dakshyam_pending_course_apply'); } catch {}
+        } else {
+          navigateToTab('portal'); // Take directly to workspace
+        }
       } else {
         setAuthError(res.error || 'Registration failed.');
         DakshyamDatabase.logEvent('Student Registration Failed', `Signup failed for ${emailClean}. Error: ${res.error}`, emailClean, 'student', 'ERROR');
@@ -653,10 +765,21 @@ export default function App() {
         DakshyamDatabase.setLoggedInUser(match);
         DakshyamDatabase.logEvent('Student Logged In', `Student ${match.name} (${match.email}) authenticated successfully.`, match.email, 'student', 'SUCCESS');
         setShowAuthModal(false);
+        setShowApplyAuthPrompt(false);
         setStudentEmail('');
         setPasswordInput('');
         refreshDb();
-        setActiveTab('portal');
+
+        if (pendingApplyCourseId) {
+          const targetCourse = courses.find(c => c.id === pendingApplyCourseId);
+          setPreselectedCourseId(pendingApplyCourseId);
+          setApplicationSuccessBanner(`Welcome back, ${match.name}! Your student credentials are verified. Complete your application for "${targetCourse?.title || 'Selected Course'}" below.`);
+          navigateToTab('services');
+          setPendingApplyCourseId(null);
+          try { sessionStorage.removeItem('dakshyam_pending_course_apply'); } catch {}
+        } else {
+          navigateToTab('portal');
+        }
       } else {
         // Registering failed attempt even for non-existent users to protect user enumeration
         handleFailedAttempt(emailClean);
@@ -727,7 +850,7 @@ export default function App() {
         setStudentEmail('');
         setPasswordInput('');
         refreshDb();
-        setActiveTab('portal');
+        navigateToTab('portal');
       } else {
         handleFailedAttempt(emailClean);
       }
@@ -820,7 +943,7 @@ export default function App() {
         setFailedAttempts(updatedAttempts);
 
         refreshDb();
-        setActiveTab('portal');
+        navigateToTab('portal');
       } catch {
         setAuthError('Admin indexing node failure.');
       }
@@ -832,13 +955,28 @@ export default function App() {
   const handleLogout = () => {
     DakshyamDatabase.setLoggedInUser(null);
     refreshDb();
-    setActiveTab('home');
+    navigateToTab('home');
   };
 
-  // CTA triggers from Public screens
+  // CTA triggers from Public screens & Course Catalogs
   const triggerQuickEnroll = (courseId: string) => {
-    setPreselectedCourseId(courseId);
-    setActiveTab('services');
+    if (currentUser && currentUser.role === 'student') {
+      navigateToTab('services', courseId);
+    } else {
+      setPendingApplyCourseId(courseId);
+      try {
+        sessionStorage.setItem('dakshyam_pending_course_apply', courseId);
+      } catch {}
+      setShowApplyAuthPrompt(true);
+    }
+  };
+
+  const handleApplyAuthChoice = (mode: 'login' | 'register') => {
+    setShowApplyAuthPrompt(false);
+    setAuthRoleTab('student');
+    setAuthMode(mode);
+    setAuthError('');
+    setShowAuthModal(true);
   };
 
   const isLight = theme === 'light';
@@ -846,17 +984,34 @@ export default function App() {
   return (
     <div className={`relative min-h-screen font-sans antialiased overflow-x-hidden flex flex-col justify-between transition-colors duration-500 ${
       isLight 
-        ? 'bg-white text-slate-800 selection:bg-amber-500/20 selection:text-amber-900' 
-        : 'bg-[#050505] text-slate-100 selection:bg-cyan-500/35 selection:text-cyan-100'
+        ? 'bg-white text-slate-900 selection:bg-blue-900 selection:text-white' 
+        : 'bg-[#0a192f] text-slate-100 selection:bg-blue-600/35 selection:text-white'
     }`}>
       
+      {/* FULL-SCREEN ANIMATED VIDEO LAZY LOADER */}
+      <PageLoader 
+        isLoading={isPageLoading}
+        targetTab={loadingTargetTab}
+        config={activeLoaderConfig}
+        onFinish={() => setIsPageLoading(false)}
+        onOpenUploadSettings={() => {
+          setIsPageLoading(false);
+          if (currentUser?.role === 'admin') {
+            navigateToTab('portal');
+          } else {
+            handleStaffAccessTrigger();
+          }
+        }}
+        theme={theme}
+      />
+
       {/* Dynamic scanlines & background ambient lights */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none -z-20">
         <div className={`absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[140px] opacity-25 animate-pulseGlow ${
-          isLight ? 'bg-amber-100/40' : 'bg-[#082a3c]'
+          isLight ? 'bg-blue-100/50' : 'bg-[#0d2847]'
         }`} />
         <div className={`absolute bottom-[10%] right-[-5%] w-[50%] h-[50%] rounded-full blur-[120px] opacity-20 ${
-          isLight ? 'bg-amber-50/20' : 'bg-[#0f1f2e]'
+          isLight ? 'bg-slate-100/30' : 'bg-[#112240]'
         }`} />
         <div 
           className="absolute inset-0 opacity-[0.015] pointer-events-none" 
@@ -871,13 +1026,13 @@ export default function App() {
 
       {/* NAVIGATION BAR HEADER */}
       <header className={`relative z-20 w-full border-b backdrop-blur-md no-print py-4 transition-colors duration-300 ${
-        isLight ? 'border-amber-500/10 bg-white/70' : 'border-cyan-500/5 bg-[#050505]/40'
+        isLight ? 'border-blue-900/10 bg-white/85' : 'border-blue-500/10 bg-[#0a192f]/75'
       }`}>
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
           
           {/* Logo segment */}
           <div 
-            onClick={() => { setActiveTab('home'); setMenuOpen(false); }}
+            onClick={() => navigateToTab('home')}
             className="flex items-center gap-3 cursor-pointer select-none group"
           >
             <div className="relative w-8 h-8 flex items-center justify-center shrink-0">
@@ -890,86 +1045,86 @@ export default function App() {
                 />
               ) : (
                 <div className={`w-full h-full flex items-center justify-center rounded-lg border font-mono font-black text-sm transition-all duration-300 ${
-                  isLight ? 'border-amber-500/25 bg-amber-500/10 text-amber-700' : 'border-cyan-500/10 bg-cyan-950/20 text-cyan-400 group-hover:border-cyan-400/30'
+                  isLight ? 'border-blue-900/20 bg-blue-50 text-blue-950' : 'border-blue-400/20 bg-blue-950/40 text-sky-400 group-hover:border-blue-400/40'
                 }`}>
                   D
                 </div>
               )}
             </div>
             <div className="text-left font-sans space-y-0.5">
-              <span className={`text-xs font-black tracking-[0.22em] transition-colors duration-300 ${isLight ? 'text-slate-900' : 'text-white'}`}>DAKSHYAM</span>
-              <span className={`text-[8px] font-mono tracking-[0.38em] block translate-x-[0.1em] transition-colors duration-300 ${isLight ? 'text-amber-700' : 'text-slate-400'}`}>INNOVATIONS</span>
+              <span className={`text-xs font-black tracking-[0.22em] transition-colors duration-300 ${isLight ? 'text-blue-950' : 'text-white'}`}>DAKSHYAM</span>
+              <span className={`text-[8px] font-mono tracking-[0.38em] block translate-x-[0.1em] transition-colors duration-300 ${isLight ? 'text-blue-900 font-bold' : 'text-slate-300'}`}>INNOVATIONS</span>
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
           <nav className="hidden lg:flex items-center gap-1.5 text-2xs md:text-xs font-mono tracking-wider font-semibold">
             <button
-              onClick={() => { setActiveTab('home'); setPreselectedCourseId(null); }}
+              onClick={() => navigateToTab('home', null)}
               className={`px-3 py-1.5 rounded-lg transition-all border ${
                 activeTab === 'home' 
-                  ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-bold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                  : (isLight ? 'border-transparent text-slate-600 hover:text-amber-800' : 'border-transparent text-slate-450 hover:text-white')
+                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]') 
+                  : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
               }`}
             >
               WELCOME
             </button>
             <button
-              onClick={() => { setActiveTab('services'); setPreselectedCourseId(null); }}
+              onClick={() => navigateToTab('services', null)}
               className={`px-3 py-1.5 rounded-lg transition-all border ${
                 activeTab === 'services' 
-                  ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-bold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                  : (isLight ? 'border-transparent text-slate-600 hover:text-amber-800' : 'border-transparent text-slate-450 hover:text-white')
+                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]') 
+                  : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
               }`}
             >
               SERVICES & SYLLABUS
             </button>
             <button
-              onClick={() => setActiveTab('leaderboard')}
+              onClick={() => navigateToTab('leaderboard')}
               className={`px-3 py-1.5 rounded-lg transition-all border ${
                 activeTab === 'leaderboard' 
-                  ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-bold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                  : (isLight ? 'border-transparent text-slate-600 hover:text-amber-800' : 'border-transparent text-slate-450 hover:text-white')
+                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]') 
+                  : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
               }`}
             >
               LEADERBOARD
             </button>
             <button
-              onClick={() => setActiveTab('social')}
+              onClick={() => navigateToTab('social')}
               className={`px-3 py-1.5 rounded-lg transition-all border ${
                 activeTab === 'social' 
-                  ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-bold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                  : (isLight ? 'border-transparent text-slate-600 hover:text-amber-800' : 'border-transparent text-slate-450 hover:text-white')
+                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]') 
+                  : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
               }`}
             >
               INNOVATION EXHIBITION
             </button>
             <button
-              onClick={() => setActiveTab('verification')}
+              onClick={() => navigateToTab('verification')}
               className={`px-3 py-1.5 rounded-lg transition-all border ${
                 activeTab === 'verification' 
-                  ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-bold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                  : (isLight ? 'border-transparent text-slate-600 hover:text-amber-800' : 'border-transparent text-slate-450 hover:text-white')
+                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]') 
+                  : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
               }`}
             >
               VERIFY CREDENTIALS
             </button>
             <button
-              onClick={() => setActiveTab('about')}
+              onClick={() => navigateToTab('about')}
               className={`px-3 py-1.5 rounded-lg transition-all border ${
                 activeTab === 'about' 
-                  ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-bold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                  : (isLight ? 'border-transparent text-slate-600 hover:text-amber-800' : 'border-transparent text-slate-450 hover:text-white')
+                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]') 
+                  : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
               }`}
             >
               ABOUT US
             </button>
             <button
-              onClick={() => setActiveTab('contact')}
+              onClick={() => navigateToTab('contact')}
               className={`px-3 py-1.5 rounded-lg transition-all border ${
                 activeTab === 'contact' 
-                  ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-bold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                  : (isLight ? 'border-transparent text-slate-600 hover:text-amber-800' : 'border-transparent text-slate-450 hover:text-white')
+                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]') 
+                  : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
               }`}
             >
               CONTACT US
@@ -983,10 +1138,10 @@ export default function App() {
               onClick={() => setTheme(isLight ? 'dark' : 'light')}
               className={`p-2 rounded-xl border transition-all hover:scale-105 cursor-pointer flex items-center justify-center ${
                 isLight 
-                  ? 'border-amber-500/20 bg-amber-50 text-amber-700' 
-                  : 'border-cyan-500/10 bg-cyan-950/20 text-cyan-400 hover:border-cyan-500/35'
+                  ? 'border-blue-900/15 bg-blue-50 text-blue-950 hover:bg-blue-100/70' 
+                  : 'border-white/15 bg-[#112240] text-white hover:border-white/35'
               }`}
-              title={isLight ? 'Activate Dark Mode' : 'Activate Light Theme'}
+              title={isLight ? 'Activate Navy Blue Theme' : 'Activate White Theme'}
             >
               {isLight ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
             </button>
@@ -996,11 +1151,11 @@ export default function App() {
               {currentUser ? (
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setActiveTab('portal')}
+                    onClick={() => navigateToTab('portal')}
                     className={`border text-2xs font-mono font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                       isLight 
-                        ? 'bg-amber-500/10 border-amber-500/25 text-amber-800 hover:bg-amber-500/20' 
-                        : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400'
+                        ? 'bg-blue-50 border-blue-900/20 text-blue-950 hover:bg-blue-100/50' 
+                        : 'bg-blue-600/20 border-blue-400/30 text-white shadow-[0_0_10px_rgba(59,130,246,0.2)]'
                     }`}
                   >
                     <UserCircle className="w-3.5 h-3.5" /> 
@@ -1009,7 +1164,7 @@ export default function App() {
                   <button
                     onClick={handleLogout}
                     className={`p-1.5 border border-transparent rounded-xl transition-all cursor-pointer ${
-                      isLight ? 'text-slate-400 hover:text-red-650 hover:bg-red-50' : 'text-slate-500 hover:text-red-400 hover:bg-red-950/20 hover:border-red-500/10'
+                      isLight ? 'text-slate-400 hover:text-red-600 hover:bg-red-50' : 'text-slate-400 hover:text-red-400 hover:bg-red-950/20 hover:border-red-500/10'
                     }`}
                     title="Logout Session"
                   >
@@ -1024,8 +1179,8 @@ export default function App() {
                   }}
                   className={`text-2xs font-bold font-mono px-4 py-2 rounded-xl flex items-center gap-1.5 tracking-wider active:scale-95 transition-all cursor-pointer ${
                     isLight 
-                      ? 'bg-amber-600 hover:bg-amber-700 text-white' 
-                      : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 hover:shadow-[0_0_12px_rgba(34,211,238,0.22)]'
+                      ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-sm' 
+                      : 'bg-white hover:bg-slate-100 text-[#0a192f] font-bold shadow-[0_0_15px_rgba(255,255,255,0.2)]'
                   }`}
                 >
                   <LogIn className="w-3.5 h-3.5" /> ENTER CONSOLE
@@ -1038,8 +1193,8 @@ export default function App() {
               onClick={() => setMenuOpen(!menuOpen)}
               className={`lg:hidden p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
                 isLight 
-                  ? 'border-amber-500/20 bg-amber-50 text-amber-700' 
-                  : 'border-cyan-500/10 bg-cyan-950/20 text-cyan-400'
+                  ? 'border-blue-900/15 bg-blue-50 text-blue-950' 
+                  : 'border-white/15 bg-[#112240] text-white'
               }`}
             >
               <motion.div
@@ -1069,76 +1224,76 @@ export default function App() {
               }}
               style={{ overflow: 'hidden' }}
               className={`lg:hidden w-full border-t mt-4 ${
-                isLight ? 'border-amber-500/10 bg-white' : 'border-cyan-500/5 bg-[#050505]/95'
+                isLight ? 'border-blue-900/10 bg-white' : 'border-blue-500/10 bg-[#0a192f]'
               }`}
             >
               <div className="p-4 space-y-2 flex flex-col font-mono text-xs font-bold">
                 <button
-                  onClick={() => { setActiveTab('home'); setMenuOpen(false); }}
+                  onClick={() => navigateToTab('home')}
                   className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${
                     activeTab === 'home' 
-                      ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-extrabold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                      : (isLight ? 'border-transparent text-slate-600' : 'border-transparent text-slate-400')
+                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold') 
+                      : (isLight ? 'border-transparent text-slate-700' : 'border-transparent text-slate-300')
                   }`}
                 >
                   WELCOME DEAR VISITOR
                 </button>
                 <button
-                  onClick={() => { setActiveTab('services'); setPreselectedCourseId(null); setMenuOpen(false); }}
+                  onClick={() => navigateToTab('services', null)}
                   className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${
                     activeTab === 'services' 
-                      ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-extrabold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                      : (isLight ? 'border-transparent text-slate-600' : 'border-transparent text-slate-400')
+                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold') 
+                      : (isLight ? 'border-transparent text-slate-700' : 'border-transparent text-slate-300')
                   }`}
                 >
                   SERVICES & PROGRAM CATALOGS
                 </button>
                 <button
-                  onClick={() => { setActiveTab('leaderboard'); setMenuOpen(false); }}
+                  onClick={() => navigateToTab('leaderboard')}
                   className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${
                     activeTab === 'leaderboard' 
-                      ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-extrabold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                      : (isLight ? 'border-transparent text-slate-600' : 'border-transparent text-slate-400')
+                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold') 
+                      : (isLight ? 'border-transparent text-slate-700' : 'border-transparent text-slate-300')
                   }`}
                 >
                   LEADERBOARD TRACKER
                 </button>
                 <button
-                  onClick={() => { setActiveTab('social'); setMenuOpen(false); }}
+                  onClick={() => navigateToTab('social')}
                   className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${
                     activeTab === 'social' 
-                      ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-extrabold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                      : (isLight ? 'border-transparent text-slate-600' : 'border-transparent text-slate-400')
+                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold') 
+                      : (isLight ? 'border-transparent text-slate-700' : 'border-transparent text-slate-300')
                   }`}
                 >
                   EXHIBITION POSTINGS
                 </button>
                 <button
-                  onClick={() => { setActiveTab('verification'); setMenuOpen(false); }}
+                  onClick={() => navigateToTab('verification')}
                   className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${
                     activeTab === 'verification' 
-                      ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-extrabold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                      : (isLight ? 'border-transparent text-slate-600' : 'border-transparent text-slate-400')
+                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold') 
+                      : (isLight ? 'border-transparent text-slate-700' : 'border-transparent text-slate-300')
                   }`}
                 >
                   VERIFY CREDENTIALS
                 </button>
                 <button
-                  onClick={() => { setActiveTab('about'); setMenuOpen(false); }}
+                  onClick={() => navigateToTab('about')}
                   className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${
                     activeTab === 'about' 
-                      ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-extrabold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                      : (isLight ? 'border-transparent text-slate-600' : 'border-transparent text-slate-400')
+                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold') 
+                      : (isLight ? 'border-transparent text-slate-700' : 'border-transparent text-slate-300')
                   }`}
                 >
                   ABOUT US
                 </button>
                 <button
-                  onClick={() => { setActiveTab('contact'); setMenuOpen(false); }}
+                  onClick={() => navigateToTab('contact')}
                   className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${
                     activeTab === 'contact' 
-                      ? (isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 font-extrabold' : 'bg-cyan-500/10 border-cyan-500/15 text-cyan-400') 
-                      : (isLight ? 'border-transparent text-slate-600' : 'border-transparent text-slate-400')
+                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold') 
+                      : (isLight ? 'border-transparent text-slate-700' : 'border-transparent text-slate-300')
                   }`}
                 >
                   CONTACT US
@@ -1148,11 +1303,11 @@ export default function App() {
                   {currentUser ? (
                     <div className="space-y-1.5 pt-1">
                       <button
-                        onClick={() => { setActiveTab('portal'); setMenuOpen(false); }}
+                        onClick={() => navigateToTab('portal')}
                         className={`w-full py-2.5 rounded-xl text-center border font-mono font-bold tracking-widest ${
                           isLight 
-                            ? 'bg-amber-600 border-amber-600 text-white' 
-                            : 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400'
+                            ? 'bg-blue-900 border-blue-900 text-white' 
+                            : 'bg-blue-600/20 border-blue-400/30 text-white'
                         }`}
                       >
                         MEMBERS AREA ({currentUser.role})
@@ -1172,7 +1327,7 @@ export default function App() {
                         setMenuOpen(false);
                       }}
                       className={`w-full py-3 rounded-xl font-mono text-center font-black tracking-widest ${
-                        isLight ? 'bg-amber-600 text-white shadow-xs' : 'bg-cyan-500 text-slate-950'
+                        isLight ? 'bg-blue-950 text-white shadow-xs' : 'bg-white text-[#0a192f] font-bold'
                       }`}
                     >
                       ENTER CONSOLE LOGIN
@@ -1203,9 +1358,18 @@ export default function App() {
                 courses={courses} 
                 banners={banners}
                 galleryImages={galleryImages}
+                currentUser={currentUser}
+                onNavigateToAdmin={() => {
+                  if (currentUser?.role === 'admin') {
+                    navigateToTab('portal');
+                  } else {
+                    setAuthMode('login');
+                    setShowAuthModal(true);
+                  }
+                }}
                 onEnterPortal={() => {
                   if (currentUser) {
-                    setActiveTab('portal');
+                    navigateToTab('portal');
                   } else {
                     setAuthMode('login');
                     setShowAuthModal(true);
@@ -1218,13 +1382,37 @@ export default function App() {
             {/* VIEW 2: COURSE & SERVICES REQUEST */}
             {activeTab === 'services' && (
               <div className="space-y-6 max-w-7xl mx-auto">
-                <div className={`text-center space-y-2 max-w-2xl mx-auto border-b pb-4 transition-colors duration-300 ${isLight ? 'border-amber-500/10' : 'border-cyan-500/5'}`}>
-                  <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${isLight ? 'text-amber-700' : 'text-cyan-400'}`}>Services & Academic Catalogs</span>
+                <div className={`text-center space-y-2 max-w-2xl mx-auto border-b pb-4 transition-colors duration-300 ${isLight ? 'border-blue-900/10' : 'border-blue-900/20'}`}>
+                  <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${isLight ? 'text-blue-900' : 'text-sky-300'}`}>Services & Academic Catalogs</span>
                   <h1 className={`text-2xl sm:text-3xl font-black tracking-wide uppercase ${isLight ? 'text-slate-900' : 'text-white'}`}>Academic Admissions Portal</h1>
                   <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                     Choose from our National Education Policy (NEP 2020) compliant programs, explore STEM vocational frameworks, and submit your registration request below.
                   </p>
                 </div>
+
+                {/* Candidate verified notification banner */}
+                {applicationSuccessBanner && (
+                  <div className={`p-4 rounded-2xl border flex items-start justify-between gap-3 animate-fadeIn transition-all ${
+                    isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-emerald-950/50 border-emerald-500/40 text-emerald-100'
+                  }`}>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                      <div className="text-xs">
+                        <span className="font-mono uppercase font-bold tracking-wider block text-[10px] text-emerald-600 dark:text-emerald-400">
+                          ✓ Candidate Profile Verified
+                        </span>
+                        <p className="mt-0.5 font-medium">{applicationSuccessBanner}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setApplicationSuccessBanner(null)}
+                      className="text-xs opacity-60 hover:opacity-100 cursor-pointer p-1"
+                      title="Dismiss"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                   
@@ -1233,17 +1421,17 @@ export default function App() {
                     
                     {/* NEP 2020 & STEM Briefing Card */}
                     <div className={`border rounded-2xl p-6 backdrop-blur-md transition-all ${
-                      isLight ? 'bg-white border-amber-500/15 text-slate-800 shadow-sm' : 'bg-[#050505]/70 border-cyan-500/10 text-white'
+                      isLight ? 'bg-white border-blue-900/10 text-slate-800 shadow-sm' : 'bg-[#0d1f38]/70 border-blue-800/30 text-white'
                     }`}>
                       <h2 className={`text-sm sm:text-base font-bold tracking-wide mb-3 flex items-center gap-2 uppercase font-mono ${
-                        isLight ? 'text-amber-800' : 'text-cyan-400'
+                        isLight ? 'text-blue-900' : 'text-sky-400'
                       }`}>
                         <Cpu className="w-5 h-5 animate-pulse" /> NEP 2020 & STEM Education Paradigm
                       </h2>
                       
                       <div className="space-y-4 text-xs font-sans">
                         <div className={`p-4 rounded-xl border ${
-                          isLight ? 'bg-amber-500/5 border-amber-500/10' : 'bg-cyan-950/10 border-cyan-500/5'
+                          isLight ? 'bg-blue-50/50 border-blue-900/10' : 'bg-blue-950/20 border-blue-900/20'
                         }`}>
                           <h3 className={`font-extrabold mb-1 tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>National Education Policy Compliance (NEP 2020)</h3>
                           <p className={`leading-relaxed ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>
@@ -1252,7 +1440,7 @@ export default function App() {
                         </div>
 
                         <div className={`p-4 rounded-xl border ${
-                          isLight ? 'bg-amber-500/5 border-amber-500/10' : 'bg-cyan-950/10 border-cyan-500/5'
+                          isLight ? 'bg-blue-50/50 border-blue-900/10' : 'bg-blue-950/20 border-blue-900/20'
                         }`}>
                           <h3 className={`font-extrabold mb-1 tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>Industrial STEM Pedagogy</h3>
                           <p className={`leading-relaxed ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>
@@ -1264,10 +1452,10 @@ export default function App() {
 
                     {/* Dynamic Course Catalogs Panel */}
                     <div className={`border rounded-2xl p-6 backdrop-blur-md transition-all ${
-                      isLight ? 'bg-white border-amber-500/15 text-slate-800 shadow-sm' : 'bg-[#050505]/70 border-cyan-500/10 text-white'
+                      isLight ? 'bg-white border-blue-900/10 text-slate-800 shadow-sm' : 'bg-[#0d1f38]/70 border-blue-800/30 text-white'
                     }`}>
                       <h2 className={`text-sm sm:text-base font-bold tracking-wide mb-3 flex items-center gap-2 uppercase font-mono ${
-                        isLight ? 'text-amber-800' : 'text-cyan-400'
+                        isLight ? 'text-blue-900' : 'text-sky-400'
                       }`}>
                         <BookOpen className="w-5 h-5" /> Available Program Catalogs
                       </h2>
@@ -1284,14 +1472,14 @@ export default function App() {
                               onClick={() => setPreselectedCourseId(course.id)}
                               className={`p-4 rounded-xl border transition-all cursor-pointer text-left relative ${
                                 isSelected 
-                                  ? (isLight ? 'bg-amber-500/[0.04] border-amber-500/40 shadow-sm' : 'bg-cyan-950/20 border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.05)]')
-                                  : (isLight ? 'bg-slate-50 border-slate-200/60 hover:bg-slate-100/50' : 'bg-black/40 border-slate-500/5 hover:border-cyan-500/15')
+                                  ? (isLight ? 'bg-blue-50/70 border-blue-900/30 shadow-sm' : 'bg-blue-950/30 border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.1)]')
+                                  : (isLight ? 'bg-slate-50 border-slate-200/60 hover:bg-slate-100/50' : 'bg-black/40 border-slate-500/5 hover:border-blue-500/20')
                               }`}
                             >
                               <div className="flex justify-between items-start gap-2">
                                 <div>
                                   <span className={`text-[9px] font-mono font-bold tracking-widest uppercase ${
-                                    isLight ? 'text-amber-700' : 'text-cyan-400'
+                                    isLight ? 'text-blue-900' : 'text-sky-400'
                                   }`}>
                                     {course.duration} Program
                                   </span>
@@ -1303,7 +1491,7 @@ export default function App() {
                                 </div>
                                 {isSelected && (
                                   <span className={`text-[8px] font-mono uppercase font-bold tracking-wider px-2 py-0.5 rounded-md ${
-                                    isLight ? 'bg-amber-500/10 text-amber-700' : 'bg-cyan-500/10 text-cyan-400'
+                                    isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-600/20 text-sky-300'
                                   }`}>
                                     Selected
                                   </span>
@@ -1314,14 +1502,31 @@ export default function App() {
                                 {course.description}
                               </p>
 
-                              <div className="flex flex-wrap gap-1 mt-3">
-                                {course.tags.map((tag, tIdx) => (
-                                  <span key={tIdx} className={`text-[9px] font-mono font-semibold px-2 py-0.5 rounded ${
-                                    isLight ? 'bg-amber-500/5 text-amber-800' : 'bg-cyan-950/30 text-cyan-400/80'
-                                  }`}>
-                                    #{tag}
-                                  </span>
-                                ))}
+                              <div className="mt-3 pt-2.5 border-t flex flex-wrap items-center justify-between gap-2 border-slate-500/10">
+                                <div className="flex flex-wrap gap-1">
+                                  {course.tags.map((tag, tIdx) => (
+                                    <span key={tIdx} className={`text-[9px] font-mono font-semibold px-2 py-0.5 rounded ${
+                                      isLight ? 'bg-blue-50 text-blue-900' : 'bg-blue-950/40 text-sky-300'
+                                    }`}>
+                                      #{tag}
+                                    </span>
+                                  ))}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    triggerQuickEnroll(course.id);
+                                  }}
+                                  className={`text-[10px] font-mono uppercase font-bold px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                                    isSelected
+                                      ? (isLight ? 'bg-blue-950 text-white border-blue-950 shadow-xs' : 'bg-white text-[#0a192f] border-white font-black')
+                                      : (isLight ? 'bg-white border-slate-300 text-blue-950 hover:bg-blue-50' : 'bg-blue-950/60 border-blue-700/40 text-sky-300 hover:bg-blue-900/60')
+                                  }`}
+                                >
+                                  Apply for Course →
+                                </button>
                               </div>
                             </div>
                           );
@@ -1334,21 +1539,33 @@ export default function App() {
                   {/* RIGHT SIDE: COURSE REGISTRATION FORM */}
                   <div className="lg:col-span-5 space-y-6">
                     <div className={`border rounded-2xl p-6 backdrop-blur-md transition-all ${
-                      isLight ? 'bg-white border-amber-500/15 text-slate-800 shadow-sm' : 'bg-[#050505]/70 border-cyan-500/10'
+                      isLight ? 'bg-white border-blue-900/10 text-slate-800 shadow-sm' : 'bg-[#0d1f38]/70 border-blue-800/30'
                     }`}>
                       <h2 className={`text-sm sm:text-base font-bold tracking-wide mb-3 flex items-center gap-2 uppercase font-mono ${
-                        isLight ? 'text-amber-800' : 'text-cyan-400'
+                        isLight ? 'text-blue-900' : 'text-sky-400'
                       }`}>
                         <Compass className="w-5 h-5" /> Registration Request
                       </h2>
                       <p className={`text-xs mb-4 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                        Pre-fills from your logged-in student profile automatically. Submit your registration choice for admin board verification.
+                        Verified candidates can submit enrollment applications directly. Allocation of hardware kits and verifiable certificates are linked to your student ID.
                       </p>
 
                       <CourseRegistrationForm 
                         courses={courses} 
                         preselectedCourseId={preselectedCourseId}
-                        onSuccess={refreshDb}
+                        onSuccess={() => {
+                          refreshDb();
+                          setApplicationSuccessBanner(null);
+                        }}
+                        onRequireAuth={(mode, cId) => {
+                          if (cId) {
+                            setPendingApplyCourseId(cId);
+                            try { sessionStorage.setItem('dakshyam_pending_course_apply', cId); } catch {}
+                          }
+                          handleApplyAuthChoice(mode);
+                        }}
+                        currentUser={currentUser}
+                        theme={theme}
                       />
                     </div>
                   </div>
@@ -1419,12 +1636,19 @@ export default function App() {
                         onRefresh={refreshDb}
                         theme={theme}
                         isDbConnected={isDbConnected}
+                        onTestLoader={() => {
+                          setLoadingTargetTab('portal');
+                          setIsPageLoading(true);
+                          setTimeout(() => {
+                            setIsPageLoading(false);
+                          }, Math.max(pageLoaderConfig.minDurationMs || 900, 800));
+                        }}
                       />
                     )}
                   </>
                 ) : (
                   <div className="text-center max-w-md mx-auto py-12 space-y-4">
-                    <HelpCircle className={`w-12 h-12 mx-auto ${isLight ? 'text-amber-600/60' : 'text-slate-600'}`} />
+                    <HelpCircle className={`w-12 h-12 mx-auto ${isLight ? 'text-blue-900' : 'text-slate-500'}`} />
                     <h2 className={`text-lg font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Console Session Inactive</h2>
                     <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Please sign in as a student, trainer, or system supervisor using the top right control card to view dashboards.</p>
                     <button
@@ -1433,7 +1657,7 @@ export default function App() {
                         setShowAuthModal(true);
                       }}
                       className={`text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer shadow-sm active:scale-95 transition-all ${
-                        isLight ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-cyan-500 text-slate-950 hover:bg-cyan-400'
+                        isLight ? 'bg-blue-950 text-white hover:bg-blue-900' : 'bg-white text-[#0a192f] hover:bg-slate-100 font-bold'
                       }`}
                     >
                       Enter Console Now
@@ -1449,11 +1673,11 @@ export default function App() {
 
       {/* FOOTER COOPERATING SIGNATURE */}
       <footer className={`relative z-20 w-full py-6 text-center text-3xs font-mono tracking-[0.3em] border-t no-print flex flex-col items-center justify-center gap-1 transition-colors duration-300 ${
-        isLight ? 'text-slate-500 border-amber-500/10 bg-white/70' : 'text-slate-500 border-cyan-500/5 bg-[#050505]/40 backdrop-blur-md'
+        isLight ? 'text-slate-500 border-blue-900/10 bg-white/70' : 'text-slate-500 border-blue-900/20 bg-[#071326]/60 backdrop-blur-md'
       }`}>
         <div 
           onClick={handleStaffAccessTrigger}
-          className="cursor-pointer hover:text-amber-600 transition-colors py-1"
+          className="cursor-pointer hover:text-blue-900 dark:hover:text-sky-400 transition-colors py-1"
           title="Supervisory Node Overlap (Click to reveal panel)"
         >
           © 2026 Dakshyam innovations
@@ -1472,6 +1696,147 @@ export default function App() {
           </button>
         </div>
       </footer>
+
+      {/* CANDIDATE COURSE APPLICATION AUTHENTICATION GATEWAY MODAL */}
+      <AnimatePresence>
+        {showApplyAuthPrompt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowApplyAuthPrompt(false)}
+              className="absolute inset-0 bg-black/85 backdrop-blur-sm pointer-events-auto cursor-pointer"
+            />
+
+            {/* Modal Content */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              className={`border p-6 sm:p-7 max-w-md w-full relative z-10 text-left space-y-5 rounded-2xl transition-all shadow-2xl overflow-hidden ${
+                isLight 
+                  ? 'bg-white border-blue-900/15 text-slate-800' 
+                  : 'bg-[#0d1f38] border-blue-800/40 text-white'
+              }`}
+            >
+              {/* Header */}
+              <div className="flex justify-between items-start border-b pb-3 border-slate-500/10">
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-2 rounded-xl border ${
+                    isLight ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-amber-950/40 border-amber-500/30 text-amber-300'
+                  }`}>
+                    <ShieldAlert className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className={`text-[9px] font-mono uppercase font-bold tracking-widest block ${
+                      isLight ? 'text-amber-800' : 'text-amber-300'
+                    }`}>
+                      Official Enrollment Gateway
+                    </span>
+                    <h3 className={`text-sm sm:text-base font-black uppercase tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                      Candidate Verification Required
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowApplyAuthPrompt(false)}
+                  className={`text-xs font-mono font-bold transition-colors cursor-pointer p-1 ${
+                    isLight ? 'text-slate-400 hover:text-slate-900' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  ✕ CLOSE
+                </button>
+              </div>
+
+              {/* Target Course Preview */}
+              {pendingApplyCourseId && (
+                (() => {
+                  const targetCourse = courses.find(c => c.id === pendingApplyCourseId);
+                  if (!targetCourse) return null;
+                  return (
+                    <div className={`p-4 rounded-xl border space-y-1.5 ${
+                      isLight ? 'bg-blue-50/50 border-blue-900/15' : 'bg-blue-950/30 border-blue-800/40'
+                    }`}>
+                      <div className="flex justify-between items-center">
+                        <span className={`text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                          isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-sky-500/10 text-sky-300 border border-sky-500/20'
+                        }`}>
+                          {targetCourse.duration} Track
+                        </span>
+                        {targetCourse.mobileHardwareIncluded && (
+                          <span className="text-[9px] font-mono font-bold text-emerald-500">
+                            ★ Hardware Kit Included
+                          </span>
+                        )}
+                      </div>
+                      <h4 className={`text-xs sm:text-sm font-black uppercase ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                        {targetCourse.title}
+                      </h4>
+                      <p className={`text-3xs leading-relaxed ${isLight ? 'text-slate-650' : 'text-slate-350'}`}>
+                        {targetCourse.description}
+                      </p>
+                    </div>
+                  );
+                })()
+              )}
+
+              <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-650' : 'text-slate-350'}`}>
+                To submit an official course application, receive physical hardware kits, and track your accredited certification, please sign in to your student account or register as a new candidate.
+              </p>
+
+              {/* Benefits Checklist */}
+              <div className={`rounded-xl p-3.5 space-y-2 border text-xs font-mono ${
+                isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-[#071326] border-blue-900/30 text-slate-350'
+              }`}>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>Real-time status updates in your Student Portal</span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>Hardware kit allocation directly mapped to your Student ID</span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>Verifiable QR-coded NEP 2020 Certificate issued upon completion</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleApplyAuthChoice('login')}
+                  className={`w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 uppercase font-mono tracking-wider transition-all cursor-pointer ${
+                    isLight 
+                      ? 'bg-blue-950 text-white hover:bg-blue-900 shadow-sm' 
+                      : 'bg-white text-[#0a192f] hover:bg-slate-100 font-black'
+                  }`}
+                >
+                  <LogIn className="w-4 h-4" />
+                  Log In to Your Account
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleApplyAuthChoice('register')}
+                  className={`w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 uppercase font-mono tracking-wider transition-all cursor-pointer border ${
+                    isLight 
+                      ? 'bg-blue-50 border-blue-900/30 text-blue-950 hover:bg-blue-100' 
+                      : 'bg-blue-950/40 border-sky-400/40 text-sky-300 hover:bg-blue-900/50'
+                  }`}
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Register as New Candidate
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* AUTHENTICATION CONSOLE PANEL MODAL */}
       <AnimatePresence>
@@ -1494,16 +1859,16 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
-              className={`border p-6 sm:p-7 max-w-sm w-full relative z-10 text-left space-y-5 transition-colors duration-300 flex flex-col justify-between max-h-[90vh] overflow-y-auto ${
+              className={`border p-6 sm:p-7 max-w-sm w-full relative z-10 text-left space-y-5 transition-colors duration-300 flex flex-col justify-between max-h-[90vh] overflow-y-auto rounded-2xl ${
                 isLight 
-                  ? 'bg-white border-amber-500/20 shadow-[0_0_55px_rgba(217,119,6,0.06)]' 
-                  : 'bg-[#050505]/98 border-cyan-500/20 shadow-[0_0_55px_rgba(6,182,212,0.12)]'
+                  ? 'bg-white border-blue-900/15 shadow-2xl' 
+                  : 'bg-[#0d1f38] border-blue-800/40 shadow-2xl'
               }`}
             >
               {/* Modal Header */}
-              <div className={`flex items-center justify-between border-b pb-2.5 ${isLight ? 'border-amber-500/10' : 'border-cyan-500/5'}`}>
+              <div className={`flex items-center justify-between border-b pb-2.5 ${isLight ? 'border-blue-900/10' : 'border-blue-500/10'}`}>
                 <span className={`text-3xs font-mono tracking-widest uppercase font-black flex items-center gap-1 ${
-                  isLight ? 'text-amber-700' : 'text-[#22d3ee]'
+                  isLight ? 'text-blue-950' : 'text-sky-400'
                 }`}>
                   <Sparkles className="w-3.5 h-3.5" /> SECURE HUB ENTRANCE
                 </span>
@@ -1514,18 +1879,30 @@ export default function App() {
                     setAuthError('');
                   }}
                   className={`text-4xs font-mono transition-colors cursor-pointer ${
-                    isLight ? 'text-slate-400 hover:text-amber-800' : 'text-slate-500 hover:text-white'
+                    isLight ? 'text-slate-400 hover:text-blue-950' : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   ✕ CLOSE
                 </button>
               </div>
 
+              {/* Course Application Context Badge */}
+              {pendingApplyCourseId && (
+                <div className={`p-2.5 rounded-xl border text-xs font-mono flex items-start gap-2 ${
+                  isLight ? 'bg-blue-50 border-blue-200 text-blue-950' : 'bg-blue-950/40 border-blue-500/30 text-sky-300'
+                }`}>
+                  <Sparkles className="w-3.5 h-3.5 shrink-0 text-amber-500 mt-0.5" />
+                  <span className="text-[10px] leading-snug">
+                    Applying for course: <strong>{courses.find(c => c.id === pendingApplyCourseId)?.title || 'Selected Course'}</strong>. Sign in or register to finalize your application.
+                  </span>
+                </div>
+              )}
+
               {/* Roles tab selectors - conditionally rendering student or all depending on toggled settings */}
               <div className="space-y-2.5">
                 <div className={`p-1 rounded-xl font-mono text-[9px] font-black uppercase text-center relative z-25 grid ${
                   isStaffAccessEnabled ? 'grid-cols-3' : 'grid-cols-1'
-                } ${isLight ? 'bg-amber-100/40 text-slate-700' : 'bg-[#111]/65 text-slate-400'}`}>
+                } ${isLight ? 'bg-blue-50 text-slate-700' : 'bg-[#071326] text-slate-300'}`}>
                   
                   {/* Student is always there */}
                   <button
@@ -1537,8 +1914,8 @@ export default function App() {
                     }}
                     className={`py-2 rounded-lg cursor-pointer transition-all ${
                       authRoleTab === 'student' 
-                        ? (isLight ? 'bg-amber-600 text-white font-extrabold shadow-sm' : 'bg-cyan-500 text-slate-950 font-bold shadow-md') 
-                        : (isLight ? 'text-slate-600 hover:text-amber-800' : 'text-slate-400 hover:text-white')
+                        ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-sm' : 'bg-blue-600 text-white font-bold shadow-md') 
+                        : (isLight ? 'text-slate-600 hover:text-blue-950' : 'text-slate-400 hover:text-white')
                     }`}
                   >
                     STUDENT CONSOLE
@@ -1556,8 +1933,8 @@ export default function App() {
                         }}
                         className={`py-2 rounded-lg cursor-pointer transition-all ${
                           authRoleTab === 'trainer' 
-                            ? (isLight ? 'bg-amber-600 text-white font-extrabold shadow-sm' : 'bg-cyan-500 text-slate-950 font-bold shadow-md') 
-                            : (isLight ? 'text-slate-600 hover:text-amber-800' : 'text-slate-400 hover:text-white')
+                            ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-sm' : 'bg-blue-600 text-white font-bold shadow-md') 
+                            : (isLight ? 'text-slate-600 hover:text-blue-950' : 'text-slate-400 hover:text-white')
                         }`}
                       >
                         TRAINER
@@ -1571,8 +1948,8 @@ export default function App() {
                         }}
                         className={`py-2 rounded-lg cursor-pointer transition-all ${
                           authRoleTab === 'admin' 
-                            ? (isLight ? 'bg-amber-600 text-white font-extrabold shadow-sm' : 'bg-cyan-500 text-slate-950 font-bold shadow-md') 
-                            : (isLight ? 'text-slate-600 hover:text-amber-800' : 'text-slate-400 hover:text-white')
+                            ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-sm' : 'bg-blue-600 text-white font-bold shadow-md') 
+                            : (isLight ? 'text-slate-600 hover:text-blue-950' : 'text-slate-400 hover:text-white')
                         }`}
                       >
                         ADMIN
@@ -1595,7 +1972,7 @@ export default function App() {
                       }
                     }}
                     className={`text-[9px] font-mono tracking-wider uppercase transition-colors flex items-center gap-1.5 cursor-pointer hover:font-bold ${
-                      isLight ? 'text-slate-400 hover:text-amber-700' : 'text-slate-550 hover:text-cyan-400'
+                      isLight ? 'text-slate-400 hover:text-blue-900' : 'text-slate-400 hover:text-sky-300'
                     }`}
                   >
                     <Lock className="w-2.5 h-2.5" />
@@ -1615,7 +1992,7 @@ export default function App() {
                   {authMode === 'login' ? (
                     <form onSubmit={handleStudentLogin} className="space-y-4 font-sans">
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           Registered Student Email
                         </label>
                         <input
@@ -1625,15 +2002,15 @@ export default function App() {
                           onChange={(e) => setStudentEmail(e.target.value)}
                           placeholder="e.g. student@example.com"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 focus:bg-white transition-all" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45 transition-all"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900 focus:bg-white transition-all" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-400 transition-all"
                           }
                         />
                       </div>
 
                       <div className="space-y-1">
                         <div className="flex justify-between items-center">
-                          <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                          <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                             Secure Account Password
                           </label>
                         </div>
@@ -1644,8 +2021,8 @@ export default function App() {
                           onChange={(e) => setPasswordInput(e.target.value)}
                           placeholder="••••••••"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 focus:bg-white transition-all" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45 transition-all"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900 focus:bg-white transition-all" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-400 transition-all"
                           }
                         />
                       </div>
@@ -1659,7 +2036,7 @@ export default function App() {
                             setResetSuccessMessage('');
                           }}
                           className={`text-[9px] font-mono uppercase tracking-wide hover:underline cursor-pointer ${
-                            isLight ? 'text-amber-700 hover:text-amber-900' : 'text-cyan-400 hover:text-cyan-300'
+                            isLight ? 'text-blue-900 hover:text-blue-950 font-bold' : 'text-sky-400 hover:text-sky-300'
                           }`}
                         >
                           Forgot Password?
@@ -1670,8 +2047,8 @@ export default function App() {
                         type="submit"
                         className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all uppercase font-mono tracking-wider shadow-xs ${
                           isLight 
-                            ? 'bg-amber-600 hover:bg-amber-700 text-white hover:shadow-[0_0_12px_rgba(217,119,6,0.15)]' 
-                            : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 hover:shadow-[0_0_12px_rgba(34,211,238,0.2)]'
+                            ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-sm' 
+                            : 'bg-white hover:bg-slate-100 text-[#0a192f] font-bold shadow-[0_0_15px_rgba(255,255,255,0.2)]'
                         }`}
                       >
                         Sign In Student
@@ -1685,7 +2062,7 @@ export default function App() {
                             setAuthMode('register');
                             setAuthError('');
                           }}
-                          className={`uppercase font-black cursor-pointer ${isLight ? 'text-amber-700 hover:underline' : 'text-[#22d3ee] hover:underline'}`}
+                          className={`uppercase font-black cursor-pointer ${isLight ? 'text-blue-900 hover:underline' : 'text-sky-400 hover:underline'}`}
                         >
                           Register Student
                         </button>
@@ -1694,7 +2071,7 @@ export default function App() {
                   ) : (
                     <form onSubmit={handleStudentRegister} className="space-y-3 font-sans">
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           Student Full Name
                         </label>
                         <input
@@ -1704,14 +2081,14 @@ export default function App() {
                           onChange={(e) => setStudentName(e.target.value)}
                           placeholder="e.g. Kunal Sonkar"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500 focus:bg-white" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-45"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-900 focus:bg-white" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-400"
                           }
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           Email (Registry ID)
                         </label>
                         <input
@@ -1727,32 +2104,32 @@ export default function App() {
                           }}
                           placeholder="e.g. kunal@example.com"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500 focus:bg-white" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-45"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-900 focus:bg-white" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-400"
                           }
                         />
                       </div>
 
                       {/* Real OTP Profile Verification Integration */}
                       <div className={`p-3 border rounded-xl space-y-1.5 transition-all ${
-                        isLight ? 'bg-amber-500/5 border-amber-500/10' : 'bg-cyan-950/10 border-cyan-500/10'
+                        isLight ? 'bg-blue-50/50 border-blue-900/10' : 'bg-blue-950/20 border-blue-900/30'
                       }`}>
                         <div className="flex items-center justify-between gap-2">
-                          <span className={`text-[9px] font-mono uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                          <span className={`text-[9px] font-mono uppercase tracking-wider ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                             Email Verification Security
                           </span>
                           {isEmailVerified ? (
-                            <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-widest">
+                            <span className="text-[9px] font-mono font-bold text-emerald-500 uppercase tracking-widest">
                               ✓ Verified
                             </span>
                           ) : (
                             <button
                               type="button"
                               onClick={triggerOtp}
-                              className={`text-[8px] font-mono uppercase px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                              className={`text-[8px] font-mono uppercase px-2.5 py-1 rounded-lg border transition-all cursor-pointer font-bold ${
                                 isLight 
-                                  ? 'bg-amber-50 border-amber-500/20 text-amber-700 hover:bg-amber-100/50' 
-                                  : 'bg-cyan-950/40 border-cyan-500/15 text-[#22d3ee] hover:bg-cyan-900/40'
+                                  ? 'bg-blue-50 border-blue-900/20 text-blue-900 hover:bg-blue-100/50' 
+                                  : 'bg-blue-600/20 border-blue-400/30 text-sky-300 hover:bg-blue-600/30'
                               }`}
                             >
                               {otpSent ? 'Resend Code' : 'Send Code'}
@@ -1768,8 +2145,8 @@ export default function App() {
                               onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
                               placeholder="6-digit verification code"
                               className={isLight
-                                ? "flex-1 bg-white border border-amber-500/20 text-slate-800 rounded-lg px-2.5 py-1 text-xs focus:outline-none"
-                                : "flex-1 bg-[#111]/70 border border-cyan-500/10 text-white rounded-lg px-2.5 py-1 text-xs focus:outline-none"
+                                ? "flex-1 bg-white border border-blue-900/20 text-slate-800 rounded-lg px-2.5 py-1 text-xs focus:outline-none"
+                                : "flex-1 bg-[#071326] border border-blue-900/40 text-white rounded-lg px-2.5 py-1 text-xs focus:outline-none"
                               }
                             />
                             <button
@@ -1777,8 +2154,8 @@ export default function App() {
                               onClick={confirmOtp}
                               className={`text-[8px] font-mono font-bold uppercase px-3 py-1 rounded-lg border transition-all cursor-pointer ${
                                 isLight 
-                                  ? 'bg-amber-600 border-amber-500/20 text-white hover:bg-amber-700' 
-                                  : 'bg-cyan-500 border-cyan-400/20 text-slate-950 hover:bg-cyan-400'
+                                  ? 'bg-blue-900 border-blue-900 text-white hover:bg-blue-950' 
+                                  : 'bg-blue-600 border-blue-600 text-white hover:bg-blue-500'
                               }`}
                             >
                               Verify
@@ -1787,7 +2164,7 @@ export default function App() {
                         )}
                         {otpStatusMsg && (
                           <p className={`text-[9px] font-mono ${
-                            otpStatusMsg.includes('✓') ? 'text-emerald-400' : 'text-amber-500/90'
+                            otpStatusMsg.includes('✓') ? 'text-emerald-500 font-bold' : 'text-blue-800 dark:text-sky-300'
                           }`}>
                             {otpStatusMsg}
                           </p>
@@ -1795,7 +2172,7 @@ export default function App() {
                       </div>
 
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           WhatsApp Node
                         </label>
                         <input
@@ -1808,14 +2185,14 @@ export default function App() {
                           }}
                           placeholder="10-digit mobile number"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500 focus:bg-white" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-45"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-900 focus:bg-white" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-400"
                           }
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           School / College
                         </label>
                         <input
@@ -1825,14 +2202,14 @@ export default function App() {
                           onChange={(e) => setStudentSchool(e.target.value)}
                           placeholder="Secondary School Name"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500 focus:bg-white" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-45"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-900 focus:bg-white" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-400"
                           }
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           Choose Safe Password
                         </label>
                         <input
@@ -1842,22 +2219,22 @@ export default function App() {
                           onChange={(e) => setPasswordInput(e.target.value)}
                           placeholder="Create strong account passcode"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500 focus:bg-white" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-45"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-900 focus:bg-white" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-400"
                           }
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           Class Level
                         </label>
                         <select
                           value={studentLevel}
                           onChange={(e) => setStudentLevel(e.target.value)}
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 focus:bg-white" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900 focus:bg-white" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none"
                           }
                         >
                           <option value="Grade 10">Grade 10 High School Setup</option>
@@ -1872,8 +2249,8 @@ export default function App() {
                         type="submit"
                         className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all uppercase font-mono tracking-wider shadow-xs ${
                           isLight 
-                            ? 'bg-amber-600 hover:bg-amber-700 text-white hover:shadow-[0_0_12px_rgba(217,119,6,0.15)]' 
-                            : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 hover:shadow-[0_0_12px_rgba(34,211,238,0.2)]'
+                            ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-sm' 
+                            : 'bg-white hover:bg-slate-100 text-[#0a192f] font-bold shadow-[0_0_15px_rgba(255,255,255,0.2)]'
                         }`}
                       >
                         Confirm Register
@@ -1887,7 +2264,7 @@ export default function App() {
                             setAuthMode('login');
                             setAuthError('');
                           }}
-                          className={`uppercase font-black cursor-pointer ${isLight ? 'text-amber-700 hover:underline' : 'text-[#22d3ee] hover:underline'}`}
+                          className={`uppercase font-black cursor-pointer ${isLight ? 'text-blue-900 hover:underline' : 'text-sky-400 hover:underline'}`}
                         >
                           Sign In
                         </button>
@@ -1903,7 +2280,7 @@ export default function App() {
                   {authMode === 'login' ? (
                     <form onSubmit={handleTrainerLogin} className="space-y-4 font-sans">
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           Trainer Email Key
                         </label>
                         <input
@@ -1913,15 +2290,15 @@ export default function App() {
                           onChange={(e) => setStudentEmail(e.target.value)}
                           placeholder="e.g. trainer@dakshyam.com"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 focus:bg-white" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900 focus:bg-white" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-40"
                           }
                         />
                       </div>
 
                       <div className="space-y-1">
                         <div className="flex justify-between items-center">
-                          <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                          <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                             Trainer Password
                           </label>
                         </div>
@@ -1932,8 +2309,8 @@ export default function App() {
                           onChange={(e) => setPasswordInput(e.target.value)}
                           placeholder="••••••••"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 focus:bg-white" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900 focus:bg-white" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-40"
                           }
                         />
                       </div>
@@ -1947,7 +2324,7 @@ export default function App() {
                             setResetSuccessMessage('');
                           }}
                           className={`text-[9px] font-mono uppercase tracking-wide hover:underline cursor-pointer ${
-                            isLight ? 'text-amber-700 hover:text-amber-900' : 'text-cyan-400 hover:text-cyan-300'
+                            isLight ? 'text-blue-900 hover:text-blue-950 font-bold' : 'text-sky-400 hover:text-sky-300'
                           }`}
                         >
                           Forgot Password?
@@ -1958,8 +2335,8 @@ export default function App() {
                         type="submit"
                         className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all uppercase font-mono tracking-wider shadow-xs ${
                           isLight 
-                            ? 'bg-amber-600 hover:bg-amber-700 text-white hover:shadow-[0_0_12px_rgba(217,119,6,0.15)]' 
-                            : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 hover:shadow-[0_0_12px_rgba(34,211,238,0.2)]'
+                            ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-sm' 
+                            : 'bg-white hover:bg-slate-100 text-[#0a192f] font-bold shadow-[0_0_15px_rgba(255,255,255,0.2)]'
                         }`}
                       >
                         Enter Trainer Workspace
@@ -1973,7 +2350,7 @@ export default function App() {
                             setAuthMode('register');
                             setAuthError('');
                           }}
-                          className={`uppercase font-black cursor-pointer ${isLight ? 'text-amber-700 hover:underline' : 'text-cyan-400 hover:underline'}`}
+                          className={`uppercase font-black cursor-pointer ${isLight ? 'text-blue-900 hover:underline' : 'text-sky-400 hover:underline'}`}
                         >
                           Request Approved Account
                         </button>
@@ -1982,7 +2359,7 @@ export default function App() {
                   ) : (
                     <form onSubmit={handleTrainerRegister} className="space-y-4 font-sans">
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           Full Name
                         </label>
                         <input
@@ -1992,14 +2369,14 @@ export default function App() {
                           onChange={(e) => setStudentName(e.target.value)}
                           placeholder="Trainer Amit Mathur"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-40"
                           }
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           Email (Needs Approval)
                         </label>
                         <input
@@ -2009,14 +2386,14 @@ export default function App() {
                           onChange={(e) => setStudentEmail(e.target.value)}
                           placeholder="name@dakshyam.com"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-40"
                           }
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           Choose Safe Password
                         </label>
                         <input
@@ -2026,14 +2403,14 @@ export default function App() {
                           onChange={(e) => setPasswordInput(e.target.value)}
                           placeholder="Create strong account passcode"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-40"
                           }
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                        <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                           Trainer Registration Code (Optional)
                         </label>
                         <input
@@ -2042,18 +2419,18 @@ export default function App() {
                           onChange={(e) => setTrainerRegCode(e.target.value)}
                           placeholder="trainer@dki2026 for instant approval"
                           className={isLight 
-                            ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500" 
-                            : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40"
+                            ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900" 
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-40"
                           }
                         />
                       </div>
 
                       <button
                         type="submit"
-                        className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all uppercase font-mono tracking-wider shadow-xs animate-pulse ${
+                        className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all uppercase font-mono tracking-wider shadow-xs ${
                           isLight 
-                            ? 'bg-amber-600 hover:bg-amber-700 text-white' 
-                            : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                            ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-sm' 
+                            : 'bg-white hover:bg-slate-100 text-[#0a192f] font-bold shadow-[0_0_15px_rgba(255,255,255,0.2)]'
                         }`}
                       >
                         Submit ID Application
@@ -2067,7 +2444,7 @@ export default function App() {
                             setAuthMode('login');
                             setAuthError('');
                           }}
-                          className={`uppercase font-black cursor-pointer ${isLight ? 'text-amber-700 hover:underline' : 'text-cyan-400 hover:underline'}`}
+                          className={`uppercase font-black cursor-pointer ${isLight ? 'text-blue-900 hover:underline' : 'text-sky-400 hover:underline'}`}
                         >
                           Sign In
                         </button>
@@ -2081,7 +2458,7 @@ export default function App() {
               {authRoleTab === 'admin' && (
                 <form onSubmit={handleAdminLogin} className="space-y-4 font-sans">
                   <div className="space-y-1">
-                    <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                    <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                       Admin Signature Override Passcode
                     </label>
                     <input
@@ -2091,8 +2468,8 @@ export default function App() {
                       onChange={(e) => setSecretCode(e.target.value)}
                       placeholder="ENTER PRIVATE SYSTEM CODE"
                       className={isLight 
-                        ? "w-full bg-slate-50 border border-amber-500/25 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 tracking-widest text-center uppercase font-black" 
-                        : "w-full bg-[#111]/85 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45 tracking-widest text-center uppercase text-cyan-400 font-bold"
+                        ? "w-full bg-slate-50 border border-blue-900/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900 tracking-widest text-center uppercase font-black" 
+                        : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-400 tracking-widest text-center uppercase text-sky-400 font-bold"
                       }
                     />
                   </div>
@@ -2101,8 +2478,8 @@ export default function App() {
                     type="submit"
                     className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all uppercase font-mono tracking-wider shadow-xs ${
                       isLight 
-                        ? 'bg-amber-600 hover:bg-amber-700 text-white hover:shadow-[0_0_12px_rgba(217,119,6,0.15)]' 
-                        : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 hover:shadow-[0_0_12px_rgba(34,211,238,0.2)]'
+                        ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-sm' 
+                        : 'bg-white hover:bg-slate-100 text-[#0a192f] font-bold shadow-[0_0_15px_rgba(255,255,255,0.2)]'
                     }`}
                   >
                     Authenticate Console
@@ -2113,7 +2490,7 @@ export default function App() {
               {/* SECTION D: SELF-SERVICE PASSWORD RECOVERY */}
               {authMode === 'forgot' && (
                 <form onSubmit={handleResetPassword} className="space-y-4 font-sans">
-                  <div className="space-y-1.5 text-center pb-2 border-b border-cyan-500/5">
+                  <div className="space-y-1.5 text-center pb-2 border-b border-blue-500/10">
                     <h3 className={`text-xs font-black uppercase tracking-wide ${isLight ? 'text-slate-800' : 'text-slate-100'}`}>
                       Recover {authRoleTab === 'student' ? 'Student' : 'Trainer'} Access
                     </h3>
@@ -2129,7 +2506,7 @@ export default function App() {
                   )}
 
                   <div className="space-y-1">
-                    <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-amber-700/85' : 'text-cyan-400/85'}`}>
+                    <label className={`block text-4xs font-mono tracking-widest uppercase mb-1 ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
                       Registered Account Email
                     </label>
                     <input
@@ -2139,8 +2516,8 @@ export default function App() {
                       onChange={(e) => setResetEmail(e.target.value)}
                       placeholder="e.g. user@example.com"
                       className={isLight 
-                        ? "w-full bg-slate-50 border border-amber-500/20 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500" 
-                        : "w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-45"
+                        ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900" 
+                        : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-400"
                       }
                     />
                   </div>
@@ -2149,8 +2526,8 @@ export default function App() {
                     type="submit"
                     className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all uppercase font-mono tracking-wider shadow-xs ${
                       isLight 
-                        ? 'bg-amber-600 hover:bg-amber-700 text-white hover:shadow-[0_0_12px_rgba(217,119,6,0.15)]' 
-                        : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 hover:shadow-[0_0_12px_rgba(34,211,238,0.2)]'
+                        ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-sm' 
+                        : 'bg-white hover:bg-slate-100 text-[#0a192f] font-bold shadow-[0_0_15px_rgba(255,255,255,0.2)]'
                     }`}
                   >
                     Send Recovery Email
@@ -2165,7 +2542,7 @@ export default function App() {
                         setAuthError('');
                         setResetSuccessMessage('');
                       }}
-                      className={`uppercase font-black cursor-pointer ${isLight ? 'text-amber-700 hover:underline' : 'text-[#22d3ee] hover:underline'}`}
+                      className={`uppercase font-black cursor-pointer ${isLight ? 'text-blue-900 hover:underline' : 'text-sky-400 hover:underline'}`}
                     >
                       Sign In Page
                     </button>
@@ -2201,14 +2578,14 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               className={`border p-6 max-w-sm w-full relative z-10 text-center space-y-5 transition-colors duration-300 rounded-2xl ${
                 isLight 
-                  ? 'bg-white border-amber-500/35 shadow-[0_0_55px_rgba(217,119,6,0.12)] font-sans' 
-                  : 'bg-[#050505]/98 border-cyan-500/25 shadow-[0_0_55px_rgba(6,182,212,0.22)] font-sans'
+                  ? 'bg-white border-blue-900/15 shadow-2xl font-sans' 
+                  : 'bg-[#0d1f38] border-blue-800/40 shadow-2xl font-sans'
               }`}
             >
               {/* Icon & Title */}
               <div className="space-y-2">
                 <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center border ${
-                  isLight ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-cyan-950/40 border-cyan-500/20 text-[#22d3ee]'
+                  isLight ? 'bg-blue-50 border-blue-900/20 text-blue-950' : 'bg-blue-950/60 border-blue-500/20 text-sky-400'
                 }`}>
                   <Lock className="w-5 h-5 animate-pulse" />
                 </div>
@@ -2237,8 +2614,8 @@ export default function App() {
                     placeholder="••••••"
                     className={`w-full tracking-[1.5em] text-center font-black text-lg py-2.5 rounded-xl border focus:outline-none transition-all ${
                       isLight 
-                        ? 'bg-slate-50 border-amber-500/25 text-slate-800 focus:border-amber-500 focus:bg-white' 
-                        : 'bg-[#111] border-cyan-500/15 text-yellow-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/20'
+                        ? 'bg-slate-50 border-blue-900/20 text-slate-800 focus:border-blue-900 focus:bg-white' 
+                        : 'bg-[#071326] border-blue-900/30 text-sky-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400/20'
                     }`}
                   />
                 </div>
@@ -2269,8 +2646,8 @@ export default function App() {
                     type="submit"
                     className={`font-mono text-4xs uppercase tracking-widest py-2.5 rounded-xl transition-all cursor-pointer font-black ${
                       isLight 
-                        ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm' 
-                        : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.15)]'
+                        ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-sm' 
+                        : 'bg-white hover:bg-slate-100 text-[#0a192f] shadow-[0_0_10px_rgba(255,255,255,0.15)]'
                     }`}
                   >
                     Verify Passcode
@@ -2292,10 +2669,10 @@ export default function App() {
             className="fixed bottom-4 left-4 right-4 z-50 max-w-lg sm:left-auto sm:right-4 no-print"
           >
             <div className={`p-5 rounded-2xl border shadow-xl flex flex-col gap-3.5 ${
-              isLight ? 'bg-white border-amber-500/20 text-slate-800' : 'bg-[#060606]/95 border-cyan-500/20 text-slate-305 text-slate-300'
+              isLight ? 'bg-white border-blue-900/15 text-slate-800' : 'bg-[#0d1f38]/95 border-blue-800/40 text-slate-300'
             }`}>
               <div className="flex items-start gap-3">
-                <div className={`p-2 rounded-xl shrink-0 ${isLight ? 'bg-amber-100 text-amber-700' : 'bg-cyan-950/50 text-[#22d3ee]'}`}>
+                <div className={`p-2 rounded-xl shrink-0 ${isLight ? 'bg-blue-50 text-blue-950' : 'bg-blue-950 text-sky-400'}`}>
                   <ShieldCheck className="w-4 h-4" />
                 </div>
                 <div className="space-y-1">
@@ -2316,7 +2693,7 @@ export default function App() {
                     setCookieConsent('basic');
                   }}
                   className={`px-3 py-1.5 rounded-lg border text-4xs uppercase tracking-wider font-bold hover:opacity-80 transition-all cursor-pointer ${
-                    isLight ? 'border-slate-350 text-slate-600 bg-slate-50' : 'border-slate-800 text-slate-400 bg-[#111]'
+                    isLight ? 'border-slate-350 text-slate-600 bg-slate-50' : 'border-slate-800 text-slate-400 bg-[#071326]'
                   }`}
                 >
                   Allow Basic Only
@@ -2330,8 +2707,8 @@ export default function App() {
                   }}
                   className={`px-3 py-1.5 rounded-lg text-4xs uppercase tracking-wider font-extrabold hover:shadow-md transition-all cursor-pointer ${
                     isLight 
-                      ? 'bg-amber-600 hover:bg-amber-700 text-white' 
-                      : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                      ? 'bg-blue-950 hover:bg-blue-900 text-white' 
+                      : 'bg-white hover:bg-slate-100 text-[#0a192f]'
                   }`}
                 >
                   Accept All Preferences

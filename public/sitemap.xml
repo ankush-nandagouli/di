@@ -1,74 +1,83 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
-  <!-- Main Home Page -->
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd
+                            http://www.google.com/schemas/sitemap-image/1.1 http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd">
+  <!-- 1. Primary Landing Gateway -->
   <url>
     <loc>https://dakshyaminnovations.vercel.app/</loc>
-    <lastmod>2026-06-24</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.00</priority>
+    <image:image>
+      <image:loc>https://dakshyaminnovations.vercel.app/logo.png</image:loc>
+      <image:title>Dakshyam Innovations - Sovereign Skill Systems and Robotics Integration</image:title>
+      <image:caption>Official logo and emblem of Dakshyam Innovations</image:caption>
+    </image:image>
   </url>
+
+  <!-- 2. Home Tab -->
   <url>
     <loc>https://dakshyaminnovations.vercel.app/?tab=home</loc>
-    <lastmod>2026-06-24</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.00</priority>
   </url>
 
-  <!-- Vocational Services & Curriculum Packages -->
+  <!-- 3. Professional Technical Services & Training Programs -->
   <url>
     <loc>https://dakshyaminnovations.vercel.app/?tab=services</loc>
-    <lastmod>2026-06-24</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
+    <priority>0.90</priority>
   </url>
 
-  <!-- Certificate Verification Engine -->
+  <!-- 4. Digital Credential & Certificate Verification Engine -->
   <url>
     <loc>https://dakshyaminnovations.vercel.app/?tab=verification</loc>
-    <lastmod>2026-06-24</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
+    <priority>0.90</priority>
   </url>
 
-  <!-- About Company & Founding Board -->
+  <!-- 5. Corporate Identity, Founders & Mission -->
   <url>
     <loc>https://dakshyaminnovations.vercel.app/?tab=about</loc>
-    <lastmod>2026-06-24</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <lastmod>2026-09-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
   </url>
 
-  <!-- Leaderboards & Academic Assessment Matrices -->
+  <!-- 6. Student Assessment Leaderboard & Competency Rankings -->
   <url>
     <loc>https://dakshyaminnovations.vercel.app/?tab=leaderboard</loc>
-    <lastmod>2026-06-24</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.8</priority>
+    <priority>0.80</priority>
   </url>
 
-  <!-- Student Telemetry Feeds & Live Diagnostics -->
+  <!-- 7. Innovation Feeds, Community Exhibits & Video Showcases -->
   <url>
     <loc>https://dakshyaminnovations.vercel.app/?tab=social</loc>
-    <lastmod>2026-06-24</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.7</priority>
+    <priority>0.80</priority>
   </url>
 
-  <!-- Contact Desks & Lab Setup Booking -->
+  <!-- 8. Contact Desk & Lab Consultation Booking -->
   <url>
     <loc>https://dakshyaminnovations.vercel.app/?tab=contact</loc>
-    <lastmod>2026-06-24</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.75</priority>
   </url>
 
-  <!-- Authentication portals -->
+  <!-- 9. Student & Enterprise Access Portal -->
   <url>
     <loc>https://dakshyaminnovations.vercel.app/?tab=portal</loc>
-    <lastmod>2026-06-24</lastmod>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.70</priority>
   </url>
 </urlset>

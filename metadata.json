@@ -1,6 +1,6 @@
 {
-  "name": "Dakshyam Innovation",
-  "description": "The official high-fidelity training, assignment, and credential verification portal for Dakshyam Innovations. Features hidden secure role access, student group builders, assessment lists, peer discussion video exhibits, and print-ready digital certificates.",
+  "name": "Dakshyam Innovations",
+  "description": "Dakshyam Innovations offers elite Industrial IoT services, expert full-stack web engineering, industrial automation, and hands-on technical robotics and computer training with digital credential verification.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

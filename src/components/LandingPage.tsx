@@ -5,6 +5,7 @@ import {
   Star, ChevronLeft, ChevronRight, School, Sparkles, LayoutGrid, Image as ImageIcon 
 } from 'lucide-react';
 import DakshyamLogo from './DakshyamLogo';
+import Home3DArtViewer from './Home3DArtViewer';
 import { Course, PromoBanner, GalleryImage } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
@@ -16,6 +17,8 @@ interface LandingPageProps {
   onEnterPortal: () => void;
   onSelectCourse: (courseId: string) => void;
   theme?: 'light' | 'dark';
+  currentUser?: any;
+  onNavigateToAdmin?: () => void;
 }
 
 export default function LandingPage({ 
@@ -24,20 +27,25 @@ export default function LandingPage({
   galleryImages, 
   onEnterPortal, 
   onSelectCourse,
-  theme = 'dark'
+  theme = 'dark',
+  currentUser,
+  onNavigateToAdmin
 }: LandingPageProps) {
+  // Check if current authenticated user has administrator privileges
+  const loggedInUser = currentUser || DakshyamDatabase.getLoggedInUser();
+  const isAdmin = loggedInUser?.role === 'admin';
   
   // Theme state maps
   const isLight = theme === 'light';
-  const textGold = isLight ? 'text-amber-600' : 'text-cyan-400';
+  const textGold = isLight ? 'text-blue-900 font-bold' : 'text-sky-400';
   const textTitle = isLight ? 'text-slate-900' : 'text-white';
   const textMuted = isLight ? 'text-slate-600 font-medium' : 'text-slate-400';
   const textMutedLight = isLight ? 'text-slate-500' : 'text-slate-450';
-  const borderLight = isLight ? 'border-amber-500/20' : 'border-cyan-500/5';
-  const badgeClass = isLight ? 'border-amber-500/15 bg-amber-50/70 text-amber-700' : 'border-cyan-500/15 bg-cyan-950/20 text-cyan-400';
-  const cardBg = isLight ? 'bg-amber-500/5 border-amber-500/10 hover:border-amber-500/20 hover:shadow-lg' : 'border-cyan-500/5 bg-[#111]/30 hover:border-cyan-500/10';
-  const cardCourseBg = isLight ? 'bg-white border-amber-500/15 hover:border-amber-500/30' : 'bg-[#050505]/65 border-cyan-500/10 hover:border-cyan-500/20';
-  const actionButtonBg = isLight ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950';
+  const borderLight = isLight ? 'border-blue-900/15' : 'border-blue-900/20';
+  const badgeClass = isLight ? 'border-blue-900/15 bg-blue-50/70 text-blue-950' : 'border-blue-500/20 bg-blue-950/40 text-sky-300';
+  const cardBg = isLight ? 'bg-blue-50/40 border-blue-900/10 hover:border-blue-900/25 hover:shadow-lg' : 'border-blue-900/20 bg-[#0d1f38]/40 hover:border-blue-500/30';
+  const cardCourseBg = isLight ? 'bg-white border-blue-900/10 hover:border-blue-900/25 shadow-xs' : 'bg-[#0d1f38]/60 border-blue-800/30 hover:border-blue-500/30';
+  const actionButtonBg = isLight ? 'bg-blue-950 hover:bg-blue-900 text-white' : 'bg-white hover:bg-slate-100 text-[#0a192f] font-bold';
   
   // Banner Slider state
   const activeBanners = banners.filter(b => b.isActive);
@@ -64,6 +72,74 @@ export default function LandingPage({
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [lightboxImage, setLightboxImage] = useState<GalleryImage | null>(null);
 
+  // Campus Special Programs Registration states
+  const [selectedRegProg, setSelectedRegProg] = useState<any>(null);
+  const [studentName, setStudentName] = useState('');
+  const [branch, setBranch] = useState('');
+  const [year, setYear] = useState('');
+  const [fatherName, setFatherName] = useState('');
+  const [email, setEmail] = useState('');
+  const [roll, setRoll] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [regSuccess, setRegSuccess] = useState('');
+  const [regError, setRegError] = useState('');
+
+  const activeSpecialPrograms = DakshyamDatabase.getSpecialPrograms();
+
+  const handleSelfRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegError('');
+    setRegSuccess('');
+
+    if (!studentName.trim() || !email.trim() || !roll.trim() || !mobile.trim()) {
+      setRegError('Please complete Name, Email, Roll, and Mobile fields.');
+      return;
+    }
+
+    try {
+      const enrollments = DakshyamDatabase.getSpecialEnrollments();
+      
+      // Check if student already registered in this specific program
+      const exists = enrollments.some(
+        x => x.programId === selectedRegProg.id && x.email.toLowerCase() === email.toLowerCase().trim()
+      );
+
+      if (exists) {
+        setRegError('You have already submitted your registry enrollment form for this campus training!');
+        return;
+      }
+
+      const newRegistration = {
+        id: `enroll-${Date.now()}`,
+        programId: selectedRegProg.id,
+        trainingName: selectedRegProg.trainingName,
+        institutionName: selectedRegProg.institutionName,
+        name: studentName,
+        branch,
+        yearOfStudy: year,
+        fathersName: fatherName,
+        email: email.toLowerCase().trim(),
+        rollNumber: roll,
+        mobileNumber: mobile,
+        enrolledAt: new Date().toISOString().split('T')[0]
+      };
+
+      enrollments.push(newRegistration);
+      DakshyamDatabase.saveSpecialEnrollments(enrollments);
+
+      setRegSuccess('✓ CONGRATULATIONS! Your special student registration has been captured successfully.');
+      setStudentName('');
+      setBranch('');
+      setYear('');
+      setFatherName('');
+      setEmail('');
+      setRoll('');
+      setMobile('');
+    } catch {
+      setRegError('Failed submitting your enrollment record to repository.');
+    }
+  };
+
   const categories = [
     { key: 'all', label: 'ALL EVENTS' },
     { key: 'school_programs', label: 'SCHOOL PROGRAMS' },
@@ -80,14 +156,14 @@ export default function LandingPage({
     <div className="space-y-16 py-4 relative text-center">
       {/* Absolute ambient lights background */}
       <div className={`absolute top-24 left-1/2 -translate-x-1/2 h-96 w-96 bg-radial via-transparent to-transparent blur-3xl pointer-events-none -z-10 ${
-        isLight ? 'from-amber-400/15' : 'from-cyan-500/10'
+        isLight ? 'from-blue-600/10' : 'from-blue-500/15'
       }`} />
 
       {/* --- SECTION A: PROMOTIONAL BANNER CAROUSEL --- */}
       {activeBanners.length > 0 && (
         <div id="banner-slider" className="max-w-5xl mx-auto px-4 relative">
           <div className={`relative h-[280px] sm:h-[340px] w-full rounded-2xl border overflow-hidden transition-all duration-300 ${
-            isLight ? 'border-amber-500/20 bg-amber-50/5 shadow-[0_0_45px_rgba(217,119,6,0.08)]' : 'border-cyan-500/20 bg-[#050505]/90 shadow-[0_0_40px_rgba(6,182,212,0.1)]'
+            isLight ? 'border-blue-900/15 bg-white shadow-[0_4px_25px_rgba(15,23,42,0.06)]' : 'border-blue-800/30 bg-[#0d1f38]/90 shadow-[0_0_40px_rgba(30,58,138,0.2)]'
           }`}>
             
             {/* Slide renderer */}
@@ -102,12 +178,12 @@ export default function LandingPage({
                 style={{
                   backgroundImage: isLight
                     ? `linear-gradient(to top, rgba(254,254,254,0.99) 35%, rgba(254,254,254,0.6) 70%, rgba(254,254,254,0.2) 100%), url(${activeBanners[currentSlide].imageUrl})`
-                    : `linear-gradient(to top, rgba(5,5,5,0.98) 35%, rgba(5,5,5,0.6) 70%, rgba(5,5,5,0.2) 100%), url(${activeBanners[currentSlide].imageUrl})`
+                    : `linear-gradient(to top, rgba(10,25,47,0.98) 35%, rgba(10,25,47,0.6) 70%, rgba(10,25,47,0.2) 100%), url(${activeBanners[currentSlide].imageUrl})`
                 }}
               >
                 <div className="max-w-2xl space-y-2.5 z-10">
                   <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-mono text-[9px] font-black tracking-widest uppercase transition-colors duration-300 ${
-                    isLight ? 'border-amber-500/25 bg-amber-50 text-amber-700' : 'border-cyan-400/30 bg-cyan-950/40 text-cyan-400'
+                    isLight ? 'border-blue-900/20 bg-blue-50 text-blue-950' : 'border-blue-400/30 bg-blue-950/60 text-sky-300'
                   }`}>
                     <Sparkles className="w-3 h-3 text-current" /> PROMOTIONAL SPOTLIGHT
                   </div>
@@ -143,7 +219,7 @@ export default function LandingPage({
                 <button
                   onClick={handlePrevSlide}
                   className={`absolute left-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full border transition-all text-sm shrink-0 cursor-pointer ${
-                    isLight ? 'border-amber-500/20 bg-white/80 text-amber-800' : 'border-cyan-500/10 bg-black/60 text-slate-400 hover:text-cyan-400'
+                    isLight ? 'border-blue-900/15 bg-white/90 text-blue-950' : 'border-blue-700/30 bg-[#071326]/80 text-slate-300 hover:text-sky-300'
                   }`}
                   title="Previous Banner"
                 >
@@ -152,7 +228,7 @@ export default function LandingPage({
                 <button
                   onClick={handleNextSlide}
                   className={`absolute right-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full border transition-all text-sm shrink-0 cursor-pointer ${
-                    isLight ? 'border-amber-500/20 bg-white/80 text-amber-800' : 'border-cyan-500/10 bg-black/60 text-slate-400 hover:text-cyan-400'
+                    isLight ? 'border-blue-900/15 bg-white/90 text-blue-950' : 'border-blue-700/30 bg-[#071326]/80 text-slate-300 hover:text-sky-300'
                   }`}
                   title="Next Banner"
                 >
@@ -167,7 +243,7 @@ export default function LandingPage({
                       onClick={() => setCurrentSlide(index)}
                       className={`h-1.5 rounded-full transition-all cursor-pointer ${
                         currentSlide === index 
-                          ? (isLight ? 'w-5 bg-amber-600' : 'w-5 bg-cyan-400') 
+                          ? (isLight ? 'w-5 bg-blue-950' : 'w-5 bg-sky-400') 
                           : 'w-1.5 bg-slate-400 hover:bg-slate-300'
                       }`}
                     />
@@ -179,10 +255,14 @@ export default function LandingPage({
         </div>
       )}
 
-      {/* --- HERO / LOGO SECTION --- */}
+      {/* --- HERO / 3D ART SECTION --- */}
       <div className="flex flex-col items-center justify-center min-h-[48vh] px-4 space-y-6">
-        <div className="scale-90 md:scale-102 transition-all">
-          <DakshyamLogo size="lg" pulseGlow={true} interactive={true} showText={true} theme={theme} />
+        <div className="w-full transition-all">
+          <Home3DArtViewer 
+            theme={theme} 
+            isAdmin={isAdmin} 
+            onNavigateToAdmin={onNavigateToAdmin} 
+          />
         </div>
 
         <motion.div 
@@ -200,8 +280,8 @@ export default function LandingPage({
               onClick={onEnterPortal}
               className={`font-black text-xs sm:text-sm px-8 py-3.5 rounded-xl inline-flex items-center gap-2 group cursor-pointer active:scale-95 transition-all uppercase font-mono tracking-wider ${
                 isLight 
-                  ? 'bg-amber-600 hover:bg-amber-700 text-white hover:shadow-[0_0_25px_rgba(217,119,6,0.22)]' 
-                  : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 hover:shadow-[0_0_25px_rgba(34,211,238,0.22)]'
+                  ? 'bg-blue-950 hover:bg-blue-900 text-white hover:shadow-[0_4px_20px_rgba(15,23,42,0.2)]' 
+                  : 'bg-white hover:bg-slate-100 text-[#0a192f] hover:shadow-[0_0_25px_rgba(255,255,255,0.2)]'
               }`}
             >
               Enter Innovation Portal <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -212,7 +292,7 @@ export default function LandingPage({
 
       {/* --- SECTION B: NEP 2020 INTEGRATION GRID (CONNECTSHIKSHA INSPIRED) --- */}
       <div className="max-w-4xl mx-auto px-4 space-y-8">
-        <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-amber-600' : 'border-[#22d3ee]'}`}>
+        <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
           <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${textGold}`}>Policy & Compliance</span>
           <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>NEP 2020 School Computer Literacy & 21st-Century Coding</h2>
           <p className={`text-xs max-w-xl font-sans ${textMuted}`}>
@@ -224,7 +304,7 @@ export default function LandingPage({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-left font-sans">
           
           <div className={`p-5 rounded-2xl border transition-all space-y-3 ${cardBg}`}>
-            <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700' : 'bg-cyan-950/30 border-cyan-500/10 text-cyan-400'}`}>
+            <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-blue-100/60 border-blue-900/15 text-blue-950' : 'bg-blue-950/40 border-blue-800/30 text-sky-400'}`}>
               <School className="w-5 h-5" />
             </div>
             <h3 className={`text-xs font-bold uppercase tracking-wider ${textTitle}`}>NEP Comp Thinking Alignment</h3>
@@ -234,7 +314,7 @@ export default function LandingPage({
           </div>
 
           <div className={`p-5 rounded-2xl border transition-all space-y-3 ${cardBg}`}>
-            <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700' : 'bg-cyan-950/30 border-cyan-500/10 text-cyan-400'}`}>
+            <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-blue-100/60 border-blue-900/15 text-blue-950' : 'bg-blue-950/40 border-blue-800/30 text-sky-400'}`}>
               <Smartphone className="w-5 h-5" />
             </div>
             <h3 className={`text-xs font-bold uppercase tracking-wider ${textTitle}`}>Zero Setup Hassle for Schools</h3>
@@ -244,7 +324,7 @@ export default function LandingPage({
           </div>
 
           <div className={`p-5 rounded-2xl border transition-all space-y-3 ${cardBg}`}>
-            <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-amber-500/10 border-amber-500/20 text-amber-700' : 'bg-cyan-950/30 border-cyan-500/10 text-cyan-400'}`}>
+            <div className={`p-2.5 rounded-xl border w-fit ${isLight ? 'bg-blue-100/60 border-blue-900/15 text-blue-950' : 'bg-blue-950/40 border-blue-800/30 text-sky-400'}`}>
               <Star className="w-5 h-5 animate-spin-slow" />
             </div>
             <h3 className={`text-xs font-bold uppercase tracking-wider ${textTitle}`}>1-Week & 3-Month Core Tracks</h3>
@@ -258,7 +338,7 @@ export default function LandingPage({
 
       {/* --- SECTION C: SERVICING WORKSPACES SPOTLIGHT --- */}
       <div className="max-w-4xl mx-auto px-4 space-y-8">
-        <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-amber-600' : 'border-cyan-400'}`}>
+        <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
           <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${textGold}`}>Dakshyam Capabilities</span>
           <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Comprehensive Vocational Services & Delivery</h2>
           <p className={`text-xs max-w-2xl ${textMuted}`}>
@@ -271,7 +351,7 @@ export default function LandingPage({
           
           <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3`}>
             <div className="flex items-center gap-3">
-              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-amber-600/10 text-amber-750' : 'bg-cyan-950/40 text-[#22d3ee]'}`}>S1</span>
+              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>S1</span>
               <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>On-Demand High-Spec Computer Leases</h4>
             </div>
             <p className={`${textMuted}`}>
@@ -285,7 +365,7 @@ export default function LandingPage({
 
           <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3`}>
             <div className="flex items-center gap-3">
-              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-amber-600/10 text-amber-750' : 'bg-cyan-950/40 text-[#22d3ee]'}`}>S2</span>
+              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>S2</span>
               <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>Hands-On Hardware Kit Provision</h4>
             </div>
             <p className={`${textMuted}`}>
@@ -299,7 +379,7 @@ export default function LandingPage({
 
           <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3`}>
             <div className="flex items-center gap-3">
-              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-amber-600/10 text-amber-750' : 'bg-cyan-950/40 text-[#22d3ee]'}`}>S3</span>
+              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>S3</span>
               <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>Sovereign Evaluation & Micro-Credentials</h4>
             </div>
             <p className={`${textMuted}`}>
@@ -313,7 +393,7 @@ export default function LandingPage({
 
           <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3`}>
             <div className="flex items-center gap-3">
-              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-amber-600/10 text-amber-750' : 'bg-cyan-950/40 text-[#22d3ee]'}`}>S4</span>
+              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>S4</span>
               <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>Institutional Lab Integrations</h4>
             </div>
             <p className={`${textMuted}`}>
@@ -330,7 +410,7 @@ export default function LandingPage({
 
       {/* --- SECTION CD: SYLLABUS DIRECTORY --- */}
       <div className="max-w-4xl mx-auto px-4 space-y-8">
-        <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-amber-600' : 'border-[#22d3ee]'}`}>
+        <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
           <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${textGold}`}>Curriculum Catalog</span>
           <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Official Course Syllabus Directory</h2>
           <p className={`text-xs max-w-xl ${textMuted}`}>
@@ -345,7 +425,7 @@ export default function LandingPage({
               <div 
                 key={course.id}
                 className={`p-5 border rounded-2xl transition-all duration-300 flex flex-col justify-between space-y-4 relative group ${cardCourseBg} ${
-                  isLight ? 'hover:shadow-[0_0_20px_rgba(217,119,6,0.04)]' : 'hover:shadow-[0_0_20px_rgba(34,211,238,0.03)]'
+                  isLight ? 'hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)]' : 'hover:shadow-[0_0_20px_rgba(59,130,246,0.1)]'
                 }`}
               >
                 <div className="space-y-3">
@@ -370,7 +450,7 @@ export default function LandingPage({
                   </p>
 
                   {/* Program Features */}
-                  <div className={`space-y-1.5 pt-2 border-t ${isLight ? 'border-amber-500/10' : 'border-cyan-500/5'}`}>
+                  <div className={`space-y-1.5 pt-2 border-t ${isLight ? 'border-blue-900/10' : 'border-blue-900/20'}`}>
                     {course.features.map((feat, fIdx) => (
                       <div key={fIdx} className={`text-[10px] flex items-start gap-1 font-mono uppercase ${isLight ? 'text-slate-600' : 'text-slate-350'}`}>
                         <span className={`${textGold} font-bold select-none shrink-0`}>•</span>
@@ -385,8 +465,8 @@ export default function LandingPage({
                     onClick={() => onSelectCourse(course.id)}
                     className={`w-full text-center border font-bold text-2xs py-2.5 rounded-xl cursor-pointer transition-all uppercase tracking-wider ${
                       isLight 
-                        ? 'bg-amber-500/10 border-amber-500/25 text-amber-700 hover:bg-amber-600 hover:text-white hover:border-amber-600' 
-                        : 'bg-cyan-950/30 border-cyan-500/20 text-cyan-400 hover:bg-cyan-500 hover:text-slate-950'
+                        ? 'bg-blue-50 border-blue-900/20 text-blue-950 hover:bg-blue-950 hover:text-white hover:border-blue-950' 
+                        : 'bg-blue-950/40 border-blue-800/40 text-sky-300 hover:bg-white hover:text-[#0a192f]'
                     }`}
                   >
                     Enroll / Service Request
@@ -405,78 +485,9 @@ export default function LandingPage({
       </div>
 
       {/* --- SECTION CA: SPECIAL SCHOOL & COLLEGE CAMPUS REGISTRATIONS --- */}
-      {(() => {
-        const activePrograms = DakshyamDatabase.getSpecialPrograms();
-        const [selectedRegProg, setSelectedRegProg] = useState<any>(null);
-        const [studentName, setStudentName] = useState('');
-        const [branch, setBranch] = useState('');
-        const [year, setYear] = useState('');
-        const [fatherName, setFatherName] = useState('');
-        const [email, setEmail] = useState('');
-        const [roll, setRoll] = useState('');
-        const [mobile, setMobile] = useState('');
-        const [regSuccess, setRegSuccess] = useState('');
-        const [regError, setRegError] = useState('');
-
-        const handleSelfRegister = (e: React.FormEvent) => {
-          e.preventDefault();
-          setRegError('');
-          setRegSuccess('');
-
-          if (!studentName.trim() || !email.trim() || !roll.trim() || !mobile.trim()) {
-            setRegError('Please complete Name, Email, Roll, and Mobile fields.');
-            return;
-          }
-
-          try {
-            const enrollments = DakshyamDatabase.getSpecialEnrollments();
-            
-            // Check if student already registered in this specific program
-            const exists = enrollments.some(
-              x => x.programId === selectedRegProg.id && x.email.toLowerCase() === email.toLowerCase().trim()
-            );
-
-            if (exists) {
-              setRegError('You have already submitted your registry enrollment form for this campus training!');
-              return;
-            }
-
-            const newRegistration = {
-              id: `enroll-${Date.now()}`,
-              programId: selectedRegProg.id,
-              trainingName: selectedRegProg.trainingName,
-              institutionName: selectedRegProg.institutionName,
-              name: studentName,
-              branch,
-              yearOfStudy: year,
-              fathersName: fatherName,
-              email: email.toLowerCase().trim(),
-              rollNumber: roll,
-              mobileNumber: mobile,
-              enrolledAt: new Date().toISOString().split('T')[0]
-            };
-
-            enrollments.push(newRegistration);
-            DakshyamDatabase.saveSpecialEnrollments(enrollments);
-
-            setRegSuccess('✓ CONGRATULATIONS! Your special student registration has been captured successfully.');
-            setStudentName('');
-            setBranch('');
-            setYear('');
-            setFatherName('');
-            setEmail('');
-            setRoll('');
-            setMobile('');
-          } catch {
-            setRegError('Failed submitting your enrollment record to repository.');
-          }
-        };
-
-        if (activePrograms.length === 0) return null;
-
-        return (
-          <div className="max-w-5xl mx-auto px-4 space-y-8 animate-fadeIn text-left">
-            <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-amber-600' : 'border-cyan-400'}`}>
+      {activeSpecialPrograms.length > 0 && (
+        <div className="max-w-5xl mx-auto px-4 space-y-8 animate-fadeIn text-left">
+            <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
               <span className={`text-3xs font-mono tracking-widest uppercase font-black ${textGold}`}>Public Registrations</span>
               <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>
                 🏫 Active School & College Campus Training Registrations
@@ -487,7 +498,7 @@ export default function LandingPage({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {activePrograms.map(prog => (
+              {activeSpecialPrograms.map(prog => (
                 <div 
                   key={prog.id}
                   className={`p-5 rounded-2xl border text-left flex flex-col justify-between space-y-4 transition-all duration-300 ${cardCourseBg}`}
@@ -515,8 +526,8 @@ export default function LandingPage({
                     }}
                     className={`w-full text-center border font-bold text-2xs py-2.5 rounded-xl cursor-pointer transition-all uppercase tracking-wider ${
                       isLight 
-                        ? 'bg-amber-600 hover:bg-amber-700 text-white border-transparent' 
-                        : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-transparent hover:shadow-[0_0_12px_rgba(34,211,238,0.2)]'
+                        ? 'bg-blue-950 hover:bg-blue-900 text-white border-transparent' 
+                        : 'bg-white hover:bg-slate-100 text-[#0a192f] border-transparent font-bold'
                     }`}
                   >
                     Fill Registration Form
@@ -542,12 +553,12 @@ export default function LandingPage({
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     className={`border rounded-2xl max-w-lg w-full p-6 relative z-10 text-left space-y-4 max-h-[90vh] overflow-y-auto ${
-                      isLight ? 'bg-white border-amber-500/20 shadow-xl' : 'bg-[#0a0a0a] border-cyan-500/25 shadow-2xl'
+                      isLight ? 'bg-white border-blue-900/20 shadow-xl' : 'bg-[#0a192f] border-blue-700/40 shadow-2xl'
                     }`}
                   >
                     <div className="flex justify-between items-start border-b pb-2 border-slate-500/10">
                       <div>
-                        <span className="text-[9px] font-mono text-amber-600 uppercase tracking-widest font-bold">CAMPUS REGISTRATION DESK</span>
+                        <span className={`text-[9px] font-mono uppercase tracking-widest font-bold ${isLight ? 'text-blue-900' : 'text-sky-300'}`}>CAMPUS REGISTRATION DESK</span>
                         <h3 className={`text-xs sm:text-sm font-black uppercase mt-0.5 ${textTitle}`}>
                           {selectedRegProg.trainingName}
                         </h3>
@@ -556,7 +567,7 @@ export default function LandingPage({
                       <button 
                         onClick={() => setSelectedRegProg(null)} 
                         className={`text-xs font-mono font-bold px-2 py-1 rounded border hover:text-red-400 transition-colors ${
-                          isLight ? 'border-amber-500/10 text-slate-700' : 'border-cyan-500/10 text-slate-400'
+                          isLight ? 'border-blue-900/15 text-slate-700' : 'border-blue-700/40 text-slate-300'
                         }`}
                       >
                         ✕ CLOSE
@@ -565,11 +576,11 @@ export default function LandingPage({
 
                     {regError && <p className="text-3xs text-red-400 font-mono bg-red-950/20 p-2.5 rounded-xl border border-red-500/10 text-center">{regError}</p>}
                     {regSuccess && (
-                      <div className="bg-cyan-950/30 p-4 rounded-xl border border-cyan-500/20 text-center space-y-3 font-mono">
-                        <p className="text-2xs text-cyan-400 font-bold leading-relaxed">{regSuccess}</p>
+                      <div className="bg-blue-950/40 p-4 rounded-xl border border-blue-600/30 text-center space-y-3 font-mono">
+                        <p className="text-2xs text-sky-300 font-bold leading-relaxed">{regSuccess}</p>
                         <button
                           onClick={() => setSelectedRegProg(null)}
-                          className="bg-cyan-500 text-slate-950 text-3xs px-4 py-1.5 rounded-lg header-text font-black uppercase tracking-wider"
+                          className="bg-white text-[#0a192f] hover:bg-slate-100 text-3xs px-4 py-1.5 rounded-lg header-text font-black uppercase tracking-wider cursor-pointer"
                         >
                           Okay, Got It!
                         </button>
@@ -588,7 +599,7 @@ export default function LandingPage({
                               onChange={(e) => setStudentName(e.target.value)}
                               placeholder="e.g. Ramesh Kumar"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-black/40 border-slate-500/15 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
@@ -602,7 +613,7 @@ export default function LandingPage({
                               onChange={(e) => setBranch(e.target.value)}
                               placeholder="e.g. Science / CSE / IT"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-black/40 border-slate-500/15 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
@@ -616,7 +627,7 @@ export default function LandingPage({
                               onChange={(e) => setYear(e.target.value)}
                               placeholder="e.g. Class 11 / 2nd Year"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-black/40 border-slate-500/15 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
@@ -630,7 +641,7 @@ export default function LandingPage({
                               onChange={(e) => setFatherName(e.target.value)}
                               placeholder="Father's Full Name"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-black/40 border-slate-500/15 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
@@ -644,7 +655,7 @@ export default function LandingPage({
                               onChange={(e) => setEmail(e.target.value)}
                               placeholder="student@example.com"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-black/40 border-slate-500/15 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
@@ -658,7 +669,7 @@ export default function LandingPage({
                               onChange={(e) => setRoll(e.target.value)}
                               placeholder="e.g. ROLL12A"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-black/40 border-slate-500/15 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
@@ -673,14 +684,16 @@ export default function LandingPage({
                             onChange={(e) => setMobile(e.target.value)}
                             placeholder="+91 WhatsApp Contact"
                             className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                              isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-black/40 border-slate-500/15 text-white'
+                              isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
                             }`}
                           />
                         </div>
 
                         <button
                           type="submit"
-                          className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs py-3 rounded-xl transition-all cursor-pointer uppercase font-mono mt-3"
+                          className={`w-full font-black text-xs py-3 rounded-xl transition-all cursor-pointer uppercase font-mono mt-3 ${
+                            isLight ? 'bg-blue-950 hover:bg-blue-900 text-white' : 'bg-white hover:bg-slate-100 text-[#0a192f]'
+                          }`}
                         >
                           Submit Enrollment Form
                         </button>
@@ -691,12 +704,11 @@ export default function LandingPage({
               )}
             </AnimatePresence>
           </div>
-        );
-      })()}
+        )}
 
       {/* --- SECTION D: AUTHENTIC captioned PHOTO GALLERY --- */}
       <div className="max-w-4xl mx-auto px-4 space-y-8">
-        <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-amber-600' : 'border-cyan-400'}`}>
+        <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
           <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${textGold}`}>Class Actions</span>
           <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Dakshyam Innovations Project Photo Gallery</h2>
           <p className={`text-xs max-w-xl ${textMuted}`}>
@@ -705,15 +717,15 @@ export default function LandingPage({
         </div>
 
         {/* Filter categories tabs selector */}
-        <div className={`flex flex-wrap items-center justify-start gap-1.5 pb-2 font-mono text-[9px] font-bold border-b ${isLight ? 'border-amber-500/10' : 'border-cyan-500/5'}`}>
+        <div className={`flex flex-wrap items-center justify-start gap-1.5 pb-2 font-mono text-[9px] font-bold border-b ${isLight ? 'border-blue-900/10' : 'border-blue-900/20'}`}>
           {categories.map(cat => (
             <button
               key={cat.key}
               onClick={() => setActiveCategory(cat.key)}
               className={`px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
                 activeCategory === cat.key 
-                  ? (isLight ? 'bg-amber-600/10 border-amber-600/30 text-amber-700 font-extrabold shadow-[0_0_10px_rgba(217,119,6,0.08)]' : 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400 font-bold shadow-[0_0_10px_rgba(34,211,238,0.1)]')
-                  : (isLight ? 'border-transparent text-slate-600 hover:text-amber-800' : 'border-transparent text-slate-450 hover:text-white')
+                  ? (isLight ? 'bg-blue-900/10 border-blue-900/30 text-blue-950 font-extrabold shadow-xs' : 'bg-blue-600/20 border-blue-500/40 text-sky-300 font-bold shadow-[0_0_10px_rgba(59,130,246,0.15)]')
+                  : (isLight ? 'border-transparent text-slate-600 hover:text-blue-950' : 'border-transparent text-slate-400 hover:text-white')
               }`}
             >
               {cat.label}
@@ -731,8 +743,8 @@ export default function LandingPage({
                 onClick={() => setLightboxImage(img)}
                 className={`group border rounded-2xl overflow-hidden cursor-pointer transition-all hover:scale-[1.01] ${
                   isLight 
-                    ? 'border-amber-500/10 bg-white hover:border-amber-500/30 hover:shadow-[0_0_20px_rgba(217,119,6,0.04)]' 
-                    : 'border-cyan-500/5 bg-[#050505]/60 hover:border-cyan-500/25 hover:shadow-[0_0_20px_rgba(6,182,212,0.05)]'
+                    ? 'border-blue-900/10 bg-white hover:border-blue-900/30 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)]' 
+                    : 'border-blue-800/30 bg-[#0d1f38]/60 hover:border-blue-500/40 hover:shadow-[0_0_20px_rgba(59,130,246,0.1)]'
                 }`}
               >
                 <div className="h-44 w-full overflow-hidden relative bg-slate-900">
@@ -745,15 +757,15 @@ export default function LandingPage({
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-transparent opacity-80" />
                   
                   <span className={`absolute top-3 left-3 text-[8px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
-                    isLight ? 'border-amber-500/20 bg-amber-50 text-amber-700' : 'border-cyan-500/20 bg-black/75 text-cyan-400'
+                    isLight ? 'border-blue-900/20 bg-blue-50 text-blue-950' : 'border-blue-500/30 bg-black/75 text-sky-300'
                   }`}>
                     {img.category.replace('_', ' ')}
                   </span>
                 </div>
 
-                <div className={`p-4 space-y-1 transition-colors duration-305 ${isLight ? 'bg-amber-500/5' : 'bg-[#0a0a0a]/80'}`}>
+                <div className={`p-4 space-y-1 transition-colors duration-305 ${isLight ? 'bg-blue-50/30' : 'bg-[#0a192f]/80'}`}>
                   <h4 className={`text-2xs font-extrabold uppercase transition-colors tracking-wide ${
-                    isLight ? 'text-slate-800 group-hover:text-amber-700' : 'text-white group-hover:text-cyan-400'
+                    isLight ? 'text-slate-800 group-hover:text-blue-950' : 'text-white group-hover:text-sky-300'
                   }`}>
                     {img.title}
                   </h4>
@@ -776,8 +788,8 @@ export default function LandingPage({
       {/* --- ABOUT DAKSHYAM INNOVATIONS SECTION --- */}
       <div className={`max-w-4xl mx-auto px-4 mt-20 p-8 rounded-3xl border transition-all duration-300 relative overflow-hidden ${
         isLight 
-          ? 'bg-amber-500/5 border-amber-500/15 shadow-[0_0_55px_rgba(217,119,6,0.05)]' 
-          : 'bg-[#050505]/80 border-cyan-500/10 shadow-[0_0_55px_rgba(6,182,212,0.04)]'
+          ? 'bg-blue-50/40 border-blue-900/10 shadow-[0_4px_30px_rgba(15,23,42,0.05)]' 
+          : 'bg-[#0d1f38]/70 border-blue-800/30 shadow-[0_0_55px_rgba(30,58,138,0.15)]'
       }`}>
         {/* Subtle grid accent background */}
         <div className="absolute inset-0 bg-scanlines opacity-[0.015] pointer-events-none" />
@@ -792,7 +804,7 @@ export default function LandingPage({
             </div>
             
             <div className={`px-4 py-2 rounded-2xl border font-mono text-[10px] tracking-wide leading-relaxed font-bold w-fit ${
-              isLight ? 'bg-amber-100/50 border-amber-500/20 text-amber-800' : 'bg-cyan-950/20 border-cyan-500/15 text-cyan-400'
+              isLight ? 'bg-blue-50 border-blue-900/15 text-blue-950' : 'bg-blue-950/40 border-blue-700/40 text-sky-300'
             }`}>
               📍 Location Node: Waraseoni, District Balaghat, MP
             </div>
@@ -862,7 +874,7 @@ export default function LandingPage({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               className={`border rounded-2xl max-w-xl w-full overflow-hidden relative z-10 text-left space-y-4 flex flex-col justify-between max-h-[90vh] overflow-y-auto ${
-                isLight ? 'bg-white border-amber-500/20 shadow-[0_0_40px_rgba(217,119,6,0.1)]' : 'bg-[#050505] border-cyan-500/25 shadow-[0_0_40px_rgba(34,211,238,0.15)]'
+                isLight ? 'bg-white border-blue-900/20 shadow-[0_4px_30px_rgba(15,23,42,0.1)]' : 'bg-[#0a192f] border-blue-700/40 shadow-[0_0_40px_rgba(30,58,138,0.25)]'
               }`}
             >
               <div className="relative aspect-video w-full bg-slate-900">
@@ -877,7 +889,7 @@ export default function LandingPage({
                 <button
                   onClick={() => setLightboxImage(null)}
                   className={`absolute top-3 right-3 p-2 rounded-full border bg-black/80 text-white hover:text-red-400 transition-colors cursor-pointer text-xs font-mono ${
-                    isLight ? 'border-amber-400/25' : 'border-cyan-400/20'
+                    isLight ? 'border-blue-300/30' : 'border-blue-500/30'
                   }`}
                 >
                   ✕ CLOSE
@@ -886,7 +898,7 @@ export default function LandingPage({
 
               <div className="p-5 sm:p-6 space-y-2.5">
                 <span className={`text-[8px] font-mono font-black tracking-widest uppercase px-2 py-0.5 rounded border ${
-                  isLight ? 'text-amber-700 bg-amber-50 border-amber-500/15' : 'text-cyan-400 bg-cyan-950/40 border-cyan-500/10'
+                  isLight ? 'text-blue-950 bg-blue-50 border-blue-900/20' : 'text-sky-300 bg-blue-950/60 border-blue-500/30'
                 }`}>
                   {lightboxImage.category.replace('_', ' ')}
                 </span>
@@ -900,7 +912,7 @@ export default function LandingPage({
                 </p>
 
                 <div className={`text-[8px] font-mono border-t pt-2.5 flex justify-between items-center ${
-                  isLight ? 'text-slate-500 border-amber-500/10' : 'text-slate-500 border-cyan-500/5'
+                  isLight ? 'text-slate-500 border-blue-900/10' : 'text-slate-500 border-blue-900/20'
                 }`}>
                   <span>SYSTEM UNIQUE ID: {lightboxImage.id}</span>
                   <span>RECORDED: {lightboxImage.createdAt}</span>

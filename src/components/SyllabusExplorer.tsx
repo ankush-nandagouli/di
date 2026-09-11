@@ -311,7 +311,7 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
         {/* Course Select */}
         <div className="md:col-span-2.5 space-y-2">
           <label className={`block text-[10px] font-mono uppercase tracking-widest ${
-            isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'
+            isLight ? 'text-blue-950 font-bold' : 'text-sky-400'
           }`}>Select Course Syllabus</label>
           <select
             value={selectedCourseId}
@@ -321,8 +321,8 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
             }}
             className={`w-full rounded-xl px-4 py-2.5 text-xs focus:outline-none font-sans tracking-wide cursor-pointer border ${
               isLight 
-                ? 'bg-slate-50 border-slate-200 text-slate-850 focus:border-amber-500' 
-                : 'bg-black/80 border-cyan-500/10 text-slate-200 focus:border-cyan-400'
+                ? 'bg-slate-50 border-slate-200 text-slate-850 focus:border-blue-950' 
+                : 'bg-[#071326] border-blue-900/40 text-slate-200 focus:border-sky-400'
             }`}
           >
             {courses.map(course => (
@@ -338,7 +338,7 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
 
         {/* Enrollment Status Indicator Badge */}
         <div className={`md:col-span-1.5 flex flex-col justify-center border p-4 rounded-xl ${
-          isLight ? 'bg-slate-50/50 border-slate-100' : 'bg-black/40 border-cyan-500/5'
+          isLight ? 'bg-slate-50/50 border-slate-100' : 'bg-[#0a192f]/40 border-blue-900/20'
         }`}>
           <span className="text-[8px] font-mono text-slate-500 uppercase tracking-widest block mb-1">Your Enrollment Status</span>
           
@@ -380,14 +380,14 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
           
           {/* Top Panel: Expansive Row Overview */}
           <div className={`border rounded-2xl p-6 space-y-6 transition-all duration-300 ${
-            isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#050505]/75 border-cyan-500/10'
+            isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#0a192f]/75 border-blue-800/40'
           }`}>
             <div className={`flex flex-col md:flex-row justify-between items-start gap-6 pb-5 border-b ${
-              isLight ? 'border-slate-100' : 'border-cyan-500/10'
+              isLight ? 'border-slate-100' : 'border-blue-900/30'
             }`}>
               <div className="space-y-2 max-w-3xl">
                 <h4 className={`text-[10px] font-mono uppercase tracking-widest font-extrabold ${
-                  isLight ? 'text-amber-800' : 'text-cyan-400'
+                  isLight ? 'text-blue-950' : 'text-sky-400'
                 }`}>NEP 2020 Aligned Syllabus Overview</h4>
                 <h3 className={`text-lg md:text-xl font-black uppercase tracking-wide leading-tight ${
                   isLight ? 'text-slate-900' : 'text-white'
@@ -399,8 +399,8 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
                       key={idx} 
                       className={`text-[9.5px] px-2.5 py-1 rounded-full font-mono font-bold uppercase tracking-wider border ${
                         isLight 
-                          ? 'bg-amber-50 border-amber-500/20 text-amber-800' 
-                          : 'bg-cyan-950/40 border-cyan-500/15 text-cyan-400'
+                          ? 'bg-blue-50 border-blue-900/20 text-blue-950' 
+                          : 'bg-blue-950/50 border-blue-800/40 text-sky-300'
                       }`}
                     >
                       {tag}
@@ -411,40 +411,40 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
 
               {/* Scope badge */}
               <div className={`border rounded-xl px-4 py-3.5 flex flex-col items-center justify-center min-w-[130px] shrink-0 text-center font-mono self-stretch md:self-auto ${
-                isLight ? 'bg-amber-500/5 border-amber-500/20 text-slate-800' : 'bg-cyan-950/20 border-cyan-500/20 text-white'
+                isLight ? 'bg-blue-50 border-blue-900/20 text-slate-800' : 'bg-blue-950/40 border-blue-800/40 text-white'
               }`}>
-                <Calendar className={`w-5 h-5 mb-1 animate-pulse ${isLight ? 'text-amber-700' : 'text-cyan-400'}`} />
+                <Calendar className={`w-5 h-5 mb-1 animate-pulse ${isLight ? 'text-blue-950' : 'text-sky-400'}`} />
                 <span className="text-[9px] text-slate-400 uppercase font-black">Syllabus Span</span>
-                <span className={`text-xs font-black uppercase mt-0.5 ${isLight ? 'text-amber-800' : 'text-[#22d3ee]'}`}>{activeCourse.duration}</span>
+                <span className={`text-xs font-black uppercase mt-0.5 ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>{activeCourse.duration}</span>
               </div>
             </div>
 
             {/* Sub-Bento details grids */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs leading-relaxed font-sans mt-3">
               <div className={`space-y-2 p-4 border rounded-xl ${
-                isLight ? 'bg-slate-50 border-slate-100' : 'bg-black/40 border-cyan-500/5'
+                isLight ? 'bg-slate-50 border-slate-100' : 'bg-[#071326]/60 border-blue-900/20'
               }`}>
-                <span className={`text-[10px] font-mono uppercase tracking-widest block font-bold ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>Target Audience</span>
+                <span className={`text-[10px] font-mono uppercase tracking-widest block font-bold ${isLight ? 'text-blue-950' : 'text-sky-400'}`}>Target Audience</span>
                 <div className={`flex items-start gap-2.5 ${isLight ? 'text-slate-700 font-medium' : 'text-slate-300'}`}>
-                  <GraduationCap className={`w-4.5 h-4.5 mt-0.5 shrink-0 ${isLight ? 'text-amber-700' : 'text-cyan-400'}`} />
+                  <GraduationCap className={`w-4.5 h-4.5 mt-0.5 shrink-0 ${isLight ? 'text-blue-950' : 'text-sky-400'}`} />
                   <span>{currentSyllabus.targetAudience}</span>
                 </div>
               </div>
 
               <div className={`space-y-2 p-4 border rounded-xl ${
-                isLight ? 'bg-slate-50 border-slate-100' : 'bg-black/40 border-cyan-500/5'
+                isLight ? 'bg-slate-50 border-slate-100' : 'bg-[#071326]/60 border-blue-900/20'
               }`}>
-                <span className={`text-[10px] font-mono uppercase tracking-widest block font-bold ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>Prerequisites</span>
+                <span className={`text-[10px] font-mono uppercase tracking-widest block font-bold ${isLight ? 'text-blue-950' : 'text-sky-400'}`}>Prerequisites</span>
                 <div className={`flex items-start gap-2.5 ${isLight ? 'text-slate-700 font-medium' : 'text-slate-300'}`}>
-                  <Bookmark className={`w-4.5 h-4.5 mt-0.5 shrink-0 ${isLight ? 'text-amber-700' : 'text-cyan-400'}`} />
+                  <Bookmark className={`w-4.5 h-4.5 mt-0.5 shrink-0 ${isLight ? 'text-blue-950' : 'text-sky-400'}`} />
                   <span>{currentSyllabus.prerequisites}</span>
                 </div>
               </div>
 
               <div className={`space-y-2 p-4 border rounded-xl font-mono text-3xs ${
-                isLight ? 'bg-amber-500/5 border-amber-500/10 text-slate-600' : 'bg-cyan-950/10 border-cyan-500/10 text-slate-400'
+                isLight ? 'bg-blue-50/50 border-blue-900/10 text-slate-600' : 'bg-blue-950/20 border-blue-800/30 text-slate-400'
               }`}>
-                <span className={`font-extrabold uppercase block text-[10px] tracking-wider mb-1 ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>Vocational Compliance Node</span>
+                <span className={`font-extrabold uppercase block text-[10px] tracking-wider mb-1 ${isLight ? 'text-blue-950' : 'text-sky-400'}`}>Vocational Compliance Node</span>
                 <p>This specialized course is engineered to provide physical-digital manual skills, in full alignment with the vocational enrichment guidelines of national curriculums.</p>
               </div>
             </div>
@@ -452,13 +452,13 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
 
           {/* Chapters and Units: Now taking up 100% full-width of the dashboard layout! */}
           <div className={`border rounded-2xl p-6 space-y-4 w-full transition-all duration-300 ${
-            isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#050505]/75 border-cyan-500/10'
+            isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#0a192f]/75 border-blue-800/40'
           }`}>
             <h4 className={`text-xs font-black font-mono tracking-wider uppercase border-b pb-3 flex items-center justify-between ${
-              isLight ? 'text-amber-800 border-slate-100' : 'text-[#22d3ee] border-cyan-500/10'
+              isLight ? 'text-blue-950 border-slate-100' : 'text-sky-300 border-blue-900/30'
             }`}>
               <span>Course Chapters & Structural Units ({currentSyllabus.weeks.length})</span>
-              <span className={`text-3xs uppercase tracking-widest font-mono ${isLight ? 'text-amber-700' : 'text-cyan-500'}`}>Expansive Mode</span>
+              <span className={`text-3xs uppercase tracking-widest font-mono ${isLight ? 'text-blue-900' : 'text-sky-400'}`}>Expansive Mode</span>
             </h4>
 
             <div className="space-y-4">
@@ -470,8 +470,8 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
                     key={idx}
                     className={`border rounded-xl transition-all duration-250 overflow-hidden ${
                       isOpen 
-                        ? (isLight ? 'bg-amber-50/20 border-amber-500/30 shadow-md' : 'bg-black/60 border-cyan-500/30 shadow-2xl shadow-cyan-950/20') 
-                        : (isLight ? 'bg-white border-slate-200 hover:border-amber-500/20 hover:bg-slate-50/40' : 'bg-black/25 border-cyan-500/5 hover:border-cyan-500/20 hover:bg-black/40')
+                        ? (isLight ? 'bg-blue-50/30 border-blue-900/30 shadow-md' : 'bg-[#0a192f] border-blue-600/40 shadow-xl shadow-blue-950/30') 
+                        : (isLight ? 'bg-white border-slate-200 hover:border-blue-900/20 hover:bg-slate-50/40' : 'bg-[#071326]/50 border-blue-900/30 hover:border-blue-700/40 hover:bg-[#071326]')
                     }`}
                   >
                     {/* Header trigger */}
@@ -482,7 +482,7 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
                     >
                       <div className="space-y-1.5 pr-4">
                         <span className={`text-[9px] font-mono border px-2.5 py-0.5 rounded-md font-bold uppercase tracking-wider ${
-                          isLight ? 'text-amber-850 bg-amber-50 border-amber-500/15' : 'text-cyan-400 bg-cyan-950/40 border-cyan-500/15'
+                          isLight ? 'text-blue-950 bg-blue-50 border-blue-900/20' : 'text-sky-300 bg-blue-950/60 border-blue-800/40'
                         }`}>
                           {u.week}
                         </span>
@@ -494,7 +494,7 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
                       </div>
                       <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
                         isOpen ? 'rotate-180' : ''
-                      } ${isLight ? 'text-amber-700' : 'text-cyan-400'}`} />
+                      } ${isLight ? 'text-blue-950' : 'text-sky-400'}`} />
                     </button>
  
                     {/* Content Accordion */}
@@ -511,23 +511,23 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
                           className="overflow-hidden"
                         >
                           <div className={`px-5 pb-5 pt-3.5 border-t space-y-5 text-xs ${
-                            isLight ? 'border-amber-500/10 bg-amber-500/5' : 'border-cyan-500/10 bg-cyan-950/5'
+                            isLight ? 'border-blue-900/10 bg-blue-50/20' : 'border-blue-800/30 bg-blue-950/20'
                           }`}>
                             
                             {/* Unit Overview */}
                             <div className="space-y-1.5">
-                              <span className={`text-[10px] font-mono uppercase tracking-widest block font-bold ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>Chapter Overview:</span>
+                              <span className={`text-[10px] font-mono uppercase tracking-widest block font-bold ${isLight ? 'text-blue-950' : 'text-sky-400'}`}>Chapter Overview:</span>
                               <p className={`leading-relaxed font-sans ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{u.description}</p>
                             </div>
 
                             {/* Major topics & Practical skill blocks */}
-                            <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4 ${isLight ? 'border-amber-500/5' : 'border-cyan-500/5'}`}>
+                            <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4 ${isLight ? 'border-blue-900/10' : 'border-blue-900/30'}`}>
                               <div className="space-y-2">
                                 <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block font-bold">Core Study Topics:</span>
                                 <ul className="space-y-2">
                                   {u.topics.map((tp, tIdx) => (
                                     <li key={tIdx} className={`flex items-start gap-2.5 leading-relaxed font-sans ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full mt-2 shrink-0 ${isLight ? 'bg-amber-600' : 'bg-cyan-400'}`} />
+                                      <span className={`w-1.5 h-1.5 rounded-full mt-2 shrink-0 ${isLight ? 'bg-blue-950' : 'bg-sky-400'}`} />
                                       <span>{tp}</span>
                                     </li>
                                   ))}
@@ -548,10 +548,10 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
 
                             {/* Hardware lab detail */}
                             <div className={`p-4 border rounded-xl space-y-1.5 text-left ${
-                              isLight ? 'bg-white border-amber-500/15' : 'bg-black/55 border-cyan-500/15'
+                              isLight ? 'bg-white border-blue-900/15' : 'bg-[#071326] border-blue-800/40'
                             }`}>
-                              <div className={`flex items-center gap-2 text-[10px] font-mono font-black uppercase tracking-wider ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>
-                                <GraduationCap className={`w-4 h-4 ${isLight ? 'text-amber-700' : 'text-[#22d3ee]'}`} />
+                              <div className={`flex items-center gap-2 text-[10px] font-mono font-black uppercase tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-400'}`}>
+                                <GraduationCap className={`w-4 h-4 ${isLight ? 'text-blue-950' : 'text-sky-300'}`} />
                                 <span>Hands-On Laboratory Practicum Goals</span>
                               </div>
                               <p className={`text-[11px] leading-relaxed font-sans italic p-0.5 ${isLight ? 'text-slate-755 font-medium' : 'text-slate-300'}`}>
@@ -572,7 +572,7 @@ export default function SyllabusExplorer({ courses, applications, theme = 'dark'
         </div>
       ) : (
         <div className={`border border-dashed rounded-2xl py-12 text-center text-xs italic font-mono ${
-          isLight ? 'bg-slate-50 border-slate-250 text-slate-500' : 'bg-[#050505]/75 border-cyan-500/10 text-slate-500'
+          isLight ? 'bg-slate-50 border-slate-250 text-slate-500' : 'bg-[#0a192f]/75 border-blue-900/20 text-slate-400'
         }`}>
           Could not fetch custom syllabus parameters for selected course code.
         </div>

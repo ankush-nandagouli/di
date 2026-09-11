@@ -1,5 +1,7 @@
-# https://www.robotstxt.org/db.html
-# Dakshyam Innovation robots.txt configuration
+# ==============================================================================
+# Robots.txt for Dakshyam Innovations (https://dakshyaminnovations.vercel.app)
+# Generated: 2026-09-11
+# ==============================================================================
 
 User-agent: *
 Allow: /
@@ -12,11 +14,44 @@ Allow: /?tab=social
 Allow: /?tab=contact
 Allow: /?tab=portal
 
-# Block caching of temporary media uploads or test endpoints if any
-Disallow: /api/
-Disallow: /admin/
-Disallow: /trainer/
+# Allow search engine crawlers to access all critical visual & functional assets
+Allow: /*.css$
+Allow: /*.js$
+Allow: /*.svg$
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.webp$
+Allow: /*.ico$
+Allow: /*.obj$
+Allow: /*.glb$
+Allow: /logo.svg
+Allow: /logo.png
+Allow: /og-image.png
 
-# Host & Sitemap links
+# Disallow private internal panels, trainer consoles, and admin dashboard routes
+Disallow: /admin
+Disallow: /admin/
+Disallow: /trainer
+Disallow: /trainer/
+Disallow: /api/
+Disallow: /*?*preview=
+Disallow: /*?*admin=
+
+# Specific Crawler Directives
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.svg$
+Allow: /*.webp$
+
+User-agent: Bingbot
+Allow: /
+
+# Canonical Host & XML Sitemaps
 Host: https://dakshyaminnovations.vercel.app
 Sitemap: https://dakshyaminnovations.vercel.app/sitemap.xml

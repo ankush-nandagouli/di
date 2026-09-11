@@ -1,7 +1,64 @@
-import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder, AppLog } from '../types';
+import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder, AppLog, PageLoaderConfig } from '../types';
 
 // Default seeded courses requested by the user
-export const DEFAULT_COURSES: Course[] = [];
+export const DEFAULT_COURSES: Course[] = [
+  {
+    id: 'CRS-IOT-101',
+    title: 'IoT & Smart Robotics Engineering',
+    duration: '3 Months',
+    description: 'Comprehensive vocational training in physical computing, ESP32 microcontroller programming, Wi-Fi telemetry pipelines, and autonomous robotic rovers.',
+    tags: ['ESP32', 'Robotics', 'Sensors', 'Telemetry', 'NEP-2020'],
+    features: [
+      'Hands-on ESP32 architecture & C++ firmware programming',
+      'Dual H-Bridge Motor Kinetics & Sensor Diagnostics',
+      'Real-time Telemetry Dashboard Deployment',
+      'Complete Leased Hardware Kit Included'
+    ],
+    mobileHardwareIncluded: true
+  },
+  {
+    id: 'CRS-WEB-201',
+    title: 'Full-Stack Web & Real-Time Telemetry',
+    duration: '8 Weeks',
+    description: 'Build scalable web applications, RESTful microservices, and live IoT dashboards using React, TypeScript, Node.js, and MongoDB.',
+    tags: ['React', 'TypeScript', 'Node.js', 'Express', 'MongoDB'],
+    features: [
+      'Modern Reactive Component Architecture',
+      'REST API Development with Express & Middleware',
+      'Real-time WebSockets & Telemetry Streaming',
+      'Production Deployment to Cloud Infrastructure'
+    ],
+    mobileHardwareIncluded: false
+  },
+  {
+    id: 'CRS-NEP-301',
+    title: 'NEP 2020 Computational Thinking & Coding',
+    duration: '1 Month',
+    description: 'Inquiry-based foundational coding aligned with the National Education Policy. Covers logical flowcharts, block coding to script transitions, and cyber safety.',
+    tags: ['NEP-2020', 'Computational-Thinking', 'Python', 'Logic', 'STEM'],
+    features: [
+      'Flowchart Architecture & Algorithmic Design',
+      'Interactive Simulator & Game Logic Development',
+      'Micro:bit & Arduino Physical Logic Demonstrations',
+      'Verifiable NEP 2020 Certificate of Completion'
+    ],
+    mobileHardwareIncluded: true
+  },
+  {
+    id: 'CRS-EMB-401',
+    title: 'Embedded Systems & Circuit Instrumentation',
+    duration: '6 Weeks',
+    description: 'Master electronic circuit schematics, analog-to-digital signal processing, bus protocols (I2C, SPI, UART), and industrial motor drives.',
+    tags: ['Embedded-C', 'Circuits', 'PCB-Basics', 'Sensors', 'Hardware'],
+    features: [
+      'Breadboard Prototyping & Multimeter Testing',
+      'Microcontroller Register-Level Interfacing',
+      'Pulse-Width Modulation & Motor Velocity Control',
+      'Diagnostic Telemetry Logging'
+    ],
+    mobileHardwareIncluded: true
+  }
+];
 
 // Initial seeded students
 export const SEEDED_STUDENTS: StudentUser[] = [];
@@ -25,10 +82,70 @@ export const SEEDED_CERTIFICATES: Certificate[] = [];
 export const SEEDED_APPLICATIONS: CourseApplication[] = [];
 
 // Initial seeded promotional banners (fully editable by admin)
-export const DEFAULT_BANNERS: PromoBanner[] = [];
+export const DEFAULT_BANNERS: PromoBanner[] = [
+  {
+    id: 'ban-1',
+    title: 'Vocational STEM Laboratories Across Madhya Pradesh Schools',
+    subtitle: 'Equipping rural and urban students with leased high-performance hardware kits and hands-on robotics labs under NEP 2020 guidelines.',
+    imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=80',
+    actionUrl: '#services',
+    isActive: true,
+    createdAt: '2026-01-01'
+  },
+  {
+    id: 'ban-2',
+    title: 'Hands-on IoT & Embedded Systems Winter Bootcamp',
+    subtitle: '100% practical, project-driven engineering camps where students design, build, and deploy functional IoT telemetric products.',
+    imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80',
+    actionUrl: '#services',
+    isActive: true,
+    createdAt: '2026-01-02'
+  }
+];
 
 // Initial seeded project image gallery displaying real actions (fully editable by admin)
-export const DEFAULT_GALLERY_IMAGES: GalleryImage[] = [];
+export const DEFAULT_GALLERY_IMAGES: GalleryImage[] = [
+  {
+    id: 'gal-1',
+    title: 'Robotics Assembly & Telemetry Testing',
+    description: 'Students constructing autonomous wheeled robots with ultrasonic obstacle sensors and ESP32 microcontrollers.',
+    imageUrl: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=800&q=80',
+    category: 'iot_robotics',
+    createdAt: '2026-01-01'
+  },
+  {
+    id: 'gal-2',
+    title: 'School Lab Installation & Microcontroller Workshops',
+    description: 'Hands-on laboratory setup and diagnostic breadboard sessions conducted inside regional secondary schools.',
+    imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
+    category: 'school_programs',
+    createdAt: '2026-01-02'
+  },
+  {
+    id: 'gal-3',
+    title: 'Full-Stack Software Development & Cloud Dashboards',
+    description: 'Candidates designing real-time sensor dashboards and REST APIs using modern React and Node.js frameworks.',
+    imageUrl: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80',
+    category: 'mern_web',
+    createdAt: '2026-01-03'
+  }
+];
+
+// Default animated video page loader configuration
+export const DEFAULT_PAGE_LOADER_CONFIG: PageLoaderConfig = {
+  enabled: true,
+  videoUrl: '', // Ready for user's uploaded animated video
+  mediaType: 'auto',
+  showOnTabChange: true,
+  minDurationMs: 850,
+  title: 'DAKSHYAM INNOVATIONS',
+  subtitle: 'Initializing Advanced Engineering & Telemetry Platform...',
+  overlayTheme: 'glass',
+  soundEnabled: false,
+  showProgress: true,
+  videoFit: 'cover',
+  updatedAt: '2026-01-01'
+};
 
 /**
  * Offline-first localStorage Data Layer
@@ -146,6 +263,14 @@ export class DakshyamDatabase {
 
   static saveApplications(items: CourseApplication[]): void {
     this.set('applications', items);
+  }
+
+  static getPageLoaderConfig(): PageLoaderConfig {
+    return this.get<PageLoaderConfig>('page_loader_config', DEFAULT_PAGE_LOADER_CONFIG);
+  }
+
+  static savePageLoaderConfig(config: PageLoaderConfig): void {
+    this.set('page_loader_config', config);
   }
 
   // Active authenticated user state manager

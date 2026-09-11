@@ -6,24 +6,24 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
-/* Custom Scrollbar to match Immersive UI */
+/* Custom Scrollbar for Navy Blue & White UI */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #050505;
+  background: #071224;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #0f2a2e;
+  background: #1e3a8a;
   border-radius: 4px;
-  border: 1px solid rgba(34, 211, 238, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #22d3ee;
+  background: #3b82f6;
 }
 
 /* Fluid keyframe pulses to animate background glowing spots */

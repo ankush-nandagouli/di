@@ -15,8 +15,8 @@ export default function ThreeBackground({ theme = 'dark' }: { theme?: 'light' | 
     if (!container) return;
 
     const isLight = theme === 'light';
-    const clearColorVal = isLight ? 0xffffff : 0x050505;
-    const fogColorVal = isLight ? 0xffffff : 0x050505;
+    const clearColorVal = isLight ? 0xffffff : 0x0a192f;
+    const fogColorVal = isLight ? 0xffffff : 0x0a192f;
 
     // 1. Create Scene
     const scene = new THREE.Scene();
@@ -56,9 +56,9 @@ export default function ThreeBackground({ theme = 'dark' }: { theme?: 'light' | 
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
 
-    // Color definitions matching Immersive UI theme (Deep Slate-Indigo & Glowing Cyan for dark; Gold & Amber for light)
-    const colorBlue = isLight ? new THREE.Color('#ea580c') : new THREE.Color('#0a1d37'); // Orange-red vs Indigo
-    const colorGold = isLight ? new THREE.Color('#b45309') : new THREE.Color('#22d3ee'); // Deep Amber vs Teal cyan
+    // Color definitions matching Navy Blue and White theme
+    const colorBlue = isLight ? new THREE.Color('#0a192f') : new THREE.Color('#1e40af'); // Deep Navy vs Royal Navy
+    const colorGold = isLight ? new THREE.Color('#3b82f6') : new THREE.Color('#ffffff'); // Sky blue vs Crisp White
 
     let idx = 0;
     for (let i = 0; i <= wSegments; i++) {
@@ -94,13 +94,13 @@ export default function ThreeBackground({ theme = 'dark' }: { theme?: 'light' | 
     const grad = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
     
     if (isLight) {
-      grad.addColorStop(0, 'rgba(180, 83, 9, 1)'); // Rich gold
-      grad.addColorStop(0.3, 'rgba(217, 119, 6, 0.8)');
+      grad.addColorStop(0, 'rgba(10, 25, 47, 1)'); // Deep Navy
+      grad.addColorStop(0.3, 'rgba(30, 64, 175, 0.7)');
       grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
     } else {
-      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.8)');
-      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1)'); // Crisp White
+      grad.addColorStop(0.3, 'rgba(147, 197, 253, 0.8)'); // Soft sky glow
+      grad.addColorStop(1, 'rgba(10, 25, 47, 0)');
     }
     
     ctx.fillStyle = grad;
@@ -139,9 +139,9 @@ export default function ThreeBackground({ theme = 'dark' }: { theme?: 'light' | 
     linesGeometry.setIndex(lineIndices);
 
     const linesMaterial = new THREE.LineBasicMaterial({
-      color: isLight ? 0xd97706 : 0x113d4b,
+      color: isLight ? 0x1e3a8a : 0x2563eb,
       transparent: true,
-      opacity: isLight ? 0.12 : 0.28,
+      opacity: isLight ? 0.12 : 0.25,
       blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
 
@@ -153,7 +153,7 @@ export default function ThreeBackground({ theme = 'dark' }: { theme?: 'light' | 
     const keyLights: THREE.PointLight[] = [];
     const lightGlowGeometry = new THREE.SphereGeometry(0.2, 8, 8);
     
-    const lightColors = isLight ? [0xd97706, 0xb45309, 0xfca5a5] : [0x22d3ee, 0x6366f1, 0x0ea5e9];
+    const lightColors = isLight ? [0x1e3a8a, 0x2563eb, 0x60a5fa] : [0xffffff, 0x60a5fa, 0x38bdf8];
     lightColors.forEach((color, i) => {
       const light = new THREE.PointLight(color, isLight ? 1.2 : 2, 40);
       const glowMat = new THREE.MeshBasicMaterial({

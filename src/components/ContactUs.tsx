@@ -40,8 +40,8 @@ export default function ContactUs({ theme }: ContactUsProps) {
   return (
     <div className="max-w-5xl mx-auto py-4 space-y-10">
       {/* HEADER SECTION */}
-      <div className={`text-center space-y-2 max-w-xl mx-auto border-b pb-4 ${isLight ? 'border-amber-500/10' : 'border-cyan-500/5'}`}>
-        <span className={`text-3xs font-mono tracking-widest uppercase font-black ${isLight ? 'text-amber-700' : 'text-cyan-400'}`}>Get in touch</span>
+      <div className={`text-center space-y-2 max-w-xl mx-auto border-b pb-4 ${isLight ? 'border-blue-900/10' : 'border-blue-800/30'}`}>
+        <span className={`text-3xs font-mono tracking-widest uppercase font-black ${isLight ? 'text-blue-950' : 'text-sky-400'}`}>Get in touch</span>
         <h1 className={`text-2xl font-black tracking-wide uppercase ${isLight ? 'text-slate-900' : 'text-white'}`}>Contact Dakshyam Innovations</h1>
         <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
           Have queries about IoT syllabus integration, custom school STEM curriculums, robotic hardware kits or corporate workshop options? Message our cooperative cell today.
@@ -55,14 +55,14 @@ export default function ContactUs({ theme }: ContactUsProps) {
           <h2 className={`text-2xs font-mono font-black uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Direct Terminals</h2>
           
           <div className={`p-4 rounded-2xl border transition-all ${
-            isLight ? 'bg-amber-50/20 border-amber-500/10 hover:border-amber-500/30' : 'bg-[#0a0a0a]/60 border-cyan-500/5 hover:border-cyan-500/15'
+            isLight ? 'bg-blue-50/40 border-blue-900/10 hover:border-blue-900/25' : 'bg-[#0a192f]/60 border-blue-800/30 hover:border-blue-500/40'
           }`}>
             <div className="flex items-start gap-3">
-              <div className={`p-2 rounded-xl ${isLight ? 'bg-amber-100/60 text-amber-800' : 'bg-cyan-950/40 text-cyan-400'}`}>
+              <div className={`p-2 rounded-xl ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>
                 <MapPin className="w-4 h-4" />
               </div>
               <div className="space-y-1">
-                <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>Registered Office</h3>
+                <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Registered Office</h3>
                 <p className={`text-xs leading-relaxed font-sans ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                   Dakshyam Innovations LLC<br />
                   Delhi/NCR STEM Cluster Area<br />
@@ -73,15 +73,15 @@ export default function ContactUs({ theme }: ContactUsProps) {
           </div>
 
           <div className={`p-4 rounded-2xl border transition-all ${
-            isLight ? 'bg-amber-50/20 border-amber-500/10 hover:border-amber-500/30' : 'bg-[#0a0a0a]/60 border-cyan-500/5 hover:border-cyan-500/15'
+            isLight ? 'bg-blue-50/40 border-blue-900/10 hover:border-blue-900/25' : 'bg-[#0a192f]/60 border-blue-800/30 hover:border-blue-500/40'
           }`}>
             <div className="flex items-start gap-3">
-              <div className={`p-2 rounded-xl ${isLight ? 'bg-amber-100/60 text-amber-800' : 'bg-cyan-950/40 text-cyan-400'}`}>
+              <div className={`p-2 rounded-xl ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>
                 <Mail className="w-4 h-4" />
               </div>
               <div className="space-y-1">
-                <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>Electronic Mail</h3>
-                <a href="mailto:support@dakshyam.com" className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-cyan-300'}`}>
+                <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Electronic Mail</h3>
+                <a href="mailto:support@dakshyam.com" className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-sky-300'}`}>
                   support@dakshyam.com
                 </a>
                 <span className="text-4xs font-mono text-slate-500 block uppercase">24-hour Dispatch SLA</span>
@@ -90,15 +90,15 @@ export default function ContactUs({ theme }: ContactUsProps) {
           </div>
 
           <div className={`p-4 rounded-2xl border transition-all ${
-            isLight ? 'bg-amber-50/20 border-amber-500/10 hover:border-amber-500/30' : 'bg-[#0a0a0a]/60 border-cyan-500/5 hover:border-cyan-500/15'
+            isLight ? 'bg-blue-50/40 border-blue-900/10 hover:border-blue-900/25' : 'bg-[#0a192f]/60 border-blue-800/30 hover:border-blue-500/40'
           }`}>
             <div className="flex items-start gap-3">
-              <div className={`p-2 rounded-xl ${isLight ? 'bg-amber-100/60 text-amber-800' : 'bg-cyan-950/40 text-cyan-400'}`}>
+              <div className={`p-2 rounded-xl ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>
                 <Phone className="w-4 h-4" />
               </div>
               <div className="space-y-1">
-                <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>Cooperative Hotlines</h3>
-                <a href="tel:+919876543210" className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-cyan-300'}`}>
+                <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Cooperative Hotlines</h3>
+                <a href="tel:+919876543210" className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-sky-300'}`}>
                   +91 98765 43210
                 </a>
                 <span className="text-4xs font-mono text-slate-500 block uppercase flex items-center gap-1">
@@ -112,10 +112,10 @@ export default function ContactUs({ theme }: ContactUsProps) {
         {/* INTERACTIVE MESSAGE BOARD FORM */}
         <div className="md:col-span-2">
           <div className={`p-6 rounded-3xl border ${
-            isLight ? 'bg-white border-amber-500/15 shadow-xs' : 'bg-[#080808]/80 border-cyan-500/10 shadow-sm'
+            isLight ? 'bg-white border-blue-900/10 shadow-xs' : 'bg-[#0a192f]/70 border-blue-800/30 shadow-sm'
           }`}>
             <div className="flex items-center gap-2 mb-4">
-              <MessageSquare className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-cyan-400'}`} />
+              <MessageSquare className={`w-4 h-4 ${isLight ? 'text-blue-950' : 'text-sky-400'}`} />
               <h2 className={`text-xs font-mono font-black uppercase tracking-wider ${isLight ? 'text-slate-900' : 'text-white'}`}>Dispatch Requisition Node</h2>
             </div>
 
@@ -137,7 +137,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
                   <button
                     onClick={() => setSubmitted(false)}
                     className={`mt-4 px-5 py-2.5 rounded-xl font-mono text-2xs font-bold transition-all cursor-pointer ${
-                      isLight ? 'bg-slate-100 text-slate-700 hover:bg-amber-600 hover:text-white' : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-slate-950'
+                      isLight ? 'bg-blue-950 text-white hover:bg-blue-900' : 'bg-white text-[#0a192f] hover:bg-slate-100'
                     }`}
                   >
                     Send Another Dispatch Message
@@ -157,8 +157,8 @@ export default function ContactUs({ theme }: ContactUsProps) {
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="e.g. Kunal Sonkar"
                         className={isLight 
-                          ? "w-full bg-slate-50 border border-amber-500/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 focus:bg-white transition-all" 
-                          : "w-full bg-[#111]/70 border border-cyan-500/5 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40 transition-all"
+                          ? "w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-950 focus:bg-white transition-all" 
+                          : "w-full bg-[#071326] border border-blue-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-sky-400 transition-all"
                         }
                       />
                     </div>
@@ -174,8 +174,8 @@ export default function ContactUs({ theme }: ContactUsProps) {
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         placeholder="e.g. kunal@example.com"
                         className={isLight 
-                          ? "w-full bg-slate-50 border border-amber-500/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 focus:bg-white transition-all" 
-                          : "w-full bg-[#111]/70 border border-cyan-500/5 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40 transition-all"
+                          ? "w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-950 focus:bg-white transition-all" 
+                          : "w-full bg-[#071326] border border-blue-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-sky-400 transition-all"
                         }
                       />
                     </div>
@@ -192,8 +192,8 @@ export default function ContactUs({ theme }: ContactUsProps) {
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         placeholder="+91 WhatsApp number for callback"
                         className={isLight 
-                          ? "w-full bg-slate-50 border border-amber-500/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 focus:bg-white transition-all" 
-                          : "w-full bg-[#111]/70 border border-cyan-500/5 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40 transition-all"
+                          ? "w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-950 focus:bg-white transition-all" 
+                          : "w-full bg-[#071326] border border-blue-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-sky-400 transition-all"
                         }
                       />
                     </div>
@@ -206,8 +206,8 @@ export default function ContactUs({ theme }: ContactUsProps) {
                         value={formData.subject}
                         onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                         className={isLight 
-                          ? "w-full bg-slate-50 border border-amber-500/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 focus:bg-white" 
-                          : "w-full bg-[#111]/70 border border-cyan-500/5 text-white rounded-xl px-3 py-2 text-xs focus:outline-none"
+                          ? "w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-950 focus:bg-white" 
+                          : "w-full bg-[#071326] border border-blue-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none"
                         }
                       >
                         <option value="Robotics Workshop Requisition">School/College Robotics Workshop</option>
@@ -230,8 +230,8 @@ export default function ContactUs({ theme }: ContactUsProps) {
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                       placeholder="Detail your request here (e.g. number of student participates, grade levels, preferred dates, etc.)..."
                       className={isLight 
-                        ? "w-full bg-slate-50 border border-amber-500/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 focus:bg-white transition-all" 
-                        : "w-full bg-[#111]/70 border border-cyan-500/5 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-40 transition-all resize-none"
+                        ? "w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-950 focus:bg-white transition-all" 
+                        : "w-full bg-[#071326] border border-blue-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-sky-400 transition-all resize-none"
                       }
                     />
                   </div>
@@ -243,8 +243,8 @@ export default function ContactUs({ theme }: ContactUsProps) {
                       isSending 
                         ? 'opacity-70 cursor-not-allowed'
                         : (isLight 
-                            ? 'bg-amber-600 hover:bg-amber-700 text-white' 
-                            : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950')
+                            ? 'bg-blue-950 hover:bg-blue-900 text-white' 
+                            : 'bg-white hover:bg-slate-100 text-[#0a192f] font-black')
                     }`}
                   >
                     {isSending ? (

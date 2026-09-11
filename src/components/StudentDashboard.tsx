@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Award, Users, FileText, CheckCircle2, Clock, MapPin, Phone, Briefcase, BookOpen, Camera } from 'lucide-react';
+import { User, Award, Users, FileText, CheckCircle2, Clock, MapPin, Phone, Briefcase, BookOpen, Camera, Eye } from 'lucide-react';
 import { StudentUser, StudentGroup, Course, CourseApplication, Certificate } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import SyllabusExplorer from './SyllabusExplorer';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
+import OfficialCertificate from './OfficialCertificate';
 
 interface StudentDashboardProps {
   user: StudentUser;
@@ -33,6 +34,7 @@ export default function StudentDashboard({
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState<'overview' | 'syllabus'>('overview');
+  const [viewCert, setViewCert] = useState<Certificate | null>(null);
 
   // Editing profile details states
   const [name, setName] = useState(user.name);
@@ -42,13 +44,36 @@ export default function StudentDashboard({
   const [avatar, setAvatar] = useState((user.profile as any)?.avatar || '');
   const [isSaved, setIsSaved] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsUploadingAvatar(true);
+      setErrorMsg('');
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatar(reader.result as string);
+      reader.onloadend = async () => {
+        try {
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file: reader.result, resourceType: 'image' })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setAvatar(data.url);
+          } else {
+            const errData = await res.json();
+            // Graceful fallback to local preview if Cloudinary is not configured yet
+            setAvatar(reader.result as string);
+            setErrorMsg(`⚠️ Cloudinary notice: ${errData.error || 'Storage node not active'}. Avatar preview saved locally.`);
+          }
+        } catch (err: any) {
+          setAvatar(reader.result as string);
+          setErrorMsg('⚠️ Cloudinary error. Avatar preview stored locally: ' + err.message);
+        } finally {
+          setIsUploadingAvatar(false);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -93,27 +118,27 @@ export default function StudentDashboard({
       {/* 1. Header Hero Welcome Panel */}
       <div className={`border p-6 rounded-2xl relative overflow-hidden backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all duration-300 ${
         isLight 
-          ? 'bg-gradient-to-r from-amber-50 to-amber-100/30 border-amber-500/15 text-slate-800 shadow-sm' 
-          : 'bg-gradient-to-r from-slate-950 to-[#0c1e22] border-cyan-500/15 text-white'
+          ? 'bg-gradient-to-r from-blue-50 to-white border-blue-900/15 text-slate-800 shadow-sm' 
+          : 'bg-gradient-to-r from-[#0a192f] to-[#0d223f] border-blue-800/40 text-white'
       }`}>
         <div className={`absolute top-0 right-0 h-full w-48 bg-radial blur-xl pointer-events-none ${
-          isLight ? 'from-amber-500/5 to-transparent' : 'from-cyan-500/5 to-transparent'
+          isLight ? 'from-blue-900/5 to-transparent' : 'from-blue-600/10 to-transparent'
         }`} />
         
         <div className="flex items-center gap-4">
           <div className={`p-0.5 border rounded-2xl overflow-hidden shrink-0 ${
-            isLight ? 'bg-amber-50 border-amber-500/20 shadow-sm' : 'bg-cyan-950/50 border-cyan-500/20'
+            isLight ? 'bg-blue-50 border-blue-900/20 shadow-sm' : 'bg-blue-950/60 border-blue-700/40'
           }`}>
             {avatar ? (
               <img src={avatar} className="w-16 h-16 object-cover rounded-xl" referrerPolicy="no-referrer" alt={user.name} />
             ) : (
-              <div className={`p-4 ${isLight ? 'text-amber-700' : 'text-cyan-400'}`}>
+              <div className={`p-4 ${isLight ? 'text-blue-950' : 'text-sky-400'}`}>
                 <User className="w-8 h-8" />
               </div>
             )}
           </div>
           <div className="space-y-0.5">
-            <span className={`text-[9px] font-mono tracking-widest uppercase font-bold ${isLight ? 'text-amber-800' : 'text-[#22d3ee]'}`}>Student Dashboard Portal</span>
+            <span className={`text-[9px] font-mono tracking-widest uppercase font-bold ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Student Dashboard Portal</span>
             <h1 className={`text-xl font-black tracking-wide uppercase ${isLight ? 'text-slate-900' : 'text-white'}`}>{user.name}</h1>
             <p className={`text-xs font-sans ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{user.email}</p>
           </div>
@@ -121,12 +146,12 @@ export default function StudentDashboard({
 
         {myGroup && (
           <div className={`p-3 rounded-xl max-w-xs font-mono text-xs border ${
-            isLight ? 'bg-amber-500/5 border-amber-500/20 text-slate-750' : 'bg-cyan-500/5 border-cyan-500/15 text-white'
+            isLight ? 'bg-blue-50/50 border-blue-900/20 text-slate-750' : 'bg-blue-950/40 border-blue-800/40 text-white'
           }`}>
-            <span className={`font-bold block ${isLight ? 'text-amber-800' : 'text-cyan-400/80'}`}>★ Member of {myGroup.name}</span>
+            <span className={`font-bold block ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>★ Member of {myGroup.name}</span>
             <span className={`block mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Project: "{myGroup.projectTitle}"</span>
             <span className={`block mt-1 ${isLight ? 'text-slate-850' : 'text-white'}`}>
-              Current Score: <strong className={isLight ? 'text-amber-750 font-extrabold' : 'text-cyan-400 font-extrabold'}>{myGroup.points} / 100 PTS</strong>
+              Current Score: <strong className={isLight ? 'text-blue-950 font-extrabold' : 'text-sky-400 font-extrabold'}>{myGroup.points} / 100 PTS</strong>
             </span>
           </div>
         )}
@@ -134,7 +159,7 @@ export default function StudentDashboard({
 
       {/* Selector Tabs */}
       <div className={`flex gap-1.5 border-b pb-0.5 font-mono text-2xs uppercase ${
-        isLight ? 'border-amber-500/15' : 'border-cyan-500/10'
+        isLight ? 'border-blue-900/15' : 'border-blue-900/30'
       }`}>
         {(['overview', 'syllabus'] as const).map(tab => (
           <button
@@ -142,7 +167,7 @@ export default function StudentDashboard({
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2.5 rounded-t-xl transition-all border-t border-x cursor-pointer ${
               activeTab === tab
-                ? (isLight ? 'bg-white border-amber-500/25 text-amber-800 font-bold' : 'bg-[#050505]/70 border-cyan-500/15 text-[#22d3ee] font-bold')
+                ? (isLight ? 'bg-white border-blue-900/25 text-blue-950 font-bold' : 'bg-[#0a192f] border-blue-700/50 text-sky-300 font-bold')
                 : (isLight ? 'border-transparent text-slate-500 hover:text-slate-800' : 'border-transparent text-slate-400 hover:text-white')
             }`}
           >
@@ -166,15 +191,15 @@ export default function StudentDashboard({
               {/* LEFT COLUMN: Profile custom config */}
               <div className="md:col-span-1 space-y-6">
                 <div className={`border rounded-2xl p-5 space-y-4 transition-all duration-300 ${
-                  isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#050505]/75 border-cyan-500/10'
+                  isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#0a192f]/75 border-blue-800/40'
                 }`}>
                   <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 ${
-                    isLight ? 'text-amber-800 border-slate-100' : 'text-cyan-400 border-cyan-500/5'
+                    isLight ? 'text-blue-950 border-slate-100' : 'text-sky-300 border-blue-900/30'
                   }`}>
                     My Student Profile Info
                   </h3>
 
-              {isSaved && <div className={`text-3xs font-bold text-center font-mono ${isLight ? 'text-amber-700' : 'text-cyan-400'}`}>✓ Profile saved successfully!</div>}
+              {isSaved && <div className={`text-3xs font-bold text-center font-mono ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>✓ Profile saved successfully!</div>}
               {errorMsg && <BeautifulErrorDisplay errorText={errorMsg} isLight={isLight} />}
 
               <form onSubmit={handleUpdateProfile} className="space-y-3">
@@ -182,11 +207,17 @@ export default function StudentDashboard({
                 <div className="space-y-2">
                   <label className="block text-[9px] font-mono text-slate-500 uppercase">Profile Picture</label>
                   <div className="flex items-center gap-3">
-                    {avatar ? (
-                      <img src={avatar} className={`w-12 h-12 rounded-xl object-cover border ${isLight ? 'border-amber-500/20' : 'border-cyan-500/20'}`} referrerPolicy="no-referrer" />
+                    {isUploadingAvatar ? (
+                      <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-4xs animate-pulse ${
+                        isLight ? 'bg-blue-50 border-blue-900/25 text-blue-950' : 'bg-blue-950/40 border-blue-800/40 text-sky-300'
+                      }`}>
+                        LOADING...
+                      </div>
+                    ) : avatar ? (
+                      <img src={avatar} className={`w-12 h-12 rounded-xl object-cover border ${isLight ? 'border-blue-900/20' : 'border-blue-700/40'}`} referrerPolicy="no-referrer" />
                     ) : (
                       <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono text-4xs ${
-                        isLight ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-cyan-950/40 border-cyan-500/10 text-slate-500'
+                        isLight ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-blue-950/40 border-blue-900/20 text-slate-500'
                       }`}>
                         NO PHOTO
                       </div>
@@ -196,10 +227,11 @@ export default function StudentDashboard({
                         type="file" 
                         accept="image/*" 
                         onChange={handleAvatarChange}
-                        className={`block w-full text-4xs cursor-pointer file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-4xs file:font-semibold ${
+                        disabled={isUploadingAvatar}
+                        className={`block w-full text-4xs cursor-pointer file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-4xs file:font-semibold disabled:opacity-50 ${
                           isLight 
-                            ? 'text-slate-500 file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200' 
-                            : 'text-slate-400 file:bg-cyan-950 file:text-cyan-400 hover:file:bg-cyan-900'
+                            ? 'text-slate-500 file:bg-blue-50 file:text-blue-950 hover:file:bg-blue-100' 
+                            : 'text-slate-400 file:bg-blue-950 file:text-sky-300 hover:file:bg-blue-900'
                         }`}
                       />
                     </div>
@@ -216,8 +248,8 @@ export default function StudentDashboard({
                     placeholder="Enter Full Name"
                     className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 ${
                       isLight 
-                        ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500 focus:ring-amber-500/15' 
-                        : 'bg-[#111]/80 border border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-450 focus:ring-cyan-500/15'
+                        ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-950 focus:ring-blue-950/15' 
+                        : 'bg-[#071326] border border-blue-900/40 text-white placeholder-slate-500 focus:border-sky-400 focus:ring-sky-400/20'
                     }`}
                   />
                 </div>
@@ -234,8 +266,8 @@ export default function StudentDashboard({
                     placeholder="10-digit mobile number"
                     className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 ${
                       isLight 
-                        ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500 focus:ring-amber-500/15' 
-                        : 'bg-[#111]/80 border border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-450 focus:ring-cyan-500/15'
+                        ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-950 focus:ring-blue-950/15' 
+                        : 'bg-[#071326] border border-blue-900/40 text-white placeholder-slate-500 focus:border-sky-400 focus:ring-sky-400/20'
                     }`}
                   />
                 </div>
@@ -249,8 +281,8 @@ export default function StudentDashboard({
                     placeholder="Enter School/College Name"
                     className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 ${
                       isLight 
-                        ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500 focus:ring-amber-500/15' 
-                        : 'bg-[#111]/80 border border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-450 focus:ring-cyan-500/15'
+                        ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-950 focus:ring-blue-950/15' 
+                        : 'bg-[#071326] border border-blue-900/40 text-white placeholder-slate-500 focus:border-sky-400 focus:ring-sky-400/20'
                     }`}
                   />
                 </div>
@@ -264,8 +296,8 @@ export default function StudentDashboard({
                     placeholder="e.g. Class 10 or CSE"
                     className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 ${
                       isLight 
-                        ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500 focus:ring-amber-500/15' 
-                        : 'bg-[#111]/80 border border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-450 focus:ring-cyan-500/15'
+                        ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-950 focus:ring-blue-950/15' 
+                        : 'bg-[#071326] border border-blue-900/40 text-white placeholder-slate-500 focus:border-sky-400 focus:ring-sky-400/20'
                     }`}
                   />
                 </div>
@@ -274,8 +306,8 @@ export default function StudentDashboard({
                   type="submit"
                   className={`w-full text-xs py-2.5 rounded-xl transition-all cursor-pointer font-bold border ${
                     isLight 
-                      ? 'bg-amber-600 border-amber-600 hover:bg-amber-700 text-white shadow-sm active:scale-98' 
-                      : 'bg-[#0f2a2e]/60 border border-cyan-500/25 hover:border-cyan-450 text-cyan-400 hover:bg-cyan-500/10'
+                      ? 'bg-blue-950 border-blue-900 hover:bg-blue-900 text-white shadow-sm active:scale-98' 
+                      : 'bg-white border-white hover:bg-slate-100 text-[#0a192f] font-black'
                   }`}
                 >
                   Save Profile Parameters
@@ -289,10 +321,10 @@ export default function StudentDashboard({
             
             {/* Applications list */}
             <div className={`border rounded-2xl p-5 space-y-4 transition-all duration-300 ${
-              isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#050505]/70 border-cyan-500/10'
+              isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#0a192f]/70 border-blue-800/40'
             }`}>
               <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 ${
-                isLight ? 'text-amber-800 border-slate-100' : 'text-[#22d3ee] border-cyan-500/5'
+                isLight ? 'text-blue-950 border-slate-100' : 'text-sky-300 border-blue-900/30'
               }`}>
                 Training Course Applications
               </h3>
@@ -307,8 +339,8 @@ export default function StudentDashboard({
                         key={app.id}
                         className={`flex items-center justify-between p-3.5 rounded-xl border relative transition-all ${
                           isLight 
-                            ? 'bg-slate-50/50 border-slate-100 hover:border-amber-500/20' 
-                            : 'bg-[#111]/40 border-slate-500/5 hover:border-cyan-500/15'
+                            ? 'bg-slate-50/50 border-slate-100 hover:border-blue-900/20' 
+                            : 'bg-[#071326]/60 border-blue-900/30 hover:border-blue-700/40'
                         }`}
                       >
                         <div className="text-left font-sans space-y-0.5">
@@ -323,7 +355,7 @@ export default function StudentDashboard({
                             <span className={`flex items-center gap-1 uppercase tracking-widest text-[10px] font-bold border px-2 py-0.5 rounded-full ${
                               isLight 
                                 ? 'text-emerald-700 border-emerald-500/20 bg-emerald-500/5' 
-                                : 'text-cyan-400 border border-cyan-500/10 bg-cyan-500/5'
+                                : 'text-emerald-400 border border-emerald-500/20 bg-emerald-950/30'
                             }`}>
                               <CheckCircle2 className="w-3.5 h-3.5" /> Approved
                             </span>
@@ -332,7 +364,11 @@ export default function StudentDashboard({
                               Declined
                             </span>
                           ) : (
-                            <span className="text-amber-500 flex items-center gap-1 uppercase tracking-widest text-[10px] font-bold border border-amber-500/10 bg-amber-500/5 px-2 py-0.5 rounded-full">
+                            <span className={`flex items-center gap-1 uppercase tracking-widest text-[10px] font-bold border px-2 py-0.5 rounded-full ${
+                              isLight 
+                                ? 'text-amber-800 border-amber-500/20 bg-amber-500/5' 
+                                : 'text-amber-400 border-amber-500/20 bg-amber-950/30'
+                            }`}>
                               <Clock className="w-3.5 h-3.5" /> Pending Verification
                             </span>
                           )}
@@ -350,12 +386,12 @@ export default function StudentDashboard({
 
             {/* Secure verify/awards link */}
             <div className={`border rounded-2xl p-5 space-y-4 transition-all duration-300 ${
-              isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#050505]/70 border-cyan-500/10'
+              isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#0a192f]/70 border-blue-800/40'
             }`}>
               <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 flex items-center gap-2 ${
-                isLight ? 'text-amber-800 border-slate-100' : 'text-[#22d3ee] border-cyan-500/5'
+                isLight ? 'text-blue-950 border-slate-100' : 'text-sky-300 border-blue-900/30'
               }`}>
-                <Award className={`w-4 h-4 ${isLight ? 'text-amber-700' : 'text-cyan-400'}`} /> My Issued Certificates
+                <Award className={`w-4 h-4 ${isLight ? 'text-blue-950' : 'text-sky-400'}`} /> My Issued Certificates
               </h3>
 
               {myCertificates.length > 0 ? (
@@ -365,24 +401,36 @@ export default function StudentDashboard({
                       key={cert.id}
                       className={`p-4 rounded-xl border flex flex-col justify-between space-y-3 ${
                         isLight 
-                          ? 'bg-gradient-to-br from-amber-50 to-white border-amber-500/15' 
-                          : 'bg-gradient-to-br from-[#0a1a1f] to-black border-cyan-500/20'
+                          ? 'bg-gradient-to-br from-blue-50/50 to-white border-blue-900/15' 
+                          : 'bg-gradient-to-br from-[#0c1e3a] to-[#0a192f] border-blue-800/40'
                       }`}
                     >
                       <div>
-                        <span className={`text-[9px] font-mono block font-bold ${isLight ? 'text-amber-800' : 'text-cyan-400'}`}>CODE: {cert.id}</span>
+                        <span className={`text-[9px] font-mono block font-bold ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>CODE: {cert.id}</span>
                         <h4 className={`text-xs font-bold tracking-wide mt-1 ${isLight ? 'text-slate-800' : 'text-white'}`}>{cert.courseTitle}</h4>
                         <p className={`text-[10px] font-sans mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Issuer: {cert.trainerName}</p>
                       </div>
 
                       <div className={`pt-2 border-t flex justify-between items-center text-xs font-mono ${
-                        isLight ? 'border-amber-500/10' : 'border-cyan-500/5'
+                        isLight ? 'border-blue-900/10' : 'border-blue-900/30'
                       }`}>
                         <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{cert.issueDate}</span>
-                        <span className={`text-3xs font-bold font-sans animate-pulse ${isLight ? 'text-amber-700' : 'text-cyan-400'}`}>
-                          Ready in Verifications
+                        <span className={`text-3xs font-bold font-sans ${isLight ? 'text-blue-950' : 'text-sky-400'}`}>
+                          Verified Document
                         </span>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setViewCert(cert)}
+                        className={`w-full text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          isLight 
+                            ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-xs' 
+                            : 'bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black shadow-md'
+                        }`}
+                      >
+                        <Eye className="w-3.5 h-3.5" /> View Official Certificate
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -401,6 +449,25 @@ export default function StudentDashboard({
       )}
         </motion.div>
       </AnimatePresence>
+
+      {/* Official Certificate Modal for Students */}
+      {viewCert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+          <div 
+            onClick={() => setViewCert(null)}
+            className="fixed inset-0 bg-black/85 backdrop-blur-md cursor-pointer"
+          />
+
+          <div className="bg-[#050b14] border border-amber-500/30 rounded-3xl max-w-5xl w-full relative z-10 p-4 md:p-7 space-y-4 text-center max-h-[96vh] overflow-y-auto shadow-[0_0_60px_rgba(0,0,0,0.8)]">
+            <OfficialCertificate 
+              certificate={viewCert}
+              onClose={() => setViewCert(null)}
+              showControls={true}
+              theme={theme}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );
