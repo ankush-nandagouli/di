@@ -1,5 +1,18 @@
 {
+  "version": 2,
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/feedback-form/(.*)",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/feedback/(.*)",
+      "destination": "/index.html"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"

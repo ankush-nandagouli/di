@@ -81,3 +81,118 @@ export async function deleteVideoBlob(key: string): Promise<void> {
     console.warn('Failed to delete video from IndexedDB:', err);
   }
 }
+
+// Active in-memory Object URL cache to avoid redundant createObjectURL calls
+let cachedObjectUrl: string | null = null;
+let cachedSourceUrl: string | null = null;
+
+/**
+ * Cache an external or uploaded video URL into IndexedDB for instant, smooth playback
+ * Returns an Object URL for local cached playback, or the original URL if caching fails
+ */
+export async function cacheVideoFromUrl(
+  url: string, 
+  key = 'page_loader_video'
+): Promise<string> {
+  if (!url || url.trim() === '') return '';
+
+  const cleanUrl = url.trim();
+
+  // If already an object URL or data URL, return directly
+  if (cleanUrl.startsWith('blob:') || cleanUrl.startsWith('data:')) {
+    return cleanUrl;
+  }
+
+  // Check if our active in-memory object URL matches
+  if (cachedObjectUrl && cachedSourceUrl === cleanUrl) {
+    return cachedObjectUrl;
+  }
+
+  try {
+    // Check if we already cached this specific source URL in IndexedDB
+    const lastCachedUrl = localStorage.getItem(`dakshyam_cached_vid_${key}`);
+    if (lastCachedUrl === cleanUrl) {
+      const existingBlob = await getVideoBlob(key);
+      if (existingBlob && existingBlob.size > 0) {
+        if (cachedObjectUrl) {
+          try { URL.revokeObjectURL(cachedObjectUrl); } catch {}
+        }
+        cachedObjectUrl = URL.createObjectURL(existingBlob);
+        cachedSourceUrl = cleanUrl;
+        return cachedObjectUrl;
+      }
+    }
+
+    // Otherwise fetch the remote video stream and cache as blob
+    const response = await fetch(cleanUrl, { mode: 'cors' });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} when fetching video for cache`);
+    }
+
+    const blob = await response.blob();
+    if (blob.size > 0) {
+      await storeVideoBlob(key, blob);
+      localStorage.setItem(`dakshyam_cached_vid_${key}`, cleanUrl);
+
+      if (cachedObjectUrl) {
+        try { URL.revokeObjectURL(cachedObjectUrl); } catch {}
+      }
+      cachedObjectUrl = URL.createObjectURL(blob);
+      cachedSourceUrl = cleanUrl;
+      return cachedObjectUrl;
+    }
+  } catch (err) {
+    console.warn('Could not cache video blob (falling back to direct streaming URL):', err);
+  }
+
+  return cleanUrl;
+}
+
+/**
+ * Quickly retrieve existing cached Object URL if available
+ */
+export async function getCachedVideoObjectUrl(
+  key = 'page_loader_video',
+  expectedUrl?: string
+): Promise<string | null> {
+  try {
+    const lastCachedUrl = localStorage.getItem(`dakshyam_cached_vid_${key}`);
+    if (expectedUrl && lastCachedUrl !== expectedUrl) {
+      return null;
+    }
+
+    if (cachedObjectUrl && (!expectedUrl || cachedSourceUrl === expectedUrl)) {
+      return cachedObjectUrl;
+    }
+
+    const blob = await getVideoBlob(key);
+    if (blob && blob.size > 0) {
+      if (cachedObjectUrl) {
+        try { URL.revokeObjectURL(cachedObjectUrl); } catch {}
+      }
+      cachedObjectUrl = URL.createObjectURL(blob);
+      cachedSourceUrl = lastCachedUrl || expectedUrl || null;
+      return cachedObjectUrl;
+    }
+  } catch (err) {
+    console.warn('Error reading cached video blob URL:', err);
+  }
+  return null;
+}
+
+/**
+ * Clear cached video and revoke active blob URL
+ */
+export async function clearVideoCache(key = 'page_loader_video'): Promise<void> {
+  if (cachedObjectUrl) {
+    try { URL.revokeObjectURL(cachedObjectUrl); } catch {}
+    cachedObjectUrl = null;
+    cachedSourceUrl = null;
+  }
+  try {
+    localStorage.removeItem(`dakshyam_cached_vid_${key}`);
+    await deleteVideoBlob(key);
+  } catch (err) {
+    console.warn('Error clearing video cache:', err);
+  }
+}

@@ -4,7 +4,7 @@ import {
   Plus, Trash, BookOpen, Layers, Users, Calendar, 
   Settings, CheckCircle, HelpCircle, Activity, Award, Check, 
   ShieldCheck, Sparkles, Image as ImageIcon, ToggleLeft, ToggleRight, X,
-  Download, FileSpreadsheet, Printer, RotateCcw, Eye
+  Download, FileSpreadsheet, Printer, RotateCcw, Eye, RefreshCw
 } from 'lucide-react';
 import { Course, CourseApplication, StudentGroup, StudentUser, TrainerUser, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, Certificate, CompanyAbout } from '../types';
 import { DakshyamDatabase } from '../utils/db';
@@ -46,8 +46,39 @@ export default function AdminDashboard({
   const [searchLog, setSearchLog] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'ERROR' | 'INFO'>('ALL');
 
-  // DB connection advice helper
+  // DB connection advice helper & live diagnostic tester
   const [showDbAdvice, setShowDbAdvice] = useState(false);
+  const [testingDb, setTestingDb] = useState(false);
+  const [dbTestResult, setDbTestResult] = useState<{
+    success?: boolean;
+    message?: string;
+    error?: string;
+    advice?: string;
+    latencyMs?: number;
+    hasUri?: boolean;
+    database?: string;
+  } | null>(null);
+
+  const handleTestDatabase = async () => {
+    setTestingDb(true);
+    setDbTestResult(null);
+    try {
+      const res = await fetch('/api/test-db');
+      const data = await res.json();
+      setDbTestResult(data);
+      if (data.success && onRefresh) {
+        onRefresh();
+      }
+    } catch (e: any) {
+      setDbTestResult({
+        success: false,
+        error: e.message || 'Failed to reach /api/test-db',
+        advice: 'Ensure that your Vercel deployment has rewrites configured so /api/* routes to the serverless function.'
+      });
+    } finally {
+      setTestingDb(false);
+    }
+  };
 
   // --- NEW COURSE STATE FORM ---
   const [courseTitle, setCourseTitle] = useState('');
@@ -886,38 +917,103 @@ export default function AdminDashboard({
 
       {/* Database connection details banner if in fallback mode and clicked */}
       <AnimatePresence>
-        {!isDbConnected && showDbAdvice && (
+        {(!isDbConnected || showDbAdvice) && showDbAdvice && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className={`border p-4 rounded-xl text-xs space-y-2 relative overflow-hidden transition-all ${
+            className={`border p-5 rounded-2xl text-xs space-y-3 relative overflow-hidden transition-all shadow-xl ${
               isLight 
-                ? 'bg-amber-50/50 border-amber-200 text-slate-800' 
-                : 'bg-amber-950/10 border-amber-500/10 text-slate-300'
+                ? 'bg-amber-50/80 border-amber-300 text-slate-800' 
+                : 'bg-[#101b2b] border-amber-500/30 text-slate-200'
             }`}
           >
             <button 
               onClick={() => setShowDbAdvice(false)}
-              className="absolute top-3 right-3 text-slate-400 hover:text-white cursor-pointer"
+              className="absolute top-3 right-3 text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-black/20"
             >
               <X className="w-4 h-4" />
             </button>
-            <div className="flex items-center gap-2 font-bold font-mono text-[#f59e0b] text-3xs uppercase tracking-wider">
-              <Activity className="w-4 h-4" /> Connection Status: Local Failsafe Fallback Active
+
+            <div className="flex items-center justify-between gap-3 flex-wrap pr-8">
+              <div className="flex items-center gap-2 font-bold font-mono text-[#f59e0b] text-xs uppercase tracking-wider">
+                <Activity className="w-4 h-4" /> 
+                <span>MongoDB Atlas Connectivity Center</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                  isDbConnected ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                }`}>
+                  {isDbConnected ? 'Live Connected' : 'Failsafe Fallback Active'}
+                </span>
+              </div>
+
+              {/* Action test button */}
+              <button
+                type="button"
+                onClick={handleTestDatabase}
+                disabled={testingDb}
+                className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono text-2xs font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shadow"
+              >
+                <RefreshCw className={`w-3 h-3 ${testingDb ? 'animate-spin' : ''}`} />
+                <span>{testingDb ? 'Testing Connection...' : 'Ping Atlas Cluster'}</span>
+              </button>
             </div>
-            <p className="font-sans leading-relaxed">
-              The application is fully operational and automatically persists data in a resilient local fallback server store, ensuring no interruption to your session!
-            </p>
-            <p className="font-sans leading-relaxed">
-              To connect this container to your cloud MongoDB Database:
-            </p>
-            <ol className="list-decimal list-inside space-y-1 font-mono text-[10px] pl-1 text-slate-400">
-              <li>Open <span className="text-[#22d3ee]">MongoDB Atlas</span> dashboard</li>
-              <li>Go to <span className="text-white font-bold">Network Access</span> -&gt; <span className="text-white font-bold">Add IP Address</span></li>
-              <li>Enter <span className="text-amber-300 font-bold">0.0.0.0/0</span> (Allow Access From Anywhere)</li>
-              <li>Save changes, then perform any editing task to automatically trigger a reconnect!</li>
-            </ol>
+
+            {/* Test result box if run */}
+            {dbTestResult && (
+              <div className={`p-3 rounded-xl border font-mono text-2xs space-y-1 ${
+                dbTestResult.success 
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+                  : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+              }`}>
+                <div className="flex items-center gap-2 font-bold text-xs">
+                  <span>{dbTestResult.success ? '✓ Atlas Ping Successful!' : '✕ Connection Diagnostic Notice'}</span>
+                  {dbTestResult.latencyMs && (
+                    <span className="px-2 py-0.5 rounded bg-black/40 text-emerald-400">
+                      {dbTestResult.latencyMs}ms latency
+                    </span>
+                  )}
+                </div>
+                {dbTestResult.message && <p>{dbTestResult.message}</p>}
+                {dbTestResult.error && <p className="text-rose-400"><strong>Error:</strong> {dbTestResult.error}</p>}
+                {dbTestResult.advice && (
+                  <p className="text-amber-200 mt-1">
+                    <strong>Resolution Step:</strong> {dbTestResult.advice}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              <div className={`p-3 rounded-xl border ${isLight ? 'bg-white border-amber-200' : 'bg-black/30 border-slate-700/60'}`}>
+                <strong className="text-sky-400 font-mono uppercase text-2xs block mb-1">
+                  1. MongoDB Atlas Network Access (Mandatory)
+                </strong>
+                <p className="text-[11px] leading-relaxed text-slate-300">
+                  Because Vercel serverless functions dynamically deploy on different IP ranges, MongoDB Atlas will reject connections unless access is open:
+                </p>
+                <ol className="list-decimal list-inside space-y-0.5 font-mono text-[10px] mt-1 text-slate-400">
+                  <li>In Atlas, navigate to <span className="text-white font-bold">Network Access</span></li>
+                  <li>Click <span className="text-white font-bold">Add IP Address</span></li>
+                  <li>Choose <span className="text-amber-300 font-bold">Allow Access from Anywhere (0.0.0.0/0)</span></li>
+                  <li>Click <span className="text-white font-bold">Confirm</span></li>
+                </ol>
+              </div>
+
+              <div className={`p-3 rounded-xl border ${isLight ? 'bg-white border-amber-200' : 'bg-black/30 border-slate-700/60'}`}>
+                <strong className="text-sky-400 font-mono uppercase text-2xs block mb-1">
+                  2. Vercel Environment Variables (Mandatory)
+                </strong>
+                <p className="text-[11px] leading-relaxed text-slate-300">
+                  Add your Atlas connection string to Vercel so the serverless API routes connect directly:
+                </p>
+                <ol className="list-decimal list-inside space-y-0.5 font-mono text-[10px] mt-1 text-slate-400">
+                  <li>In Vercel Dashboard, go to your project -&gt; <span className="text-white font-bold">Settings</span> -&gt; <span className="text-white font-bold">Environment Variables</span></li>
+                  <li>Key: <span className="text-sky-300 font-bold">MONGODB_URI</span></li>
+                  <li>Value: <span className="text-amber-300 font-bold">mongodb+srv://...</span> (ensure special characters in password like @ are URL-encoded)</li>
+                  <li>Click <span className="text-white font-bold">Redeploy</span></li>
+                </ol>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

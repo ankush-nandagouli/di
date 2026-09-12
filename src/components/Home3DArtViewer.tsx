@@ -11,7 +11,8 @@ import {
 import DakshyamLogo from './DakshyamLogo';
 import Admin3DModelEditorModal from './Admin3DModelEditorModal';
 import { 
-  loadObjModel, StoredModelMetadata, ModelDisplaySettings, DEFAULT_MODEL_SETTINGS 
+  loadObjModel, fetchAndCacheCloud3DModel, subscribeToCloud3DModel,
+  StoredModelMetadata, ModelDisplaySettings, DEFAULT_MODEL_SETTINGS 
 } from '../utils/modelStorage';
 
 interface Home3DArtViewerProps {
@@ -52,31 +53,47 @@ export default function Home3DArtViewer({
   const rootGroupRef = useRef<THREE.Group | null>(null);
   const animationFrameIdRef = useRef<number | null>(null);
 
-  // 1. Fetch Model and Settings from IndexedDB
+  // 1. Fetch Model and Settings from Local Cache and Firestore Cloud
+  const applyModelData = useCallback((stored: { objText: string | ArrayBuffer; meta: StoredModelMetadata } | null) => {
+    if (stored && stored.objText && stored.meta) {
+      setModelData(stored.objText);
+      setMetadata(stored.meta);
+      setHasCustomModel(true);
+
+      const loadedSettings: ModelDisplaySettings = {
+        ...DEFAULT_MODEL_SETTINGS,
+        ...(stored.meta.settings || {}),
+        materialColor: stored.meta.settings?.materialColor || stored.meta.materialColor || DEFAULT_MODEL_SETTINGS.materialColor,
+        wireframe: stored.meta.settings?.wireframe ?? stored.meta.wireframe ?? DEFAULT_MODEL_SETTINGS.wireframe,
+        autoRotate: stored.meta.settings?.autoRotate ?? stored.meta.autoRotate ?? DEFAULT_MODEL_SETTINGS.autoRotate
+      };
+
+      setSettings(loadedSettings);
+      setIsRotatingLocally(loadedSettings.autoRotate);
+      setIsWireframeLocally(loadedSettings.wireframe);
+    } else {
+      setHasCustomModel(false);
+      setModelData(null);
+      setMetadata(null);
+    }
+  }, []);
+
   const fetchModel = useCallback(async () => {
     setIsLoading(true);
     try {
-      const stored = await loadObjModel(STORAGE_KEY);
-      if (stored && stored.objText && stored.meta) {
-        setModelData(stored.objText);
-        setMetadata(stored.meta);
-        setHasCustomModel(true);
+      // Step A: Load immediate local IndexedDB cache for instant display
+      const local = await loadObjModel(STORAGE_KEY);
+      if (local && local.objText && local.meta) {
+        applyModelData(local);
+        setIsLoading(false);
+      }
 
-        const loadedSettings: ModelDisplaySettings = {
-          ...DEFAULT_MODEL_SETTINGS,
-          ...(stored.meta.settings || {}),
-          materialColor: stored.meta.settings?.materialColor || stored.meta.materialColor || DEFAULT_MODEL_SETTINGS.materialColor,
-          wireframe: stored.meta.settings?.wireframe ?? stored.meta.wireframe ?? DEFAULT_MODEL_SETTINGS.wireframe,
-          autoRotate: stored.meta.settings?.autoRotate ?? stored.meta.autoRotate ?? DEFAULT_MODEL_SETTINGS.autoRotate
-        };
-
-        setSettings(loadedSettings);
-        setIsRotatingLocally(loadedSettings.autoRotate);
-        setIsWireframeLocally(loadedSettings.wireframe);
-      } else {
+      // Step B: Synchronize with Cloud Firestore so new visitors get the admin's model & cache it
+      const cloudModel = await fetchAndCacheCloud3DModel(STORAGE_KEY);
+      if (cloudModel) {
+        applyModelData(cloudModel);
+      } else if (!local) {
         setHasCustomModel(false);
-        setModelData(null);
-        setMetadata(null);
       }
     } catch (err) {
       console.warn('Could not load custom 3D model:', err);
@@ -84,11 +101,20 @@ export default function Home3DArtViewer({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [applyModelData]);
 
+  // Initial load and manual refresh
   useEffect(() => {
     fetchModel();
   }, [fetchModel, refreshTrigger]);
+
+  // Real-time listener for any admin updates or deletions
+  useEffect(() => {
+    const unsubscribe = subscribeToCloud3DModel((updated) => {
+      applyModelData(updated);
+    }, STORAGE_KEY);
+    return () => unsubscribe();
+  }, [applyModelData]);
 
   // 2. Initialize Three.js Scene and Render Normalized Model
   useEffect(() => {

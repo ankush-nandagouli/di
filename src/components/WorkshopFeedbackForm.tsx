@@ -17,6 +17,8 @@ interface WorkshopFeedbackFormProps {
   theme?: 'light' | 'dark';
   onNavigateHome: () => void;
   preselectedWorkshopId?: string | null;
+  isPreviewMode?: boolean;
+  onClosePreview?: () => void;
 }
 
 const COMMON_INTEREST_TAGS = [
@@ -33,7 +35,9 @@ const COMMON_INTEREST_TAGS = [
 export default function WorkshopFeedbackForm({ 
   theme = 'dark', 
   onNavigateHome,
-  preselectedWorkshopId 
+  preselectedWorkshopId,
+  isPreviewMode = false,
+  onClosePreview
 }: WorkshopFeedbackFormProps) {
   const isLight = theme === 'light';
 
@@ -149,6 +153,17 @@ export default function WorkshopFeedbackForm({
     if (urlCat && ['student', 'school', 'college', 'other'].includes(urlCat)) {
       setParticipantCategory(urlCat);
     }
+
+    // 2. Fetch fresh config from Firestore in the background
+    WorkshopFeedbackStorage.fetchFeedbackConfigFromFirestore().then((remoteConfig) => {
+      if (remoteConfig && remoteConfig.workshops && remoteConfig.workshops.length > 0) {
+        setConfig(prev => ({
+          ...prev,
+          ...remoteConfig,
+          workshops: remoteConfig.workshops
+        }));
+      }
+    }).catch(() => {});
   }, [preselectedWorkshopId]);
 
   const activeWorkshop = config.workshops.find(w => w.id === selectedWorkshopId) || config.workshops[0];
@@ -221,6 +236,16 @@ export default function WorkshopFeedbackForm({
     if (!validateForm()) {
       // Scroll to first error
       window.scrollTo({ top: 180, behavior: 'smooth' });
+      return;
+    }
+
+    if (isPreviewMode) {
+      setIsSubmitting(true);
+      setTimeout(() => {
+        setSubmittedResult({ id: `PREVIEW-SIM-${Math.floor(1000 + Math.random() * 9000)}` });
+        setIsSubmitting(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 400);
       return;
     }
 
@@ -384,6 +409,13 @@ export default function WorkshopFeedbackForm({
             </div>
           </div>
 
+          {isPreviewMode && (
+            <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono text-center flex items-center justify-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span><strong>Form Preview Mode Active:</strong> This was a simulated test submission. No actual participant data was stored in MongoDB.</span>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
               onClick={() => {
@@ -400,17 +432,26 @@ export default function WorkshopFeedbackForm({
                 isLight ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
               }`}
             >
-              Submit Another Response
+              {isPreviewMode ? 'Test Fill Form Again' : 'Submit Another Response'}
             </button>
 
-            <button
-              onClick={onNavigateHome}
-              className={`w-full sm:w-auto px-6 py-3 rounded-xl font-mono text-xs font-bold uppercase transition-all cursor-pointer ${
-                isLight ? 'bg-blue-950 hover:bg-blue-900 text-white' : 'bg-sky-400 hover:bg-sky-300 text-slate-950 font-black'
-              }`}
-            >
-              Back to Main Portal →
-            </button>
+            {isPreviewMode && onClosePreview ? (
+              <button
+                onClick={onClosePreview}
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono text-xs font-bold uppercase transition-all cursor-pointer shadow-lg"
+              >
+                Close Preview
+              </button>
+            ) : (
+              <button
+                onClick={onNavigateHome}
+                className={`w-full sm:w-auto px-6 py-3 rounded-xl font-mono text-xs font-bold uppercase transition-all cursor-pointer ${
+                  isLight ? 'bg-blue-950 hover:bg-blue-900 text-white' : 'bg-sky-400 hover:bg-sky-300 text-slate-950 font-black'
+                }`}
+              >
+                Back to Main Portal →
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -447,6 +488,26 @@ export default function WorkshopFeedbackForm({
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-8 animate-fadeIn">
       
+      {/* PREVIEW MODE FLOATING BANNER */}
+      {isPreviewMode && (
+        <div className="p-3.5 px-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-between gap-3 text-xs font-mono shadow-lg backdrop-blur-md">
+          <div className="flex items-center gap-2.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0" />
+            <span>
+              <strong>Workshop Form Preview Active:</strong> Inspecting attendee layout & input flows. Submissions are simulated safely.
+            </span>
+          </div>
+          {onClosePreview && (
+            <button
+              onClick={onClosePreview}
+              className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-2xs uppercase font-bold shrink-0 cursor-pointer transition-all shadow"
+            >
+              Exit Preview
+            </button>
+          )}
+        </div>
+      )}
+
       {/* TOP BRANDING & WORKSHOP HEADER */}
       <div className={`p-6 sm:p-8 rounded-3xl border shadow-xl relative overflow-hidden backdrop-blur-xl transition-all ${
         isLight 

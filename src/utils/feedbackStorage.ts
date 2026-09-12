@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { collection, doc, getDocs, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { WorkshopFeedbackSubmission, WorkshopFeedbackConfig, WorkshopItem } from '../types';
 import { DakshyamDatabase } from './db';
 import * as XLSX from 'xlsx';
@@ -24,7 +24,7 @@ export const getWorkshopShareUrl = (ws?: WorkshopItem | string | null, useVercel
   }
   const slug = typeof ws === 'string' 
     ? toWorkshopSlug(ws) 
-    : (toWorkshopSlug(ws.id) || toWorkshopSlug(ws.name));
+    : (toWorkshopSlug(ws.name) || toWorkshopSlug(ws.id));
   return `${base}/feedback-form/${slug}`;
 };
 
@@ -230,6 +230,23 @@ export class WorkshopFeedbackStorage {
       console.warn('Config local read warning:', e);
     }
     return DEFAULT_FEEDBACK_CONFIG;
+  }
+
+  static async fetchFeedbackConfigFromFirestore(): Promise<WorkshopFeedbackConfig> {
+    try {
+      const docRef = doc(db, 'workshop_feedback_configs', 'global-config');
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data() as WorkshopFeedbackConfig;
+        if (data && data.formTitle) {
+          localStorage.setItem(LOCAL_STORAGE_CONFIG_KEY, JSON.stringify(data));
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch feedback config from Firestore:', e);
+    }
+    return this.getFeedbackConfig();
   }
 
   static async saveFeedbackConfig(config: WorkshopFeedbackConfig): Promise<boolean> {

@@ -6,7 +6,9 @@ import {
 import { PageLoaderConfig } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import { uploadMediaToCloudinary } from '../utils/mediaUpload';
-import { storeVideoBlob, deleteVideoBlob } from '../utils/videoStorage';
+import { storeVideoBlob, deleteVideoBlob, cacheVideoFromUrl } from '../utils/videoStorage';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../utils/firebase';
 
 interface PageLoaderSettingsTabProps {
   theme?: 'light' | 'dark';
@@ -62,6 +64,16 @@ export default function PageLoaderSettingsTab({
   const handleSaveConfig = (updated: PageLoaderConfig) => {
     setConfig(updated);
     DakshyamDatabase.savePageLoaderConfig(updated);
+    // Persist to Firestore settings collection so all visitors receive it globally
+    try {
+      const docRef = doc(db, 'settings', 'page_loader_config');
+      setDoc(docRef, { ...updated, value: updated, updatedAt: new Date().toISOString() }, { merge: true }).catch((err) => {
+        console.warn('Firestore page loader update warning:', err);
+      });
+    } catch (err) {
+      console.warn('Could not sync page loader to Firestore:', err);
+    }
+
     if (onConfigUpdated) {
       onConfigUpdated(updated);
     }
@@ -88,22 +100,22 @@ export default function PageLoaderSettingsTab({
     setUploadProgress(`Processing ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)...`);
 
     try {
-      // 1. Store locally in IndexedDB first so it always works even without cloud credentials!
+      // 1. Store locally in IndexedDB first so it always works with 0ms lag
       await storeVideoBlob('page_loader_video', file);
       const localBlobUrl = URL.createObjectURL(file);
 
       setUploadProgress('Persisting video to local storage...');
 
-      // 2. Attempt server-side upload to Cloudinary for cross-device sync if configured
+      // 2. Upload to server/Cloudinary for cross-device global sync
       let finalUrl = localBlobUrl;
       try {
-        setUploadProgress('Uploading to cloud storage (optional sync)...');
-        const uploadRes = await uploadMediaToCloudinary(file, isVideo ? 'video' : 'image');
-        if (uploadRes.isCloudinary && uploadRes.url) {
+        setUploadProgress('Uploading to cloud storage (global sync)...');
+        const uploadRes = await uploadMediaToCloudinary(file, isVideo ? 'video' : 'image', file.name);
+        if (uploadRes.url && !uploadRes.url.startsWith('blob:') && !uploadRes.url.startsWith('data:')) {
           finalUrl = uploadRes.url;
         }
       } catch (cloudErr) {
-        console.warn('Cloud storage sync skipped, using high-speed local storage:', cloudErr);
+        console.warn('Cloud storage sync skipped, using local storage:', cloudErr);
       }
 
       const updatedConfig: PageLoaderConfig = {
@@ -147,11 +159,16 @@ export default function PageLoaderSettingsTab({
     };
 
     handleSaveConfig(updated);
+
+    // Cache the remote video URL into IndexedDB in the background for instant subsequent playback
+    cacheVideoFromUrl(cleanUrl, 'page_loader_video').catch((err) => {
+      console.warn('Background video caching notice:', err);
+    });
   };
 
   // Handle removal of custom video
   const handleRemoveVideo = async () => {
-    if (confirm('Are you sure you want to remove your custom animated video? The app will revert to the Dakshyam Innovations logo with loading bar.')) {
+    if (confirm('Are you sure you want to remove your custom animated video? The app will revert to the Dakshyam Innovations logo with loading bar for all visitors.')) {
       await deleteVideoBlob('page_loader_video');
       const updated: PageLoaderConfig = {
         ...config,
@@ -175,6 +192,11 @@ export default function PageLoaderSettingsTab({
       updatedAt: new Date().toISOString()
     };
     handleSaveConfig(updated);
+
+    // Cache sample video in background
+    cacheVideoFromUrl(sampleUrl, 'page_loader_video').catch((err) => {
+      console.warn('Background video caching notice:', err);
+    });
   };
 
   return (

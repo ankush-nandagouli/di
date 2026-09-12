@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { MongoClient, Db } from 'mongodb';
@@ -13,6 +12,28 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+
+// Handle both /api/path and /path so rewrites on Vercel or proxies route seamlessly
+app.use((req, res, next) => {
+  if (!req.url.startsWith('/api') && (
+    req.url.startsWith('/db') || 
+    req.url.startsWith('/health') || 
+    req.url.startsWith('/upload') || 
+    req.url.startsWith('/verify') || 
+    req.url.startsWith('/test-db')
+  )) {
+    req.url = `/api${req.url}`;
+  }
+  next();
+});
+
+// Ensure public static uploads directory exists
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
 
 // Lazy configuration function for Cloudinary to prevent startup crashes when keys are empty
 function getCloudinary() {
@@ -33,9 +54,10 @@ function getCloudinary() {
   return cloudinary;
 }
 
-let mongoClient: MongoClient | null = null;
-let mongoDb: Db | null = null;
-let isMongoConnected = false;
+let mongoClient: MongoClient | null = (global as any)._mongoClient || null;
+let mongoDb: Db | null = (global as any)._mongoDb || null;
+let isMongoConnected = !!mongoDb;
+let lastMongoError: string | null = null;
 
 // Safe fallback in-memory data store in case MongoDB is not configured or offline
 const memoryDb: Record<string, any> = {
@@ -60,6 +82,7 @@ const memoryDb: Record<string, any> = {
     showProgress: true,
     videoFit: 'contain'
   },
+  home_3d_model: null,
   company_about: {
     companyName: 'Dakshyam Innovations',
     description: 'Dakshyam Innovations is a premier engineering education technology developer and skill incubator. We specialize in physical-digital integrated vocational training, making modern embedded labs, microcontrollers, IoT equipment, and programming frameworks accessible directly to students, primary setups, and regional schools.',
@@ -187,56 +210,140 @@ const memoryDb: Record<string, any> = {
   app_logs: []
 };
 
-// Safe lazy MongoDB connection initializer
+// Helper function to diagnose and provide actionable troubleshooting guidance for MongoDB Atlas issues
+function getMongoAdvice(errStr: string): string {
+  if (
+    errStr.includes("SSL alert") || 
+    errStr.includes("MongoServerSelectionError") || 
+    errStr.includes("tlsv1 alert") || 
+    errStr.includes("ETIMEDOUT") || 
+    errStr.includes("ECONNREFUSED") ||
+    errStr.includes("ENOTFOUND")
+  ) {
+    return "MongoDB Atlas is blocking connections from Vercel's serverless IP addresses. In your MongoDB Atlas Dashboard, go to 'Network Access' -> click 'Add IP Address' -> select 'Allow Access From Anywhere' (0.0.0.0/0). Once saved in Atlas, connection requests will succeed immediately.";
+  }
+  if (errStr.includes("bad auth") || errStr.includes("AuthenticationFailed") || errStr.includes("auth failed")) {
+    return "MongoDB Atlas authentication failed. Please verify your database username and password in MONGODB_URI. If your password contains special characters (e.g. @, #, $, %, +), ensure they are URL-encoded in the connection string (e.g. @ becomes %40).";
+  }
+  if (!process.env.MONGODB_URI) {
+    return "MONGODB_URI is not configured in environment variables. If deploying to Vercel, navigate to Vercel Dashboard -> Project Settings -> Environment Variables, add MONGODB_URI with your Atlas connection string, and trigger a redeployment.";
+  }
+  return "Verify that MONGODB_URI follows the standard format: mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/<database>?retryWrites=true&w=majority and that MongoDB Atlas Network Access has 0.0.0.0/0 enabled.";
+}
+
+// Safe resilient MongoDB Atlas connection initializer with global pooling
 async function getMongoDb(): Promise<Db | null> {
+  // Return cached instance if already connected
   if (mongoDb) return mongoDb;
+  if ((global as any)._mongoDb) {
+    mongoDb = (global as any)._mongoDb;
+    isMongoConnected = true;
+    return mongoDb;
+  }
+
   const uri = process.env.MONGODB_URI;
   if (!uri) {
-    console.warn("⚠️ MONGODB_URI not found in environment. Running with local in-memory fallback.");
+    lastMongoError = "MONGODB_URI environment variable is missing.";
     isMongoConnected = false;
     return null;
   }
+
   try {
-    mongoClient = new MongoClient(uri, {
-      connectTimeoutMS: 5000,
-      socketTimeoutMS: 5000,
-    });
+    if (!mongoClient) {
+      mongoClient = new MongoClient(uri, {
+        connectTimeoutMS: 8000,
+        socketTimeoutMS: 30000,
+        serverSelectionTimeoutMS: 5000,
+        maxPoolSize: 10,
+        minPoolSize: 0,
+        maxIdleTimeMS: 30000,
+      });
+      (global as any)._mongoClient = mongoClient;
+    }
+
     await mongoClient.connect();
     mongoDb = mongoClient.db();
+    (global as any)._mongoDb = mongoDb;
     isMongoConnected = true;
-    console.log("🚀 Successfully connected to live MongoDB Database!");
+    lastMongoError = null;
+    console.log("🚀 Successfully connected to live MongoDB Atlas Database!");
     
     // Ensure settings defaults exist in MongoDB settings collection
-    const settingsCol = mongoDb.collection('settings');
-    const aboutDoc = await settingsCol.findOne({ id: 'company_about' });
-    if (!aboutDoc) {
-      await settingsCol.insertOne({ id: 'company_about', value: memoryDb.company_about });
+    try {
+      const settingsCol = mongoDb.collection('settings');
+      const aboutDoc = await settingsCol.findOne({ id: 'company_about' });
+      if (!aboutDoc) {
+        await settingsCol.insertOne({ id: 'company_about', value: memoryDb.company_about });
+      }
+      const pinDoc = await settingsCol.findOne({ id: 'supervisor_pin' });
+      if (!pinDoc) {
+        await settingsCol.insertOne({ id: 'supervisor_pin', value: memoryDb.supervisor_pin });
+      }
+    } catch (initErr) {
+      console.warn("MongoDB initial collections setup notice:", initErr);
     }
-    const pinDoc = await settingsCol.findOne({ id: 'supervisor_pin' });
-    if (!pinDoc) {
-      await settingsCol.insertOne({ id: 'supervisor_pin', value: memoryDb.supervisor_pin });
-    }
+
     return mongoDb;
   } catch (error: any) {
     const errStr = error instanceof Error ? error.message : String(error);
-    let extraAdvice = "";
-    if (errStr.includes("SSL alert") || errStr.includes("MongoServerSelectionError") || errStr.includes("tlsv1 alert")) {
-      extraAdvice = "\n💡 IMPORTANT CONFIGURATION ADVICE: This connection failure (SSL alert/ServerSelectionError) typically indicates that MongoDB Atlas is blocking access because the server's IP is not in your IP Access List. Because our containerized environment runs with dynamic IP addresses, you MUST go to your MongoDB Atlas Dashboard -> Network Access -> Add IP Address, and choose 'Allow Access From Anywhere' (IP: 0.0.0.0/0). Once you configure this, the server will connect successfully on the next database request!";
-    }
-    console.error(`❌ MongoDB connection failed. Running with local in-memory fallback.${extraAdvice}`, error);
+    lastMongoError = errStr;
     isMongoConnected = false;
+    const advice = getMongoAdvice(errStr);
+    console.error(`❌ MongoDB Atlas connection failed. Falling back to local in-memory store.\n💡 Advice: ${advice}`, error);
     return null;
   }
 }
 
-// REST API endpoint to check connection status
+// REST API endpoint to check connection status and diagnostics
 app.get('/api/health', async (req, res) => {
   const db = await getMongoDb();
   res.json({
     status: "ok",
     mongodb: db ? "connected" : "local_fallback",
-    details: db ? "Connected to live MongoDB Database" : "Running locally on server memory"
+    connected: isMongoConnected,
+    hasMongoUri: !!process.env.MONGODB_URI,
+    databaseName: db?.databaseName || null,
+    environment: process.env.VERCEL ? "vercel" : (process.env.NODE_ENV || "development"),
+    details: db ? "Connected to live MongoDB Atlas Database" : "Running on resilient local storage fallback",
+    error: lastMongoError || null,
+    advice: lastMongoError ? getMongoAdvice(lastMongoError) : null
   });
+});
+
+// Dedicated Diagnostic ping test endpoint for admin checks
+app.get('/api/test-db', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const db = await getMongoDb();
+    if (!db) {
+      return res.json({
+        success: false,
+        connected: false,
+        hasUri: !!process.env.MONGODB_URI,
+        error: lastMongoError || 'Could not connect to MongoDB Atlas',
+        advice: getMongoAdvice(lastMongoError || '')
+      });
+    }
+    
+    // Run real ping on Atlas cluster
+    await db.command({ ping: 1 });
+    const latencyMs = Date.now() - startTime;
+    return res.json({
+      success: true,
+      connected: true,
+      database: db.databaseName,
+      latencyMs,
+      message: `Successfully reached live MongoDB Atlas cluster in ${latencyMs}ms!`
+    });
+  } catch (err: any) {
+    const msg = err.message || String(err);
+    return res.json({
+      success: false,
+      connected: false,
+      error: msg,
+      advice: getMongoAdvice(msg)
+    });
+  }
 });
 
 // Module-level transient memory cache for secure OTP dispatch verification
@@ -392,7 +499,7 @@ app.get('/api/db/all', async (req, res) => {
     const collections = [
       'students', 'trainers', 'groups', 'videos', 'certificates', 
       'applications', 'special_programs', 'special_enrollments', 
-      'company_about', 'supervisor_pin', 'page_loader_config', 'courses', 'banners', 'gallery_images', 'app_logs', 'admins'
+      'company_about', 'supervisor_pin', 'page_loader_config', 'home_3d_model', 'courses', 'banners', 'gallery_images', 'app_logs', 'admins'
     ];
     
     const dbData: Record<string, any> = { connected: isMongoConnected };
@@ -400,7 +507,7 @@ app.get('/api/db/all', async (req, res) => {
 
     if (db) {
       for (const name of collections) {
-        if (name === 'company_about' || name === 'supervisor_pin' || name === 'page_loader_config') {
+        if (name === 'company_about' || name === 'supervisor_pin' || name === 'page_loader_config' || name === 'home_3d_model') {
           const settingsCol = db.collection('settings');
           const doc = await settingsCol.findOne({ id: name });
           dbData[name] = doc ? doc.value : memoryDb[name];
@@ -450,31 +557,82 @@ app.post('/api/db/clear', async (req, res) => {
   }
 });
 
-// POST to upload a media file (photo or video) to Cloudinary
+// POST to upload a media or 3D model file (photo, video, or 3D model)
 app.post('/api/upload', async (req, res) => {
-  const { file, resourceType } = req.body;
+  const { file, resourceType, fileName } = req.body;
   if (!file) {
     return res.status(400).json({ error: 'No file data received.' });
   }
 
-  try {
-    const cSdk = getCloudinary();
-    // Cloudinary uploader supports base64 strings directly!
-    const uploadResponse = await cSdk.uploader.upload(file, {
-      resource_type: resourceType || 'auto',
-      folder: 'dakshyam_media'
-    });
+  // 1. Try Cloudinary if environment credentials are present
+  if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+    try {
+      const cSdk = getCloudinary();
+      const uploadResponse = await cSdk.uploader.upload(file, {
+        resource_type: resourceType || 'auto',
+        folder: 'dakshyam_media'
+      });
 
-    res.json({
+      return res.json({
+        success: true,
+        url: uploadResponse.secure_url,
+        public_id: uploadResponse.public_id,
+        duration: uploadResponse.duration || 0,
+        provider: 'cloudinary'
+      });
+    } catch (error: any) {
+      console.warn('Cloudinary upload warning, falling back to server disk storage:', error.message);
+    }
+  }
+
+  // 2. Resilient fallback to static server storage in /uploads
+  try {
+    let fileBuffer: Buffer;
+    let ext = 'bin';
+
+    if (typeof file === 'string' && file.startsWith('data:')) {
+      const matches = file.match(/^data:([A-Za-z-+/0-9]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const mime = matches[1].toLowerCase();
+        const base64Data = matches[2];
+        fileBuffer = Buffer.from(base64Data, 'base64');
+        if (mime.includes('mp4')) ext = 'mp4';
+        else if (mime.includes('webm')) ext = 'webm';
+        else if (mime.includes('gif')) ext = 'gif';
+        else if (mime.includes('quicktime') || mime.includes('mov')) ext = 'mov';
+        else if (mime.includes('png')) ext = 'png';
+        else if (mime.includes('jpeg') || mime.includes('jpg')) ext = 'jpg';
+        else if (mime.includes('gltf') || mime.includes('glb')) ext = 'glb';
+        else if (mime.includes('obj') || mime.includes('plain')) ext = 'obj';
+      } else {
+        const base64Raw = file.split(',')[1] || file;
+        fileBuffer = Buffer.from(base64Raw, 'base64');
+      }
+    } else if (typeof file === 'string') {
+      fileBuffer = Buffer.from(file, 'utf-8');
+    } else {
+      fileBuffer = Buffer.from(file);
+    }
+
+    if (fileName && fileName.includes('.')) {
+      const parts = fileName.split('.');
+      ext = parts[parts.length - 1].toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    const safeName = `media-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
+    const filePath = path.join(uploadsDir, safeName);
+    fs.writeFileSync(filePath, fileBuffer);
+
+    return res.json({
       success: true,
-      url: uploadResponse.secure_url,
-      public_id: uploadResponse.public_id,
-      duration: uploadResponse.duration || 0
+      url: `/uploads/${safeName}`,
+      public_id: safeName,
+      provider: 'server_storage'
     });
-  } catch (error: any) {
-    console.error('Error uploading to Cloudinary:', error);
-    res.status(500).json({ 
-      error: error.message || 'Failed to upload to Cloudinary. Check your environment settings.' 
+  } catch (localErr: any) {
+    console.error('Server storage upload error:', localErr);
+    return res.status(500).json({ 
+      error: localErr.message || 'Failed to process file upload.' 
     });
   }
 });
@@ -487,7 +645,7 @@ app.post('/api/db/:key', async (req, res) => {
     const db = await getMongoDb();
 
     if (db) {
-      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config') {
+      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config' || key === 'home_3d_model') {
         const settingsCol = db.collection('settings');
         await settingsCol.updateOne(
           { id: key },
@@ -505,7 +663,7 @@ app.post('/api/db/:key', async (req, res) => {
       }
     } else {
       // Fallback local memory store
-      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config') {
+      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config' || key === 'home_3d_model') {
         memoryDb[key] = data;
       } else if (Array.isArray(data)) {
         memoryDb[key] = data;
@@ -518,12 +676,13 @@ app.post('/api/db/:key', async (req, res) => {
   }
 });
 
-// Serve the frontend
+// Serve the frontend for container / local environments
 async function main() {
   // Eagerly connect to MongoDB Atlas
   await getMongoDb();
 
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -542,6 +701,12 @@ async function main() {
   });
 }
 
-main().catch(err => {
-  console.error("Failed to start server:", err);
-});
+// Only launch standalone web server if not running inside Vercel Serverless
+if (!process.env.VERCEL) {
+  main().catch(err => {
+    console.error("Failed to start server:", err);
+  });
+}
+
+export { app, getMongoDb };
+export default app;

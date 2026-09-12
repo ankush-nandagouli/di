@@ -5,13 +5,15 @@ import {
   Share2, Copy, Check, Download, Star, Building2, User, 
   Calendar, MapPin, Sparkles, RefreshCw, Settings, Plus, 
   X, CheckCircle2, AlertCircle, Phone, Mail, Award, Wrench, 
-  GraduationCap, BookOpen, ThumbsUp, HelpCircle, ShieldAlert
+  GraduationCap, BookOpen, ThumbsUp, HelpCircle, ShieldAlert,
+  Monitor, Smartphone, Tablet, ExternalLink
 } from 'lucide-react';
 import { 
   WorkshopFeedbackSubmission, WorkshopFeedbackConfig, 
   WorkshopItem, CustomFeedbackQuestion, ParticipantCategory, UserRole 
 } from '../types';
 import { WorkshopFeedbackStorage, VERCEL_DOMAIN, getWorkshopShareUrl, toWorkshopSlug } from '../utils/feedbackStorage';
+import WorkshopFeedbackForm from './WorkshopFeedbackForm';
 
 interface AdminWorkshopFeedbackManagerProps {
   theme?: 'light' | 'dark';
@@ -40,9 +42,12 @@ export default function AdminWorkshopFeedbackManager({
   const [selectedRatingFilter, setSelectedRatingFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'rating-high' | 'rating-low'>('newest');
 
-  // Modals
+  // Modals & Previews
   const [selectedSubmission, setSelectedSubmission] = useState<WorkshopFeedbackSubmission | null>(null);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewWorkshopId, setPreviewWorkshopId] = useState<string | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [linkCopied, setLinkCopied] = useState(false);
   const [selectedWorkshopForLink, setSelectedWorkshopForLink] = useState<string>('');
 
@@ -331,6 +336,23 @@ export default function AdminWorkshopFeedbackManager({
               <span>{linkCopied ? 'Link Copied!' : 'Copy Form Link'}</span>
             </button>
 
+            {/* PREVIEW WORKSHOP FORM BUTTON */}
+            <button
+              onClick={() => {
+                setPreviewWorkshopId(selectedWorkshopForLink || (config.workshops[0]?.id || null));
+                setShowPreviewModal(true);
+              }}
+              className={`px-3.5 py-2.5 rounded-xl border text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                isLight 
+                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300' 
+                  : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+              }`}
+              title="Preview interactive workshop feedback form across devices"
+            >
+              <Eye className="w-3.5 h-3.5 text-amber-400" />
+              <span>Preview Form</span>
+            </button>
+
             {/* Admin Form Configurator */}
             {isAdmin && (
               <button
@@ -390,13 +412,29 @@ export default function AdminWorkshopFeedbackManager({
               {linkCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
               <span>{linkCopied ? 'Copied' : 'Copy Vercel Link'}</span>
             </button>
+            <button
+              onClick={() => {
+                setPreviewWorkshopId(selectedWorkshopForLink || null);
+                setShowPreviewModal(true);
+              }}
+              className={`px-2.5 py-1 rounded-lg border text-2xs font-mono font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                isLight
+                  ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/30 hover:bg-amber-500/30'
+              }`}
+              title="Preview form in interactive modal"
+            >
+              <Eye className="w-3 h-3 text-amber-400" />
+              <span>Preview</span>
+            </button>
             {onOpenPublicForm && (
               <button
                 onClick={() => onOpenPublicForm(selectedWorkshopForLink)}
-                className="text-sky-400 hover:text-sky-300 underline text-2xs cursor-pointer px-1"
-                title="Test form view directly"
+                className="text-sky-400 hover:text-sky-300 underline text-2xs cursor-pointer px-1 flex items-center gap-1"
+                title="Test form view directly in full screen"
               >
-                Test Open ↗
+                <span>Full Tab</span>
+                <ExternalLink className="w-2.5 h-2.5" />
               </button>
             )}
           </div>
@@ -1131,6 +1169,18 @@ export default function AdminWorkshopFeedbackManager({
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
+                          onClick={() => {
+                            setPreviewWorkshopId(ws.id);
+                            setShowPreviewModal(true);
+                          }}
+                          className="px-2 py-1 rounded text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 cursor-pointer flex items-center gap-1 text-[10px] font-mono border border-amber-500/20"
+                          title="Preview feedback form for this workshop"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>Preview</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => copyShareLink(ws.id, true)}
                           className="p-1 rounded text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 cursor-pointer"
                           title="Copy Vercel Share Link for this workshop"
@@ -1307,6 +1357,166 @@ export default function AdminWorkshopFeedbackManager({
               </div>
 
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* INTERACTIVE WORKSHOP FORM PREVIEW MODAL */}
+      <AnimatePresence>
+        {showPreviewModal && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-start p-2 sm:p-4 overflow-y-auto">
+            {/* TOP FLOATING CONTROLS BAR */}
+            <motion.div
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              className={`w-full max-w-5xl rounded-2xl border p-3 mb-3 flex flex-wrap items-center justify-between gap-3 shadow-2xl backdrop-blur-xl z-20 shrink-0 ${
+                isLight ? 'bg-white/95 border-slate-300 text-slate-900' : 'bg-slate-900/95 border-sky-500/30 text-white'
+              }`}
+            >
+              {/* Left: Branding & Workshop Switcher */}
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-2xs font-mono font-bold uppercase">
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Form Preview</span>
+                </div>
+                <div className="flex items-center gap-1 text-xs font-mono">
+                  <span className="text-slate-400 hidden sm:inline">Workshop:</span>
+                  <select
+                    value={previewWorkshopId || ''}
+                    onChange={(e) => setPreviewWorkshopId(e.target.value || null)}
+                    className={`px-2 py-1 rounded-lg border text-2xs font-mono font-bold max-w-[180px] sm:max-w-xs truncate ${
+                      isLight ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-800 border-slate-700 text-sky-200'
+                    }`}
+                  >
+                    <option value="">-- General / Any Workshop --</option>
+                    {config.workshops.map(w => (
+                      <option key={w.id} value={w.id}>{w.name} ({w.date})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Center: Device Viewport Switcher */}
+              <div className="flex items-center p-1 rounded-xl bg-black/30 border border-slate-700/60 gap-1 text-xs font-mono">
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('desktop')}
+                  className={`px-2.5 py-1 rounded-lg flex items-center gap-1 text-2xs font-bold transition-all cursor-pointer ${
+                    previewDevice === 'desktop' 
+                      ? 'bg-sky-500 text-slate-950 shadow' 
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Desktop View (Full Screen)"
+                >
+                  <Monitor className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Desktop</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('tablet')}
+                  className={`px-2.5 py-1 rounded-lg flex items-center gap-1 text-2xs font-bold transition-all cursor-pointer ${
+                    previewDevice === 'tablet' 
+                      ? 'bg-sky-500 text-slate-950 shadow' 
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Tablet View (768px)"
+                >
+                  <Tablet className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Tablet</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('mobile')}
+                  className={`px-2.5 py-1 rounded-lg flex items-center gap-1 text-2xs font-bold transition-all cursor-pointer ${
+                    previewDevice === 'mobile' 
+                      ? 'bg-sky-500 text-slate-950 shadow' 
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Mobile View (390px phone)"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Mobile</span>
+                </button>
+              </div>
+
+              {/* Right: Actions & Close */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => copyShareLink(previewWorkshopId || '', true)}
+                  className={`px-2.5 py-1 rounded-lg border text-2xs font-mono font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                    linkCopied 
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                  }`}
+                  title="Copy student link for this workshop"
+                >
+                  {linkCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span className="hidden sm:inline">{linkCopied ? 'Copied' : 'Copy Link'}</span>
+                </button>
+
+                {onOpenPublicForm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenPublicForm(previewWorkshopId || undefined);
+                      setShowPreviewModal(false);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 text-2xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all"
+                    title="Open form full screen"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span className="hidden sm:inline">Open Tab</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 cursor-pointer transition-all"
+                  title="Close preview"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+
+            {/* PREVIEW VIEWPORT FRAME */}
+            <div className="w-full flex-1 flex items-start justify-center pb-8 overflow-y-auto">
+              <motion.div
+                layout
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                className={`w-full transition-all duration-300 ${
+                  previewDevice === 'mobile'
+                    ? 'max-w-[395px] rounded-[40px] border-4 border-slate-700 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden bg-slate-950 p-2 my-2'
+                    : previewDevice === 'tablet'
+                    ? 'max-w-[768px] rounded-3xl border-2 border-slate-700/60 shadow-2xl overflow-hidden bg-slate-950 p-3 my-2'
+                    : 'max-w-5xl'
+                }`}
+              >
+                {/* Mobile Phone Speaker Notch Simulation */}
+                {previewDevice === 'mobile' && (
+                  <div className="w-full flex items-center justify-center pb-2 pt-1">
+                    <div className="w-24 h-4 bg-slate-800 rounded-full flex items-center justify-center gap-2">
+                      <div className="w-8 h-1 bg-slate-700 rounded-full" />
+                      <div className="w-2 h-2 bg-slate-700 rounded-full" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Embedded Live Form in Preview Mode */}
+                <div className={`overflow-y-auto max-h-[82vh] ${previewDevice === 'mobile' ? 'rounded-2xl' : ''}`}>
+                  <WorkshopFeedbackForm
+                    theme={theme}
+                    preselectedWorkshopId={previewWorkshopId}
+                    isPreviewMode={true}
+                    onNavigateHome={() => setShowPreviewModal(false)}
+                    onClosePreview={() => setShowPreviewModal(false)}
+                  />
+                </div>
+              </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>

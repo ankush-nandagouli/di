@@ -8,8 +8,10 @@ import {
 } from 'lucide-react';
 import { 
   save3DModel, saveObjModel, deleteObjModel, updateModelSettings,
+  sync3DModelToCloud, delete3DModelFromCloud,
   StoredModelMetadata, ModelDisplaySettings, DEFAULT_MODEL_SETTINGS 
 } from '../utils/modelStorage';
+import { uploadMediaToCloudinary } from '../utils/mediaUpload';
 import { SAMPLE_3D_MODELS } from '../utils/sampleModels';
 
 interface Admin3DModelEditorModalProps {
@@ -56,14 +58,26 @@ export default function Admin3DModelEditorModal({
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState<boolean>(false);
 
+  const [urlInput, setUrlInput] = useState<string>('');
+
   if (!isOpen) return null;
 
-  // Real-time update of settings to IndexedDB
+  // Real-time update of settings to IndexedDB and Firestore Cloud
   const handleSettingChange = async (updates: Partial<ModelDisplaySettings>) => {
     const updated = { ...settings, ...updates };
     setSettings(updated);
     if (metadata) {
       await updateModelSettings(storageKey, updates);
+      try {
+        const updatedMeta: StoredModelMetadata = {
+          ...metadata,
+          settings: updated,
+          updatedAt: new Date().toISOString()
+        };
+        await sync3DModelToCloud('', updatedMeta, metadata.modelUrl, storageKey);
+      } catch (err) {
+        console.warn('Could not sync settings update to cloud:', err);
+      }
       onModelChanged();
     }
   };
@@ -135,6 +149,17 @@ export default function Admin3DModelEditorModal({
         }
       }
 
+      // Upload file to cloud/server storage so all external visitors can download it
+      let uploadedUrl: string | undefined;
+      try {
+        const uploadRes = await uploadMediaToCloudinary(file, 'raw', file.name);
+        if (uploadRes.url && !uploadRes.url.startsWith('data:')) {
+          uploadedUrl = uploadRes.url;
+        }
+      } catch (uploadErr) {
+        console.warn('Server upload note:', uploadErr);
+      }
+
       const newMeta: StoredModelMetadata = {
         id: `model-${Date.now()}`,
         name: file.name,
@@ -143,13 +168,16 @@ export default function Admin3DModelEditorModal({
         vertexCount,
         faceCount,
         updatedAt: new Date().toISOString(),
-        settings: settings
+        settings: settings,
+        modelUrl: uploadedUrl
       };
 
-      await save3DModel(storageKey, modelPayload, newMeta);
+      // Save locally to IndexedDB & sync to Firestore & MongoDB
+      await sync3DModelToCloud(modelPayload, newMeta, uploadedUrl, storageKey);
+
       setStatusMessage({ 
         type: 'success', 
-        text: `Successfully loaded "${file.name}" (${vertexCount.toLocaleString()} vertices, ${faceCount.toLocaleString()} faces).` 
+        text: `✓ Successfully saved "${file.name}" & synchronized for all website visitors!` 
       });
       onModelChanged();
       setTimeout(() => {
@@ -158,6 +186,72 @@ export default function Admin3DModelEditorModal({
     } catch (err: any) {
       console.error('Error reading 3D model file:', err);
       setStatusMessage({ type: 'error', text: err.message || 'Failed to parse 3D model file.' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Load 3D model from direct URL link
+  const handleLoadFromUrl = async () => {
+    const cleanUrl = urlInput.trim();
+    if (!cleanUrl) {
+      setStatusMessage({ type: 'error', text: 'Please enter a valid 3D model URL (.obj or .glb).' });
+      return;
+    }
+
+    setIsUploading(true);
+    setStatusMessage(null);
+
+    try {
+      const isGlb = cleanUrl.toLowerCase().includes('.glb');
+      const isGltf = cleanUrl.toLowerCase().includes('.gltf');
+      const response = await fetch(cleanUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download model from link (HTTP ${response.status})`);
+      }
+
+      let modelPayload: string | ArrayBuffer;
+      let vertexCount = 0;
+      let faceCount = 0;
+
+      if (isGlb || isGltf) {
+        const buffer = await response.arrayBuffer();
+        modelPayload = buffer;
+      } else {
+        const text = await response.text();
+        modelPayload = text;
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const trimmed = lines[i].trim();
+          if (trimmed.startsWith('v ')) vertexCount++;
+          else if (trimmed.startsWith('f ')) faceCount++;
+        }
+      }
+
+      const urlParts = cleanUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1] || 'custom_model.obj';
+
+      const newMeta: StoredModelMetadata = {
+        id: `url-model-${Date.now()}`,
+        name: fileName,
+        size: typeof modelPayload === 'string' ? modelPayload.length : modelPayload.byteLength,
+        format: isGlb ? 'glb' : (isGltf ? 'gltf' : 'obj'),
+        vertexCount: vertexCount || 500,
+        faceCount: faceCount || 250,
+        updatedAt: new Date().toISOString(),
+        settings: settings,
+        modelUrl: cleanUrl
+      };
+
+      await sync3DModelToCloud(modelPayload, newMeta, cleanUrl, storageKey);
+      setStatusMessage({ type: 'success', text: `✓ 3D Model link loaded and published globally!` });
+      onModelChanged();
+      setTimeout(() => {
+        setActiveTab('transform');
+      }, 700);
+    } catch (err: any) {
+      console.error('Failed to load 3D model from URL:', err);
+      setStatusMessage({ type: 'error', text: err.message || 'Could not load model from link.' });
     } finally {
       setIsUploading(false);
     }
@@ -186,8 +280,8 @@ export default function Admin3DModelEditorModal({
         settings: settings
       };
 
-      await saveObjModel(storageKey, objText, newMeta);
-      setStatusMessage({ type: 'success', text: `Loaded preset: "${sample.name}"` });
+      await sync3DModelToCloud(objText, newMeta, undefined, storageKey);
+      setStatusMessage({ type: 'success', text: `✓ Loaded preset "${sample.name}" & synchronized for all visitors!` });
       onModelChanged();
       setTimeout(() => {
         setActiveTab('transform');
@@ -201,9 +295,9 @@ export default function Admin3DModelEditorModal({
 
   // Revert back to default logo
   const handleRevertToDefault = async () => {
-    if (confirm('Revert home page 3D art back to the default Dakshyam Innovations logo?')) {
-      await deleteObjModel(storageKey);
-      setStatusMessage({ type: 'success', text: 'Reverted to default Dakshyam 3D Emblem' });
+    if (confirm('Revert home page 3D art back to the default Dakshyam Innovations logo for all visitors?')) {
+      await delete3DModelFromCloud(storageKey);
+      setStatusMessage({ type: 'success', text: 'Reverted to default Dakshyam 3D Emblem across all devices' });
       onModelChanged();
       setTimeout(() => {
         onClose();
@@ -722,7 +816,7 @@ export default function Admin3DModelEditorModal({
           {/* TAB 4: REPLACE / UPLOAD 3D MODEL */}
           {activeTab === 'upload' && (
             <div className="space-y-5">
-              {/* Dropzone */}
+              {/* Option A: Dropzone for File Upload */}
               <div
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -737,7 +831,7 @@ export default function Admin3DModelEditorModal({
                   }
                 }}
                 onClick={() => fileInputRef.current?.click()}
-                className={`p-8 rounded-3xl border-2 border-dashed text-center transition-all cursor-pointer ${
+                className={`p-6 sm:p-8 rounded-3xl border-2 border-dashed text-center transition-all cursor-pointer ${
                   isDraggingOver
                     ? 'border-cyan-400 bg-cyan-500/15'
                     : 'border-slate-700 hover:border-cyan-500/40 bg-slate-900/50'
@@ -760,10 +854,38 @@ export default function Admin3DModelEditorModal({
                 </div>
 
                 <p className="font-bold text-slate-200 text-sm">
-                  {isUploading ? 'Parsing & Normalizing 3D Geometry...' : 'Click or Drag & Drop 3D Model (.obj, .glb)'}
+                  {isUploading ? 'Parsing, Caching & Publishing to Cloud...' : 'Click or Drag & Drop 3D Model (.obj, .glb)'}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Supports Wavefront (.obj) and Binary GLTF (.glb / .gltf) models from Blender, Fusion 360, SolidWorks, Maya, CAD, etc.
+                  Upload an OBJ or GLB file to store globally in Firestore so all website visitors see it immediately.
+                </p>
+              </div>
+
+              {/* Option B: Provide 3D Model via Direct Link */}
+              <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+                <label className="text-[11px] font-mono text-cyan-400 uppercase font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  Or Provide 3D Model by URL Link (.obj or .glb)
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://example.com/assets/model.obj or .glb"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-mono focus:border-cyan-400 focus:outline-none placeholder:text-slate-600"
+                  />
+                  <button
+                    type="button"
+                    disabled={isUploading || !urlInput.trim()}
+                    onClick={handleLoadFromUrl}
+                    className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    {isUploading ? 'Loading...' : 'Load from Link'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Loads the model from an external CDN or cloud link, caches it locally for 0ms lag, and persists it for all visitors.
                 </p>
               </div>
 
@@ -795,7 +917,7 @@ export default function Admin3DModelEditorModal({
                   <div>
                     <p className="font-bold text-rose-300">Revert to Official Logo</p>
                     <p className="text-[11px] text-rose-300/80">
-                      Remove the custom 3D model and restore the official Dakshyam emblem.
+                      Remove the custom 3D model and restore the official Dakshyam emblem for all visitors.
                     </p>
                   </div>
                   <button
@@ -816,8 +938,13 @@ export default function Admin3DModelEditorModal({
         <div className={`p-4 border-t flex items-center justify-between ${
           isLight ? 'border-slate-200 bg-white' : 'border-slate-800 bg-[#0c1829]'
         }`}>
-          <div className="text-[11px] text-slate-400 font-mono">
-            {metadata ? `Stored in IndexedDB: ${(metadata.size / 1024).toFixed(1)} KB` : 'No custom model active'}
+          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>
+              {metadata 
+                ? `Active: ${metadata.name} (${(metadata.size / 1024).toFixed(1)} KB) • Synced to Cloud & Cached`
+                : 'Using Official Dakshyam 3D Emblem • Synced'}
+            </span>
           </div>
           <button
             type="button"

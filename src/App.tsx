@@ -25,14 +25,15 @@ import AdminWorkshopFeedbackManager from './components/AdminWorkshopFeedbackMana
 import { DakshyamDatabase } from './utils/db';
 import { Course, CourseApplication, StudentGroup, StudentUser, Certificate, VideoPost, PromoBanner, GalleryImage, PageLoaderConfig } from './types';
 import { BeautifulErrorDisplay } from './utils/errorShield';
-import { getVideoBlob } from './utils/videoStorage';
+import { getVideoBlob, cacheVideoFromUrl } from './utils/videoStorage';
 
-// Firebase Auth SDK imports for secure password resetting
+// Firebase Auth & Firestore SDK imports
 import { 
   sendPasswordResetEmail,
   createUserWithEmailAndPassword
 } from 'firebase/auth';
-import { auth as firebaseAuth } from './utils/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { auth as firebaseAuth, db } from './utils/firebase';
 
 export default function App() {
   // Theme & Mobile Menu states
@@ -138,6 +139,33 @@ export default function App() {
       }
     };
   }, [pageLoaderConfig.updatedAt]);
+
+  // Global Real-time Subscription to Page Loader Config from Firestore
+  useEffect(() => {
+    try {
+      const configDocRef = doc(db, 'settings', 'page_loader_config');
+      const unsubscribe = onSnapshot(configDocRef, (snap) => {
+        if (snap.exists()) {
+          const cloudData = snap.data();
+          const cloudConfig = (cloudData.value || cloudData) as PageLoaderConfig;
+          if (cloudConfig && typeof cloudConfig === 'object' && cloudConfig.videoUrl !== undefined) {
+            setPageLoaderConfig((prev) => ({ ...prev, ...cloudConfig }));
+            DakshyamDatabase.savePageLoaderConfig({ ...pageLoaderConfig, ...cloudConfig });
+            if (cloudConfig.videoUrl) {
+              cacheVideoFromUrl(cloudConfig.videoUrl, 'page_loader_video').then((cached) => {
+                if (cached) setLocalVideoUrl(cached);
+              }).catch(() => {});
+            }
+          }
+        }
+      }, (err) => {
+        console.warn('Firestore page loader config sync notice:', err);
+      });
+      return () => unsubscribe();
+    } catch (err) {
+      console.warn('Firestore page loader config snapshot error:', err);
+    }
+  }, []);
 
   // Initial page load lazy animation
   useEffect(() => {
