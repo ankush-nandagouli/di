@@ -86,44 +86,68 @@ export default function WorkshopFeedbackForm({
     const currentConfig = WorkshopFeedbackStorage.getFeedbackConfig();
     setConfig(currentConfig);
 
-    // 1. Extract workshop identifier from props, pathname, or searchParams
+    // 1. Extract workshop identifier from props, pathname, hash, or searchParams
     let rawIdentifier = preselectedWorkshopId;
     
     if (!rawIdentifier && typeof window !== 'undefined') {
       const pathname = window.location.pathname;
-      if (pathname.startsWith('/feedback-form') || pathname.startsWith('/feedback')) {
-        const parts = pathname.split('/').filter(Boolean);
-        if (parts.length > 1) {
-          rawIdentifier = decodeURIComponent(parts.slice(1).join('/'));
+      const feedbackPrefixes = ['/feedback-form', '/feedback', '/workshop-form', '/workshop', '/workshops'];
+      for (const prefix of feedbackPrefixes) {
+        if (pathname.startsWith(prefix)) {
+          const parts = pathname.slice(prefix.length).split('/').filter(Boolean);
+          if (parts.length > 0) {
+            rawIdentifier = decodeURIComponent(parts[0]);
+            break;
+          }
+        }
+      }
+
+      // Check hash router
+      if (!rawIdentifier && window.location.hash) {
+        const hash = window.location.hash.replace(/^#\/?/, '');
+        for (const prefix of feedbackPrefixes) {
+          const cleanPrefix = prefix.replace(/^\//, '');
+          if (hash.startsWith(cleanPrefix)) {
+            const parts = hash.slice(cleanPrefix.length).split('/').filter(Boolean);
+            if (parts.length > 0) {
+              rawIdentifier = decodeURIComponent(parts[0]);
+              break;
+            }
+          }
         }
       }
     }
 
     if (!rawIdentifier && typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
-      rawIdentifier = searchParams.get('workshop') || searchParams.get('w') || searchParams.get('ws');
+      rawIdentifier = searchParams.get('workshop') || searchParams.get('w') || searchParams.get('ws') || searchParams.get('slug');
     }
 
     const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const urlCat = searchParams ? (searchParams.get('category') as ParticipantCategory) : null;
 
-    if (rawIdentifier && rawIdentifier.trim()) {
-      const cleanId = rawIdentifier.trim();
+    const matchWorkshopInList = (identifier: string | null | undefined, list: WorkshopItem[]): WorkshopItem | null => {
+      if (!identifier || !identifier.trim() || !list || list.length === 0) return null;
+      const cleanId = identifier.trim();
       const slugOfRaw = toWorkshopSlug(cleanId);
-
-      // Match by exact id, exact slug of id, slug of title, or substring containment
-      const matched = currentConfig.workshops.find(w => 
+      return list.find(w => 
         w.id.toLowerCase() === cleanId.toLowerCase() ||
         toWorkshopSlug(w.id) === slugOfRaw ||
         toWorkshopSlug(w.name) === slugOfRaw ||
-        toWorkshopSlug(w.name).includes(slugOfRaw) ||
-        slugOfRaw.includes(toWorkshopSlug(w.name))
-      );
+        (slugOfRaw.length > 3 && toWorkshopSlug(w.name).includes(slugOfRaw)) ||
+        (slugOfRaw.length > 3 && slugOfRaw.includes(toWorkshopSlug(w.name)))
+      ) || null;
+    };
+
+    if (rawIdentifier && rawIdentifier.trim()) {
+      const matched = matchWorkshopInList(rawIdentifier, currentConfig.workshops);
 
       if (matched) {
         setSelectedWorkshopId(matched.id);
       } else {
-        // If the URL specifies a new workshop name (e.g. /feedback-form/iot-drone-masterclass)
+        // If the URL specifies a workshop name that hasn't synced to this client's localStorage yet
+        const cleanId = rawIdentifier.trim();
+        const slugOfRaw = toWorkshopSlug(cleanId);
         const friendlyName = cleanId
           .replace(/[-_]+/g, ' ')
           .replace(/\b\w/g, c => c.toUpperCase());
@@ -131,9 +155,10 @@ export default function WorkshopFeedbackForm({
           id: `WS-${slugOfRaw.toUpperCase() || 'CUSTOM'}`,
           name: friendlyName,
           date: new Date().toISOString().split('T')[0],
-          venue: 'Campus / Practical Lab Node',
+          venue: 'Dakshyam Practical Lab & Campus Node',
           trainerName: 'Dakshyam Lead Instructor',
-          isActive: true
+          isActive: true,
+          slug: slugOfRaw
         };
         setConfig(prev => {
           if (prev.workshops.some(w => w.id === tempWorkshop.id || toWorkshopSlug(w.name) === slugOfRaw)) {
@@ -154,7 +179,7 @@ export default function WorkshopFeedbackForm({
       setParticipantCategory(urlCat);
     }
 
-    // 2. Fetch fresh config from Firestore in the background
+    // 2. Fetch fresh config from Firestore and backend in the background to ensure all newly created workshops sync
     WorkshopFeedbackStorage.fetchFeedbackConfigFromFirestore().then((remoteConfig) => {
       if (remoteConfig && remoteConfig.workshops && remoteConfig.workshops.length > 0) {
         setConfig(prev => ({
@@ -162,8 +187,40 @@ export default function WorkshopFeedbackForm({
           ...remoteConfig,
           workshops: remoteConfig.workshops
         }));
+        // If user accessed via slug, re-match against the authoritative remote workshops
+        if (rawIdentifier) {
+          const remoteMatched = matchWorkshopInList(rawIdentifier, remoteConfig.workshops);
+          if (remoteMatched) {
+            setSelectedWorkshopId(remoteMatched.id);
+          }
+        }
       }
     }).catch(() => {});
+
+    // Also fetch from API settings for instant MongoDB sync
+    if (typeof fetch !== 'undefined') {
+      fetch('/api/db/all')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.workshop_feedback_config && Array.isArray(data.workshop_feedback_config.workshops)) {
+            const apiWorkshops = data.workshop_feedback_config.workshops;
+            if (apiWorkshops.length > 0) {
+              setConfig(prev => ({
+                ...prev,
+                ...data.workshop_feedback_config,
+                workshops: apiWorkshops
+              }));
+              if (rawIdentifier) {
+                const apiMatched = matchWorkshopInList(rawIdentifier, apiWorkshops);
+                if (apiMatched) {
+                  setSelectedWorkshopId(apiMatched.id);
+                }
+              }
+            }
+          }
+        })
+        .catch(() => {});
+    }
   }, [preselectedWorkshopId]);
 
   const activeWorkshop = config.workshops.find(w => w.id === selectedWorkshopId) || config.workshops[0];

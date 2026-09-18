@@ -1,4 +1,4 @@
-import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder, AppLog, PageLoaderConfig } from '../types';
+import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder, AppLog, LogCategory, PageLoaderConfig } from '../types';
 
 // Default seeded courses requested by the user
 export const DEFAULT_COURSES: Course[] = [
@@ -446,25 +446,126 @@ export class DakshyamDatabase {
     this.set('app_logs', logs);
   }
 
-  static logEvent(action: string, details: string, userEmail: string, role: string, status: 'SUCCESS' | 'ERROR' | 'INFO' = 'INFO'): void {
+  static logEvent(
+    action: string, 
+    details: string, 
+    userEmail: string, 
+    role: string, 
+    status: 'SUCCESS' | 'ERROR' | 'INFO' | 'WARNING' = 'INFO',
+    category?: LogCategory,
+    metadata?: Record<string, any>
+  ): void {
     try {
+      // Auto-detect category if not explicitly specified
+      let cat: LogCategory = category || 'SYSTEM';
+      if (!category) {
+        const lower = (action + ' ' + details).toLowerCase();
+        if (lower.includes('workshop')) cat = 'WORKSHOP';
+        else if (lower.includes('feedback')) cat = 'FEEDBACK';
+        else if (lower.includes('auth') || lower.includes('login') || lower.includes('password') || lower.includes('signup') || lower.includes('registered')) cat = 'AUTH';
+        else if (lower.includes('lockout') || lower.includes('security') || lower.includes('failed') || lower.includes('blocked')) cat = 'SECURITY';
+        else if (lower.includes('student')) cat = 'STUDENT';
+        else if (lower.includes('trainer')) cat = 'TRAINER';
+        else if (lower.includes('cert')) cat = 'CERTIFICATE';
+      }
+
       const logs = this.getAppLogs();
       const newLog: AppLog = {
-        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         timestamp: new Date().toISOString(),
         action,
         details,
-        userEmail: userEmail || 'guest@dakshyam.com',
+        userEmail: userEmail || 'system@dakshyam.com',
         role: role || 'guest',
-        status
+        status,
+        category: cat,
+        metadata
       };
       logs.unshift(newLog);
-      if (logs.length > 200) {
-        logs.length = 200;
+      if (logs.length > 500) {
+        logs.length = 500;
       }
       this.saveAppLogs(logs);
+
+      // Asynchronous non-blocking sync with backend API / MongoDB
+      if (typeof fetch !== 'undefined') {
+        fetch('/api/logs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newLog)
+        }).catch(() => {});
+      }
     } catch (e) {
       console.error('Failed to write app event log:', e);
+    }
+  }
+
+  static async fetchRemoteLogs(limit = 100): Promise<AppLog[]> {
+    try {
+      const res = await fetch(`/api/logs?limit=${limit}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.logs) && data.logs.length > 0) {
+          const local = this.getAppLogs();
+          const existingIds = new Set(local.map(l => l.id));
+          const combined = [...local];
+          for (const rl of data.logs) {
+            if (!existingIds.has(rl.id)) {
+              combined.push(rl);
+              existingIds.add(rl.id);
+            }
+          }
+          combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          if (combined.length > 500) combined.length = 500;
+          this.saveAppLogs(combined);
+          return combined;
+        }
+      }
+    } catch (err) {
+      console.warn('Could not load remote logs:', err);
+    }
+    return this.getAppLogs();
+  }
+
+  static exportLogsToCsv(logsToExport?: AppLog[]): void {
+    try {
+      const logs = logsToExport || this.getAppLogs();
+      const headers = ['ID', 'Timestamp', 'Category', 'Status', 'Action', 'Operator Email', 'Role', 'Details'];
+      const rows = logs.map(l => [
+        `"${l.id}"`,
+        `"${l.timestamp}"`,
+        `"${l.category || 'SYSTEM'}"`,
+        `"${l.status}"`,
+        `"${(l.action || '').replace(/"/g, '""')}"`,
+        `"${l.userEmail}"`,
+        `"${l.role}"`,
+        `"${(l.details || '').replace(/"/g, '""')}"`
+      ]);
+      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `dakshyam_system_audit_logs_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Export CSV error:', err);
+    }
+  }
+
+  static exportLogsToJson(logsToExport?: AppLog[]): void {
+    try {
+      const logs = logsToExport || this.getAppLogs();
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(logs, null, 2));
+      const link = document.createElement('a');
+      link.setAttribute('href', dataStr);
+      link.setAttribute('download', `dakshyam_system_audit_logs_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Export JSON error:', err);
     }
   }
 
@@ -490,11 +591,17 @@ export class DakshyamDatabase {
     console.log('Successfully cleared all user-related data.');
   }
 
-  // --- COOKIE PROTOCOL UTILITIES ---
+  // --- COOKIE PROTOCOL UTILITIES (HARDENED FOR EDGE, BRAVE, SAFARI & FIREFOX) ---
   static getCookie(name: string): string {
     try {
       const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-      return match ? decodeURIComponent(match[2]) : '';
+      if (match) return decodeURIComponent(match[2]);
+      // Resilient fallback to localStorage if privacy shields blocked cookie
+      if (typeof localStorage !== 'undefined') {
+        const local = localStorage.getItem(name);
+        if (local) return local;
+      }
+      return '';
     } catch {
       return '';
     }
@@ -504,7 +611,16 @@ export class DakshyamDatabase {
     try {
       const d = new Date();
       d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
-      document.cookie = `${name}=${encodeURIComponent(value)};path=/;expires=${d.toUTCString()};SameSite=Lax`;
+      const isHttps = typeof window !== 'undefined' && (window.location.protocol === 'https:' || window.location.hostname !== 'localhost');
+      const secureFlag = isHttps ? ';Secure' : '';
+      document.cookie = `${name}=${encodeURIComponent(value)};path=/;expires=${d.toUTCString()};SameSite=Lax${secureFlag}`;
+      
+      // Dual-layer persistence across strict privacy shields (Brave, Edge Tracking Prevention)
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem(name, value);
+        } catch {}
+      }
     } catch (e) {
       console.error('Cookie write warning:', e);
     }

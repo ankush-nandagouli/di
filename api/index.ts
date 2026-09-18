@@ -13,6 +13,24 @@ const app = express();
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
+// Enterprise Security & Caching headers middleware (Edge, Brave, Safari, Firefox, Chrome)
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
+  // Dynamic API routes must never serve stale cache
+  if (req.url.startsWith('/api') || req.url.startsWith('/db') || req.url.startsWith('/verify')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  } else if (req.url.startsWith('/uploads') || req.url.startsWith('/assets')) {
+    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+  }
+  next();
+});
+
 // URL normalizer middleware: handles Vercel rewrites and direct subpaths
 app.use((req, res, next) => {
   // If on Vercel with a rewrite to /api, check x-matched-path or originalUrl
@@ -217,7 +235,73 @@ const memoryDb: Record<string, any> = {
       createdAt: '2026-01-03'
     }
   ],
-  app_logs: []
+  app_logs: [],
+  workshop_feedback_submissions: [],
+  workshop_feedback_config: {
+    id: 'global-workshop-feedback-config',
+    formTitle: 'Dakshyam Innovations Workshop Evaluation & Feedback',
+    formSubtitle: 'Your candid evaluation directly powers our curriculum optimization, laboratory equipment enhancements, and hands-on trainer methodologies.',
+    isOpen: true,
+    totalWorkshopsCreated: 4,
+    workshops: [
+      {
+        id: 'WS-IOT-ROBO',
+        name: 'Industrial IoT & Autonomous Robotics Bootcamp',
+        date: '2026-09-10',
+        venue: 'Dakshyam Central STEM & Robotics Lab, Balaghat',
+        trainerName: 'Anand Gautam & Dakshyam Tech Leads',
+        description: 'Hands-on ESP32 sensor telemetry, dual H-Bridge motor controls, firmware flashing, and live cloud dashboards.',
+        isActive: true,
+        slug: 'industrial-iot-autonomous-robotics-bootcamp'
+      },
+      {
+        id: 'WS-NEP-STEM',
+        name: 'NEP 2020 Computational STEM & Embedded Prototyping',
+        date: '2026-08-25',
+        venue: 'Govt. Polytechnic & Model Higher Secondary School',
+        trainerName: 'Rohit Bhajipale & Kunal Raut',
+        description: 'Vocational computational thinking, circuit schematic mapping, breadboard diagnostics, and logic design.',
+        isActive: true,
+        slug: 'nep-2020-computational-stem-embedded-prototyping'
+      },
+      {
+        id: 'WS-SMART-FARM',
+        name: 'Smart Agro-Telemetry & Environmental Sensor Interfacing',
+        date: '2026-08-12',
+        venue: 'Agricultural Engineering Campus & Rural Innovation Wing',
+        trainerName: 'Shikhar Bisen & Hardware Team',
+        description: 'Analog/Digital soil moisture sensing, automated relay irrigation switches, LoRa wireless RF, and field diagnostics.',
+        isActive: true,
+        slug: 'smart-agro-telemetry-environmental-sensor-interfacing'
+      },
+      {
+        id: 'WS-FULLSTACK-DASH',
+        name: 'Full-Stack Web Engineering for IoT Telemetry',
+        date: '2026-07-28',
+        venue: 'Dakshyam Software Center, Balaghat',
+        trainerName: 'Dakshyam Web Engineering Team',
+        description: 'RESTful API integration, WebSocket pipelines, interactive real-time visual telemetry, and dashboard architecture.',
+        isActive: true,
+        slug: 'full-stack-web-engineering-for-iot-telemetry'
+      }
+    ],
+    customQuestions: [
+      {
+        id: 'q-pace',
+        label: 'How was the instructional pace of the practical workshop exercises?',
+        type: 'choice',
+        required: false,
+        options: ['Too Fast', 'Just Right & Balanced', 'A Bit Slow', 'Need More Lab Time']
+      },
+      {
+        id: 'q-kit',
+        label: 'Was the hardware laboratory kit adequate and functioning reliably?',
+        type: 'yesno',
+        required: false
+      }
+    ],
+    updatedAt: new Date().toISOString()
+  }
 };
 
 // Helper function to diagnose and provide actionable troubleshooting guidance for MongoDB Atlas issues
@@ -235,8 +319,8 @@ function getMongoAdvice(errStr: string): string {
   if (errStr.includes("bad auth") || errStr.includes("AuthenticationFailed") || errStr.includes("auth failed")) {
     return "MongoDB Atlas authentication failed. Please verify your database username and password in MONGODB_URI. If your password contains special characters (e.g. @, #, $, %, +), ensure they are URL-encoded in the connection string (e.g. @ becomes %40).";
   }
-  if (!process.env.MONGODB_URI) {
-    return "MONGODB_URI is not configured in environment variables. If deploying to Vercel, navigate to Vercel Dashboard -> Project Settings -> Environment Variables, add MONGODB_URI with your Atlas connection string, and trigger a redeployment.";
+  if (!process.env.MONGODB_URI && !process.env.MONGO_URI && !process.env.MONGODB_URL && !process.env.DATABASE_URL) {
+    return "MONGODB_URI is not configured in environment variables. In your Vercel Project Settings -> Environment Variables, add MONGODB_URI with your Atlas connection string, select Production, Preview & Development, and redeploy.";
   }
   return "Verify that MONGODB_URI follows the standard format: mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/<database>?retryWrites=true&w=majority and that MongoDB Atlas Network Access has 0.0.0.0/0 enabled.";
 }
@@ -250,28 +334,37 @@ async function getMongoDb(): Promise<Db | null> {
     return mongoDb;
   }
 
-  const uri = process.env.MONGODB_URI;
+  const uri = (
+    process.env.MONGODB_URI ||
+    process.env.MONGO_URI ||
+    process.env.MONGODB_URL ||
+    process.env.DATABASE_URL ||
+    ''
+  ).trim().replace(/^["']|["']$/g, '');
+
   if (!uri) {
-    lastMongoError = "MONGODB_URI environment variable is missing.";
+    lastMongoError = "MONGODB_URI environment variable is missing in project settings.";
     isMongoConnected = false;
     return null;
   }
 
   try {
-    if (!mongoClient) {
-      mongoClient = new MongoClient(uri, {
-        connectTimeoutMS: 8000,
-        socketTimeoutMS: 30000,
-        serverSelectionTimeoutMS: 5000,
+    if (!(global as any)._mongoClientPromise) {
+      const client = new MongoClient(uri, {
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        serverSelectionTimeoutMS: 8000,
         maxPoolSize: 10,
         minPoolSize: 0,
         maxIdleTimeMS: 30000,
       });
-      (global as any)._mongoClient = mongoClient;
+      (global as any)._mongoClient = client;
+      (global as any)._mongoClientPromise = client.connect();
     }
 
-    await mongoClient.connect();
-    mongoDb = mongoClient.db();
+    const client = await (global as any)._mongoClientPromise;
+    const dbName = process.env.MONGODB_DB_NAME || 'dakshyam_db';
+    mongoDb = client.db(client.options?.dbName || dbName);
     (global as any)._mongoDb = mongoDb;
     isMongoConnected = true;
     lastMongoError = null;
@@ -288,12 +381,19 @@ async function getMongoDb(): Promise<Db | null> {
       if (!pinDoc) {
         await settingsCol.insertOne({ id: 'supervisor_pin', value: memoryDb.supervisor_pin });
       }
+      const feedbackCfgDoc = await settingsCol.findOne({ id: 'workshop_feedback_config' });
+      if (!feedbackCfgDoc) {
+        await settingsCol.insertOne({ id: 'workshop_feedback_config', value: memoryDb.workshop_feedback_config });
+      }
     } catch (initErr) {
       console.warn("MongoDB initial collections setup notice:", initErr);
     }
 
     return mongoDb;
   } catch (error: any) {
+    (global as any)._mongoClientPromise = null;
+    (global as any)._mongoDb = null;
+    mongoDb = null;
     const errStr = error instanceof Error ? error.message : String(error);
     lastMongoError = errStr;
     isMongoConnected = false;
@@ -316,11 +416,12 @@ app.get('/api', (req, res) => {
 // REST API endpoint to check connection status and diagnostics
 app.get('/api/health', async (req, res) => {
   const db = await getMongoDb();
+  const uriConfigured = !!(process.env.MONGODB_URI || process.env.MONGO_URI || process.env.MONGODB_URL || process.env.DATABASE_URL);
   res.json({
     status: "ok",
     mongodb: db ? "connected" : "local_fallback",
     connected: isMongoConnected,
-    hasMongoUri: !!process.env.MONGODB_URI,
+    hasMongoUri: uriConfigured,
     databaseName: db?.databaseName || null,
     environment: process.env.VERCEL ? "vercel" : (process.env.NODE_ENV || "development"),
     details: db ? "Connected to live MongoDB Atlas Database" : "Running on resilient local storage fallback",
@@ -334,11 +435,12 @@ app.get('/api/test-db', async (req, res) => {
   const startTime = Date.now();
   try {
     const db = await getMongoDb();
+    const uriConfigured = !!(process.env.MONGODB_URI || process.env.MONGO_URI || process.env.MONGODB_URL || process.env.DATABASE_URL);
     if (!db) {
       return res.json({
         success: false,
         connected: false,
-        hasUri: !!process.env.MONGODB_URI,
+        hasUri: uriConfigured,
         error: lastMongoError || 'Could not connect to MongoDB Atlas',
         advice: getMongoAdvice(lastMongoError || '')
       });
@@ -518,7 +620,8 @@ app.get('/api/db/all', async (req, res) => {
     const collections = [
       'students', 'trainers', 'groups', 'videos', 'certificates', 
       'applications', 'special_programs', 'special_enrollments', 
-      'company_about', 'supervisor_pin', 'page_loader_config', 'home_3d_model', 'courses', 'banners', 'gallery_images', 'app_logs', 'admins'
+      'company_about', 'supervisor_pin', 'page_loader_config', 'home_3d_model', 
+      'workshop_feedback_config', 'workshop_feedback_submissions', 'courses', 'banners', 'gallery_images', 'app_logs', 'admins'
     ];
     
     const dbData: Record<string, any> = { connected: isMongoConnected };
@@ -526,7 +629,7 @@ app.get('/api/db/all', async (req, res) => {
 
     if (db) {
       for (const name of collections) {
-        if (name === 'company_about' || name === 'supervisor_pin' || name === 'page_loader_config' || name === 'home_3d_model') {
+        if (name === 'company_about' || name === 'supervisor_pin' || name === 'page_loader_config' || name === 'home_3d_model' || name === 'workshop_feedback_config') {
           const settingsCol = db.collection('settings');
           const doc = await settingsCol.findOne({ id: name });
           dbData[name] = doc ? doc.value : memoryDb[name];
@@ -546,6 +649,47 @@ app.get('/api/db/all', async (req, res) => {
     res.json(dbData);
   } catch (error: any) {
     console.error("Error loading sync snapshot from Database:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST to batch sync all collections to MongoDB
+app.post('/api/db/sync-all', async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const db = await getMongoDb();
+    
+    if (!db) {
+      return res.json({ 
+        success: false, 
+        connected: false, 
+        message: "Running in offline fallback mode. Database is not connected." 
+      });
+    }
+
+    const keys = Object.keys(payload);
+    for (const key of keys) {
+      const data = payload[key];
+      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config' || key === 'home_3d_model' || key === 'workshop_feedback_config' || !Array.isArray(data)) {
+        const settingsCol = db.collection('settings');
+        await settingsCol.updateOne(
+          { id: key },
+          { $set: { value: data } },
+          { upsert: true }
+        );
+      } else if (Array.isArray(data)) {
+        const col = db.collection(key);
+        await col.deleteMany({});
+        if (data.length > 0) {
+          const itemsToInsert = data.map(({ _id, ...rest }) => rest);
+          await col.insertMany(itemsToInsert);
+        }
+      }
+    }
+
+    res.json({ success: true, connected: true, syncedKeys: keys });
+  } catch (error: any) {
+    console.error("Batch sync failure:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -656,6 +800,111 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
+// POST to append an audit log entry in Database
+app.post('/api/logs', async (req, res) => {
+  try {
+    const { action, details, userEmail, role, status, category, metadata } = req.body;
+    if (!action) {
+      return res.status(400).json({ error: 'Action field is required for audit logging.' });
+    }
+
+    const logEntry = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      action: String(action).trim(),
+      details: String(details || '').trim(),
+      userEmail: String(userEmail || 'system@dakshyam.com').trim(),
+      role: String(role || 'system').trim(),
+      status: (status && ['SUCCESS', 'ERROR', 'INFO', 'WARNING'].includes(status)) ? status : 'INFO',
+      category: category || 'SYSTEM',
+      metadata: metadata || {}
+    };
+
+    if (!Array.isArray(memoryDb.app_logs)) {
+      memoryDb.app_logs = [];
+    }
+    memoryDb.app_logs.unshift(logEntry);
+    if (memoryDb.app_logs.length > 500) {
+      memoryDb.app_logs.length = 500;
+    }
+
+    const db = await getMongoDb();
+    if (db) {
+      await db.collection('app_logs').insertOne(logEntry);
+    }
+
+    res.json({ success: true, log: logEntry });
+  } catch (error: any) {
+    console.error('Audit log write error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET audit logs with search and category filters
+app.get('/api/logs', async (req, res) => {
+  try {
+    const { limit = '100', category, status, search } = req.query;
+    const maxItems = Math.min(parseInt(limit as string) || 100, 500);
+
+    const db = await getMongoDb();
+    if (db) {
+      const queryFilter: Record<string, any> = {};
+      if (category && category !== 'ALL') {
+        queryFilter.category = category;
+      }
+      if (status && status !== 'ALL') {
+        queryFilter.status = status;
+      }
+      if (search && typeof search === 'string' && search.trim()) {
+        const s = search.trim();
+        queryFilter.$or = [
+          { action: { $regex: s, $options: 'i' } },
+          { details: { $regex: s, $options: 'i' } },
+          { userEmail: { $regex: s, $options: 'i' } }
+        ];
+      }
+
+      const logs = await db.collection('app_logs')
+        .find(queryFilter)
+        .sort({ timestamp: -1 })
+        .limit(maxItems)
+        .toArray();
+
+      return res.json({
+        success: true,
+        count: logs.length,
+        logs: logs.map(({ _id, ...rest }) => rest)
+      });
+    }
+
+    // Fallback memoryDb logs
+    let logs = memoryDb.app_logs || [];
+    if (category && category !== 'ALL') {
+      logs = logs.filter((l: any) => l.category === category);
+    }
+    if (status && status !== 'ALL') {
+      logs = logs.filter((l: any) => l.status === status);
+    }
+    if (search && typeof search === 'string' && search.trim()) {
+      const s = search.toLowerCase().trim();
+      logs = logs.filter((l: any) => 
+        (l.action && l.action.toLowerCase().includes(s)) ||
+        (l.details && l.details.toLowerCase().includes(s)) ||
+        (l.userEmail && l.userEmail.toLowerCase().includes(s))
+      );
+    }
+
+    res.json({
+      success: true,
+      count: logs.slice(0, maxItems).length,
+      logs: logs.slice(0, maxItems)
+    });
+  } catch (error: any) {
+    console.error('Audit log fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST to update a collection in Database
 app.post('/api/db/:key', async (req, res) => {
   const { key } = req.params;
@@ -664,7 +913,7 @@ app.post('/api/db/:key', async (req, res) => {
     const db = await getMongoDb();
 
     if (db) {
-      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config' || key === 'home_3d_model') {
+      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config' || key === 'home_3d_model' || key === 'workshop_feedback_config' || !Array.isArray(data)) {
         const settingsCol = db.collection('settings');
         await settingsCol.updateOne(
           { id: key },
@@ -682,7 +931,7 @@ app.post('/api/db/:key', async (req, res) => {
       }
     } else {
       // Fallback local memory store
-      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config' || key === 'home_3d_model') {
+      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config' || key === 'home_3d_model' || key === 'workshop_feedback_config' || !Array.isArray(data)) {
         memoryDb[key] = data;
       } else if (Array.isArray(data)) {
         memoryDb[key] = data;

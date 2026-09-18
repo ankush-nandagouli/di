@@ -6,7 +6,25 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 
 // Canonical deployed Vercel domain for public student feedback links
-export const VERCEL_DOMAIN = 'https://dakshyminnovations.vercel.app';
+export const VERCEL_DOMAIN = 'https://dakshyaminnovations.vercel.app';
+
+export const getActiveBaseDomain = (): string => {
+  if (typeof window !== 'undefined' && window.location.origin) {
+    // If running on any deployed web host or production domain, use the current active origin
+    const origin = window.location.origin;
+    if (!origin.includes('localhost:3000') && !origin.includes('127.0.0.1:3000')) {
+      return origin;
+    }
+  }
+  // Check if a custom production domain was specified in localStorage
+  if (typeof localStorage !== 'undefined') {
+    const custom = localStorage.getItem('dakshyam_custom_production_domain');
+    if (custom && custom.startsWith('http')) {
+      return custom.replace(/\/+$/, '');
+    }
+  }
+  return VERCEL_DOMAIN;
+};
 
 export const toWorkshopSlug = (nameOrId: string): string => {
   return (nameOrId || '')
@@ -17,8 +35,19 @@ export const toWorkshopSlug = (nameOrId: string): string => {
     .replace(/^-+|-+$/g, '');
 };
 
-export const getWorkshopShareUrl = (ws?: WorkshopItem | string | null, useVercel = true): string => {
-  const base = useVercel ? VERCEL_DOMAIN : (typeof window !== 'undefined' ? window.location.origin : VERCEL_DOMAIN);
+export const getWorkshopShareUrl = (ws?: WorkshopItem | string | null, useVercel = false): string => {
+  let base = getActiveBaseDomain();
+  if (useVercel) {
+    // If current origin is already on Vercel or production domain, prefer active origin; otherwise fallback to VERCEL_DOMAIN
+    if (typeof window !== 'undefined' && window.location.origin && window.location.hostname.includes('vercel.app')) {
+      base = window.location.origin;
+    } else {
+      base = VERCEL_DOMAIN;
+    }
+  } else if (typeof window !== 'undefined' && window.location.origin) {
+    base = window.location.origin;
+  }
+
   if (!ws) {
     return `${base}/feedback-form`;
   }
@@ -26,6 +55,32 @@ export const getWorkshopShareUrl = (ws?: WorkshopItem | string | null, useVercel
     ? toWorkshopSlug(ws) 
     : (toWorkshopSlug(ws.name) || toWorkshopSlug(ws.id));
   return `${base}/feedback-form/${slug}`;
+};
+
+export const getWorkshopHashShareUrl = (ws?: WorkshopItem | string | null): string => {
+  const base = typeof window !== 'undefined' && window.location.origin ? window.location.origin : getActiveBaseDomain();
+  if (!ws) return `${base}/#/feedback-form`;
+  const slug = typeof ws === 'string' 
+    ? toWorkshopSlug(ws) 
+    : (toWorkshopSlug(ws.name) || toWorkshopSlug(ws.id));
+  return `${base}/#/feedback-form/${slug}`;
+};
+
+export const getWorkshopQueryShareUrl = (ws?: WorkshopItem | string | null): string => {
+  const base = typeof window !== 'undefined' && window.location.origin ? window.location.origin : getActiveBaseDomain();
+  if (!ws) return `${base}/?tab=feedback`;
+  const slug = typeof ws === 'string' 
+    ? toWorkshopSlug(ws) 
+    : (toWorkshopSlug(ws.name) || toWorkshopSlug(ws.id));
+  return `${base}/?tab=feedback&workshop=${slug}`;
+};
+
+export const getVercelWorkshopShareUrl = (ws?: WorkshopItem | string | null): string => {
+  return getWorkshopShareUrl(ws, true);
+};
+
+export const getLiveAppWorkshopShareUrl = (ws?: WorkshopItem | string | null): string => {
+  return getWorkshopShareUrl(ws, false);
 };
 
 export const DEFAULT_WORKSHOPS: WorkshopItem[] = [
@@ -267,13 +322,214 @@ export class WorkshopFeedbackStorage {
         `Admin modified workshop feedback form settings (${config.workshops.length} workshops, status: ${config.isOpen ? 'OPEN' : 'CLOSED'})`,
         'admin@dakshyam.com',
         'admin',
-        'SUCCESS'
+        'SUCCESS',
+        'WORKSHOP'
       );
       return true;
     } catch (err) {
       console.error('Save config error:', err);
       return false;
     }
+  }
+
+  // --- WORKSHOP LIFECYCLE & COUNTING ---
+  static getTotalWorkshopsCreated(): number {
+    const config = this.getFeedbackConfig();
+    return config.totalWorkshopsCreated || config.workshops.length || 0;
+  }
+
+  static async createWorkshop(
+    workshopData: {
+      name: string;
+      date: string;
+      venue: string;
+      trainerName?: string;
+      description?: string;
+      targetAudience?: string;
+      isActive?: boolean;
+    },
+    operatorEmail = 'admin@dakshyam.com',
+    operatorRole = 'admin'
+  ): Promise<{ success: boolean; workshop?: WorkshopItem; error?: string }> {
+    try {
+      if (!workshopData.name || !workshopData.name.trim()) {
+        return { success: false, error: 'Workshop title is required.' };
+      }
+      if (!workshopData.date || !workshopData.date.trim()) {
+        return { success: false, error: 'Workshop scheduled date is required.' };
+      }
+
+      const config = this.getFeedbackConfig();
+      const id = `WS-${Date.now().toString(36).toUpperCase()}`;
+      const slug = toWorkshopSlug(workshopData.name) || toWorkshopSlug(id);
+
+      const newWs: WorkshopItem = {
+        id,
+        name: workshopData.name.trim(),
+        date: workshopData.date.trim(),
+        venue: workshopData.venue?.trim() || 'Dakshyam Central STEM & Robotics Lab, Balaghat',
+        trainerName: workshopData.trainerName?.trim() || 'Dakshyam Tech Lead',
+        description: workshopData.description?.trim() || '',
+        targetAudience: workshopData.targetAudience?.trim() || 'School, College & Vocational STEM Candidates',
+        isActive: workshopData.isActive ?? true,
+        createdAt: new Date().toISOString(),
+        slug,
+        formUrl: `/feedback-form/${slug}`
+      };
+
+      // Check for duplicate by name
+      const existingIdx = config.workshops.findIndex(w => w.name.toLowerCase() === newWs.name.toLowerCase());
+      if (existingIdx >= 0) {
+        config.workshops[existingIdx] = { ...config.workshops[existingIdx], ...newWs };
+      } else {
+        config.workshops = [newWs, ...config.workshops];
+      }
+
+      // Maintain persistent lifetime count of created workshops
+      const currentCount = config.totalWorkshopsCreated || (config.workshops.length - 1);
+      config.totalWorkshopsCreated = Math.max(currentCount + 1, config.workshops.length);
+      config.updatedAt = new Date().toISOString();
+
+      await this.saveFeedbackConfig(config);
+
+      // Async sync to MongoDB backend
+      if (typeof fetch !== 'undefined') {
+        fetch('/api/db/workshop_feedback_config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: config })
+        }).catch(() => {});
+      }
+
+      const shareUrl = getWorkshopShareUrl(newWs, false);
+      const vercelUrl = getWorkshopShareUrl(newWs, true);
+
+      DakshyamDatabase.logEvent(
+        'Workshop Created & Form Published',
+        `Published new evaluation form for workshop "${newWs.name}" (ID: ${newWs.id}, Scheduled: ${newWs.date} at ${newWs.venue}, Lead Trainer: ${newWs.trainerName}). Live URL: ${shareUrl}. Lifetime workshops created: ${config.totalWorkshopsCreated}.`,
+        operatorEmail,
+        operatorRole,
+        'SUCCESS',
+        'WORKSHOP',
+        { workshopId: newWs.id, slug, shareUrl, vercelUrl, totalCount: config.totalWorkshopsCreated }
+      );
+
+      return { success: true, workshop: newWs };
+    } catch (err: any) {
+      console.error('Failed to create workshop:', err);
+      DakshyamDatabase.logEvent(
+        'Workshop Creation Failed',
+        `Error creating workshop "${workshopData.name}": ${err.message}`,
+        operatorEmail,
+        operatorRole,
+        'ERROR',
+        'WORKSHOP'
+      );
+      return { success: false, error: err.message || 'Failed to create workshop.' };
+    }
+  }
+
+  static async updateWorkshop(
+    id: string,
+    updates: Partial<WorkshopItem>,
+    operatorEmail = 'admin@dakshyam.com',
+    operatorRole = 'admin'
+  ): Promise<boolean> {
+    try {
+      const config = this.getFeedbackConfig();
+      const index = config.workshops.findIndex(w => w.id === id);
+      if (index === -1) return false;
+
+      const old = config.workshops[index];
+      const updated: WorkshopItem = {
+        ...old,
+        ...updates,
+        slug: updates.name ? toWorkshopSlug(updates.name) : (old.slug || toWorkshopSlug(old.name))
+      };
+      config.workshops[index] = updated;
+      config.updatedAt = new Date().toISOString();
+
+      await this.saveFeedbackConfig(config);
+
+      DakshyamDatabase.logEvent(
+        'Workshop Details Updated',
+        `Admin updated workshop "${updated.name}" (ID: ${id}, Status: ${updated.isActive ? 'ACTIVE' : 'INACTIVE'})`,
+        operatorEmail,
+        operatorRole,
+        'SUCCESS',
+        'WORKSHOP',
+        { workshopId: id, updates }
+      );
+      return true;
+    } catch (e) {
+      console.error('Error updating workshop:', e);
+      return false;
+    }
+  }
+
+  static async toggleWorkshopStatus(
+    id: string,
+    operatorEmail = 'admin@dakshyam.com',
+    operatorRole = 'admin'
+  ): Promise<boolean> {
+    const config = this.getFeedbackConfig();
+    const ws = config.workshops.find(w => w.id === id);
+    if (!ws) return false;
+    return this.updateWorkshop(id, { isActive: !ws.isActive }, operatorEmail, operatorRole);
+  }
+
+  static async deleteWorkshop(
+    id: string,
+    operatorEmail = 'admin@dakshyam.com',
+    operatorRole = 'admin'
+  ): Promise<boolean> {
+    try {
+      const config = this.getFeedbackConfig();
+      const target = config.workshops.find(w => w.id === id);
+      if (!target) return false;
+
+      config.workshops = config.workshops.filter(w => w.id !== id);
+      config.updatedAt = new Date().toISOString();
+
+      await this.saveFeedbackConfig(config);
+
+      DakshyamDatabase.logEvent(
+        'Workshop Deleted',
+        `Admin removed workshop "${target.name}" (ID: ${id}) from active configurations.`,
+        operatorEmail,
+        operatorRole,
+        'INFO',
+        'WORKSHOP',
+        { workshopId: id }
+      );
+      return true;
+    } catch (e) {
+      console.error('Error deleting workshop:', e);
+      return false;
+    }
+  }
+
+  static getWorkshopsWithStats(): (WorkshopItem & { submissionCount: number; avgRating: number })[] {
+    const config = this.getFeedbackConfig();
+    const submissions = this.getSubmissions();
+
+    return config.workshops.map(ws => {
+      const related = submissions.filter(s => 
+        s.workshopId === ws.id || 
+        toWorkshopSlug(s.workshopName) === toWorkshopSlug(ws.name)
+      );
+      const subCount = related.length;
+      let avgRating = 5;
+      if (subCount > 0) {
+        const sum = related.reduce((acc, curr) => acc + (curr.overallRating || 5), 0);
+        avgRating = Number((sum / subCount).toFixed(1));
+      }
+      return {
+        ...ws,
+        submissionCount: subCount,
+        avgRating
+      };
+    });
   }
 
   // --- SUBMISSIONS MANAGEMENT ---

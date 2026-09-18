@@ -188,6 +188,8 @@ export interface SpecialProgramEnrollment {
   enrolledAt: string;
 }
 
+export type LogCategory = 'WORKSHOP' | 'AUTH' | 'STUDENT' | 'TRAINER' | 'SECURITY' | 'SYSTEM' | 'CERTIFICATE' | 'FEEDBACK' | 'DATABASE';
+
 export interface AppLog {
   id: string;
   timestamp: string;
@@ -195,7 +197,9 @@ export interface AppLog {
   details: string;
   userEmail: string;
   role: string;
-  status: 'SUCCESS' | 'ERROR' | 'INFO';
+  status: 'SUCCESS' | 'ERROR' | 'INFO' | 'WARNING';
+  category?: LogCategory;
+  metadata?: Record<string, any>;
 }
 
 export interface PageLoaderConfig {
@@ -224,6 +228,11 @@ export interface WorkshopItem {
   trainerName?: string;
   description?: string;
   isActive: boolean;
+  createdAt?: string;
+  slug?: string;
+  formUrl?: string;
+  targetAudience?: string;
+  submissionCount?: number;
 }
 
 export interface CustomFeedbackQuestion {
@@ -242,6 +251,7 @@ export interface WorkshopFeedbackConfig {
   workshops: WorkshopItem[];
   customQuestions: CustomFeedbackQuestion[];
   updatedAt: string;
+  totalWorkshopsCreated?: number;
 }
 
 export interface WorkshopFeedbackSubmission {

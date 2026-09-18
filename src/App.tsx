@@ -21,6 +21,9 @@ import ContactUs from './components/ContactUs';
 import PageLoader from './components/PageLoader';
 import WorkshopFeedbackForm from './components/WorkshopFeedbackForm';
 import AdminWorkshopFeedbackManager from './components/AdminWorkshopFeedbackManager';
+import { SecurityToast } from './components/SecurityToast';
+import { SecurityGuard } from './utils/security';
+import { syncStorageWithCookies } from './utils/secureCookie';
 
 import { DakshyamDatabase } from './utils/db';
 import { Course, CourseApplication, StudentGroup, StudentUser, Certificate, VideoPost, PromoBanner, GalleryImage, PageLoaderConfig } from './types';
@@ -58,21 +61,38 @@ export default function App() {
   const [enteredPin, setEnteredPin] = useState('');
   const [pinError, setPinError] = useState('');
 
-  // Helper to parse feedback routes (supports /feedback-form/workshop-name, /feedback-form, ?tab=feedback, etc.)
+  // Helper to parse feedback routes (supports /feedback-form/workshop-name, /feedback, /workshop, hashes, params, etc.)
   const parseInitialFeedbackRoute = () => {
     try {
-      if (typeof window === 'undefined') return { isFeedback: false, slug: null };
+      if (typeof window === 'undefined') return { isFeedback: false, slug: null, fromPath: false };
       const pathname = window.location.pathname;
       const searchParams = new URLSearchParams(window.location.search);
+      const hash = window.location.hash || '';
 
-      if (pathname.startsWith('/feedback-form') || pathname.startsWith('/feedback')) {
-        const parts = pathname.split('/').filter(Boolean);
-        const slug = parts.length > 1 ? decodeURIComponent(parts.slice(1).join('/')) : null;
-        return { isFeedback: true, slug, fromPath: true };
+      const feedbackPrefixes = ['/feedback-form', '/feedback', '/workshop-form', '/workshop', '/workshops'];
+      for (const prefix of feedbackPrefixes) {
+        if (pathname.startsWith(prefix)) {
+          const parts = pathname.slice(prefix.length).split('/').filter(Boolean);
+          const slug = parts.length > 0 ? decodeURIComponent(parts[0]) : null;
+          return { isFeedback: true, slug, fromPath: true };
+        }
       }
 
-      if (searchParams.get('tab') === 'feedback' || searchParams.get('feedback') !== null) {
-        const slug = searchParams.get('workshop') || searchParams.get('w') || searchParams.get('ws');
+      // Check hash route (e.g. #/feedback-form/slug or #feedback...)
+      if (hash.includes('feedback') || hash.includes('workshop')) {
+        const cleanHash = hash.replace(/^#\/?/, '');
+        for (const prefix of feedbackPrefixes) {
+          const cleanPrefix = prefix.replace(/^\//, '');
+          if (cleanHash.startsWith(cleanPrefix)) {
+            const parts = cleanHash.slice(cleanPrefix.length).split('/').filter(Boolean);
+            const slug = parts.length > 0 ? decodeURIComponent(parts[0]) : null;
+            return { isFeedback: true, slug, fromPath: true };
+          }
+        }
+      }
+
+      if (searchParams.get('tab') === 'feedback' || searchParams.get('feedback') !== null || searchParams.get('workshop') !== null) {
+        const slug = searchParams.get('workshop') || searchParams.get('w') || searchParams.get('ws') || searchParams.get('slug');
         return { isFeedback: true, slug, fromPath: false };
       }
     } catch (e) {
@@ -167,8 +187,13 @@ export default function App() {
     }
   }, []);
 
-  // Initial page load lazy animation
+  // Initial page load lazy animation & Enterprise Security Initialization
   useEffect(() => {
+    // Initialize Enterprise Security Guard (restricts unauthorized right click & devtools inspection)
+    SecurityGuard.init();
+    // Synchronize resilient cookie and local storage across Edge, Brave, and modern browsers
+    syncStorageWithCookies();
+
     if (pageLoaderConfig.enabled) {
       const timer = setTimeout(() => {
         setIsPageLoading(false);
@@ -200,7 +225,11 @@ export default function App() {
       }
     };
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
   }, []);
 
   // Compute active loader configuration with local video preference
@@ -2927,6 +2956,9 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ENTERPRISE SECURITY VIOLATION FEEDBACK TOAST */}
+      <SecurityToast />
 
     </div>
   );

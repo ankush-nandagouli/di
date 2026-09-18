@@ -2,7 +2,21 @@
 <html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    
+    <!-- Browser Compatibility & Privacy Directives (Brave, Edge, Chrome, Safari, Firefox) -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="color-scheme" content="dark light" />
+    
+    <!-- Microsoft Edge & Windows Modern App Tile Meta -->
+    <meta name="application-name" content="Dakshyam Innovations" />
+    <meta name="msapplication-TileColor" content="#0a192f" />
+    <meta name="msapplication-TileImage" content="/logo.png" />
+    <meta name="msapplication-navbutton-color" content="#0a192f" />
+    <meta name="msapplication-tap-highlight" content="no" />
+    <meta name="msapplication-tooltip" content="Dakshyam Innovations Enterprise Portal" />
+    <meta name="msapplication-starturl" content="/" />
     
     <!-- Favicons and Touch Icons -->
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
@@ -10,8 +24,15 @@
     <link rel="apple-touch-icon" href="/logo.png" />
     <link rel="manifest" href="/manifest.json" />
     
+    <!-- International & Canonical References -->
+    <link rel="canonical" href="https://dakshyaminnovations.vercel.app/" />
+    <link rel="alternate" hreflang="x-default" href="https://dakshyaminnovations.vercel.app/" />
+    <link rel="alternate" hreflang="en-IN" href="https://dakshyaminnovations.vercel.app/" />
+    <link rel="alternate" hreflang="en" href="https://dakshyaminnovations.vercel.app/" />
+    
     <!-- Search Engine Verification -->
     <meta name="google-site-verification" content="-J-4SJZZSZi8ZnXnGNkyvz1Sul8ujkFSQ-K5FoxFDug" />
+    <meta name="msvalidate.01" content="DAKSHYAM_BING_EDGE_VERIFY" />
     
     <!-- Primary SEO Metadata -->
     <title>Dakshyam Innovations | IoT Training, Web Development & Industrial Automation</title>
@@ -87,7 +108,27 @@
             "publisher": {
               "@id": "https://dakshyaminnovations.vercel.app/#organization"
             },
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": "https://dakshyaminnovations.vercel.app/?tab=services&q={search_term_string}",
+              "query-input": "required name=search_term_string"
+            },
             "inLanguage": "en-US"
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://dakshyaminnovations.vercel.app/#webapp",
+            "name": "Dakshyam Innovations Portal",
+            "url": "https://dakshyaminnovations.vercel.app/",
+            "applicationCategory": "EducationalApplication",
+            "operatingSystem": "All",
+            "browserRequirements": "Compatible with all modern HTML5 browsers including Microsoft Edge, Brave Browser, Google Chrome, Mozilla Firefox, Apple Safari, and Opera.",
+            "description": "Enterprise platform for Technical Training, IoT Telemetry, Robotics Certifications, and Workshop Evaluations with anti-tamper security.",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "INR"
+            }
           },
           {
             "@type": "EducationalOrganization",

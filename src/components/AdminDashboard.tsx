@@ -4,7 +4,8 @@ import {
   Plus, Trash, BookOpen, Layers, Users, Calendar, 
   Settings, CheckCircle, HelpCircle, Activity, Award, Check, 
   ShieldCheck, Sparkles, Image as ImageIcon, ToggleLeft, ToggleRight, X,
-  Download, FileSpreadsheet, Printer, RotateCcw, Eye, RefreshCw
+  Download, FileSpreadsheet, Printer, RotateCcw, Eye, RefreshCw,
+  ShieldAlert, Lock, Unlock, Cookie, Globe
 } from 'lucide-react';
 import { Course, CourseApplication, StudentGroup, StudentUser, TrainerUser, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, Certificate, CompanyAbout } from '../types';
 import { DakshyamDatabase } from '../utils/db';
@@ -15,6 +16,7 @@ import OfficialCertificate from './OfficialCertificate';
 import PageLoaderSettingsTab from './PageLoaderSettingsTab';
 import Home3DArtSettingsTab from './Home3DArtSettingsTab';
 import AdminWorkshopFeedbackManager from './AdminWorkshopFeedbackManager';
+import { SecurityGuard } from '../utils/security';
 
 interface AdminDashboardProps {
   courses: Course[];
@@ -45,6 +47,9 @@ export default function AdminDashboard({
   // Audit Logs Filtering States
   const [searchLog, setSearchLog] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'ERROR' | 'INFO'>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [isFetchingLogs, setIsFetchingLogs] = useState(false);
+  const [isSecurityBypassed, setIsSecurityBypassed] = useState<boolean>(() => SecurityGuard.getIsBypassed());
 
   // DB connection advice helper & live diagnostic tester
   const [showDbAdvice, setShowDbAdvice] = useState(false);
@@ -2916,83 +2921,293 @@ export default function AdminDashboard({
                                   log.details.toLowerCase().includes(searchLog.toLowerCase()) ||
                                   log.userEmail.toLowerCase().includes(searchLog.toLowerCase());
             const matchesStatus = statusFilter === 'ALL' || log.status === statusFilter;
-            return matchesSearch && matchesStatus;
+            const matchesCategory = categoryFilter === 'ALL' || log.category === categoryFilter;
+            return matchesSearch && matchesStatus && matchesCategory;
           });
 
+          const workshopLogsCount = rawLogs.filter(l => l.category === 'WORKSHOP' || l.action.toLowerCase().includes('workshop')).length;
+          const securityLogsCount = rawLogs.filter(l => l.category === 'SECURITY' || l.category === 'AUTH' || l.action.toLowerCase().includes('login') || l.action.toLowerCase().includes('lockout')).length;
+          const errorLogsCount = rawLogs.filter(l => l.status === 'ERROR').length;
+
+          const handleSyncRemoteLogs = async () => {
+            setIsFetchingLogs(true);
+            try {
+              const remoteLogs = await DakshyamDatabase.fetchRemoteLogs();
+              if (remoteLogs && remoteLogs.length > 0) {
+                DakshyamDatabase.saveAppLogs(remoteLogs);
+              }
+              onRefresh();
+            } catch (err) {
+              console.error('Remote sync fail', err);
+            } finally {
+              setIsFetchingLogs(false);
+            }
+          };
+
+          const logCategories = ['ALL', 'WORKSHOP', 'AUTH', 'SECURITY', 'DATABASE', 'CERTIFICATE', 'STUDENT', 'TRAINER', 'SYSTEM'];
+
           return (
-            <div className="space-y-6 text-left">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4 border-slate-500/10">
+            <div className="space-y-6 text-left animate-fadeIn">
+              
+              {/* TOP HEADER & METRICS */}
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4 border-slate-500/15">
                 <div>
-                  <h3 className={`text-sm font-black font-mono tracking-wider uppercase ${isLight ? 'text-amber-800' : 'text-[#22d3ee]'}`}>
-                    🛡️ System Access and Security Audit logs
+                  <h3 className={`text-sm font-black font-mono tracking-wider uppercase flex items-center gap-2 ${isLight ? 'text-amber-800' : 'text-[#22d3ee]'}`}>
+                    <span>🛡️ System Security & Workshop Audit Stream</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+                      LIVE TELEMETRY
+                    </span>
                   </h3>
                   <p className="text-3xs font-mono text-slate-500 mt-0.5">
-                    Centralized platform telemetry tracking user logins, failed attempts, and operational updates in real time.
+                    Centralized platform telemetry tracking workshop publications, participant evaluation entries, security authorizations, and administrative actions.
                   </p>
                 </div>
-                <button
-                  onClick={() => {
-                    if (window.confirm('Are you sure you want to purge all security log streams? This cannot be undone.')) {
-                      DakshyamDatabase.saveAppLogs([
-                        {
-                          id: 'log-purged',
-                          timestamp: new Date().toISOString(),
-                          action: 'Audit Log Cleared',
-                          details: 'Admin purged the history log records manually.',
-                          userEmail: 'admin@dakshyam.com',
-                          role: 'admin',
-                          status: 'INFO'
-                        }
-                      ]);
-                      onRefresh();
-                    }
-                  }}
-                  className={`px-3 py-1.5 rounded-xl border font-mono text-3xs font-bold transition-all hover:bg-red-500 hover:text-white cursor-pointer ${
-                    isLight ? 'border-red-500/35 text-red-700 bg-red-50/50' : 'border-red-500/20 text-red-400 bg-red-950/20'
-                  }`}
-                >
-                  Clear Audit Log Stream
-                </button>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleSyncRemoteLogs}
+                    disabled={isFetchingLogs}
+                    className={`px-3 py-1.5 rounded-xl border font-mono text-3xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isLight ? 'bg-sky-50 border-sky-200 text-sky-800 hover:bg-sky-100' : 'bg-sky-950/40 border-sky-500/30 text-sky-300 hover:bg-sky-900/50'
+                    }`}
+                    title="Fetch centralized logs from database"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isFetchingLogs ? 'animate-spin' : ''}`} />
+                    <span>{isFetchingLogs ? 'Syncing...' : 'Sync Cloud Logs'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => DakshyamDatabase.exportLogsToCsv(filteredLogs)}
+                    className={`px-3 py-1.5 rounded-xl border font-mono text-3xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100' : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/50'
+                    }`}
+                    title="Download filtered logs as CSV spreadsheet"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>CSV</span>
+                  </button>
+
+                  <button
+                    onClick={() => DakshyamDatabase.exportLogsToJson(filteredLogs)}
+                    className={`px-3 py-1.5 rounded-xl border font-mono text-3xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isLight ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                    }`}
+                    title="Export raw JSON log stream"
+                  >
+                    <FileSpreadsheet className="w-3 h-3" />
+                    <span>JSON</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to purge all security log streams? This cannot be undone.')) {
+                        DakshyamDatabase.saveAppLogs([
+                          {
+                            id: 'log-purged',
+                            timestamp: new Date().toISOString(),
+                            action: 'Audit Log Cleared',
+                            details: 'Admin purged the history log records manually.',
+                            userEmail: 'admin@dakshyam.com',
+                            role: 'admin',
+                            status: 'INFO',
+                            category: 'SECURITY'
+                          }
+                        ]);
+                        onRefresh();
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-xl border font-mono text-3xs font-bold transition-all hover:bg-red-500 hover:text-white cursor-pointer ${
+                      isLight ? 'border-red-500/35 text-red-700 bg-red-50/50' : 'border-red-500/20 text-red-400 bg-red-950/20'
+                    }`}
+                  >
+                    Purge
+                  </button>
+                </div>
               </div>
 
-              {/* Filtering Controls */}
-              <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-                <input
-                  type="text"
-                  placeholder="Filter logs by action, details, or operator email..."
-                  value={searchLog}
-                  onChange={(e) => setSearchLog(e.target.value)}
-                  className={`w-full sm:max-w-md rounded-xl px-3 py-2 text-3xs font-mono border focus:outline-none focus:ring-1 ${
-                    isLight
-                      ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500'
-                      : 'bg-[#111]/80 border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-450'
-                  }`}
-                />
-                
-                <div className="flex gap-1">
-                  {(['ALL', 'SUCCESS', 'ERROR', 'INFO'] as const).map(f => (
+              {/* ENTERPRISE SECURITY & BROWSER COMPATIBILITY CONTROL PANEL */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                isLight 
+                  ? 'bg-gradient-to-r from-blue-50/70 to-indigo-50/40 border-blue-200 shadow-xs text-slate-800' 
+                  : 'bg-gradient-to-r from-[#071326]/90 to-[#0d1f38]/90 border-blue-800/40 shadow-md text-slate-200'
+              }`}>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-blue-500/15">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`p-2 rounded-xl ${isLight ? 'bg-blue-600 text-white shadow-xs' : 'bg-blue-500/20 text-cyan-400 border border-blue-400/30'}`}>
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className={`text-xs font-mono font-black uppercase tracking-wider ${isLight ? 'text-blue-950' : 'text-white'}`}>
+                        Enterprise Security & Multi-Browser Engine
+                      </h3>
+                      <p className="text-4xs font-sans text-slate-400">
+                        Right-click restriction, DevTools interceptor, resilient cookie sync (Brave/Edge), and search engine indexing.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
                     <button
-                      key={f}
-                      onClick={() => setStatusFilter(f)}
-                      className={`px-2.5 py-1.5 rounded-lg border font-mono text-4xs font-bold uppercase transition-all cursor-pointer ${
-                        statusFilter === f
-                          ? (isLight ? 'bg-amber-100 border-amber-500 text-amber-950' : 'bg-cyan-950/80 border-cyan-400/85 text-cyan-400')
-                          : (isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-100' : 'border-cyan-500/5 text-slate-450 hover:text-white hover:bg-[#111]')
+                      type="button"
+                      onClick={() => {
+                        const nextBypass = !isSecurityBypassed;
+                        SecurityGuard.setBypass(nextBypass);
+                        setIsSecurityBypassed(nextBypass);
+                        if (nextBypass) {
+                          alert('DevTools & Right-Click protection temporarily bypassed for Admin inspection.');
+                        } else {
+                          alert('Enterprise Security Guard restored. Right-click and DevTools shortcuts are now actively blocked.');
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-xl font-mono text-4xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
+                        isSecurityBypassed
+                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs'
+                          : isLight 
+                            ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-xs' 
+                            : 'bg-white hover:bg-slate-100 text-[#0a192f] shadow-[0_0_12px_rgba(255,255,255,0.15)]'
                       }`}
                     >
-                      {f}
+                      {isSecurityBypassed ? <Unlock className="w-3.5 h-3.5 text-slate-950" /> : <Lock className="w-3.5 h-3.5" />}
+                      <span>{isSecurityBypassed ? 'Bypass Active (Dev Enabled)' : 'Bypass for Admin Debug'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
+                  <div className={`p-3 rounded-xl border ${isLight ? 'bg-white/80 border-blue-100' : 'bg-[#040d1a]/60 border-blue-900/30'}`}>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-4xs font-mono font-bold uppercase text-slate-400 flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-cyan-400" /> DevTools & Context Menu
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded text-5xs font-mono font-bold uppercase ${
+                        isSecurityBypassed ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-400'
+                      }`}>
+                        {isSecurityBypassed ? 'Bypassed' : 'Restricted'}
+                      </span>
+                    </div>
+                    <p className="text-4xs font-sans text-slate-400 leading-snug">
+                      F12, Ctrl+Shift+I/J/C, Ctrl+U, right click, and drag-and-drop scraping disabled.
+                    </p>
+                  </div>
+
+                  <div className={`p-3 rounded-xl border ${isLight ? 'bg-white/80 border-blue-100' : 'bg-[#040d1a]/60 border-blue-900/30'}`}>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-4xs font-mono font-bold uppercase text-slate-400 flex items-center gap-1">
+                        <Cookie className="w-3 h-3 text-sky-400" /> Brave / Edge Cookie Sync
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-5xs font-mono font-bold uppercase bg-emerald-500/20 text-emerald-400">
+                        Synchronized
+                      </span>
+                    </div>
+                    <p className="text-4xs font-sans text-slate-400 leading-snug">
+                      Dual-layer persistence syncs cookies with localStorage against aggressive privacy blockers.
+                    </p>
+                  </div>
+
+                  <div className={`p-3 rounded-xl border ${isLight ? 'bg-white/80 border-blue-100' : 'bg-[#040d1a]/60 border-blue-900/30'}`}>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-4xs font-mono font-bold uppercase text-slate-400 flex items-center gap-1">
+                        <Globe className="w-3 h-3 text-indigo-400" /> Multi-Browser SEO Directives
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-5xs font-mono font-bold uppercase bg-emerald-500/20 text-emerald-400">
+                        Optimized
+                      </span>
+                    </div>
+                    <p className="text-4xs font-sans text-slate-400 leading-snug">
+                      Windows Edge application tiles, Brave referrer headers, hreflang, and JSON-LD schemas.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* TELEMETRY METRICS CARDS */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className={`p-3.5 rounded-2xl border font-mono ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-cyan-500/20'}`}>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Total Logged Events</span>
+                  <div className="text-xl font-black mt-1 text-sky-400">{rawLogs.length}</div>
+                  <span className="text-[9px] text-slate-500">Platform-wide activities</span>
+                </div>
+
+                <div className={`p-3.5 rounded-2xl border font-mono ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-purple-500/20'}`}>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Workshop Activities</span>
+                  <div className="text-xl font-black mt-1 text-purple-400">{workshopLogsCount}</div>
+                  <span className="text-[9px] text-slate-500">Creation & submissions</span>
+                </div>
+
+                <div className={`p-3.5 rounded-2xl border font-mono ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-amber-500/20'}`}>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Security & Auth</span>
+                  <div className="text-xl font-black mt-1 text-amber-400">{securityLogsCount}</div>
+                  <span className="text-[9px] text-slate-500">Tokens, logins & PINs</span>
+                </div>
+
+                <div className={`p-3.5 rounded-2xl border font-mono ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-red-500/20'}`}>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Alerts & Failures</span>
+                  <div className="text-xl font-black mt-1 text-red-400">{errorLogsCount}</div>
+                  <span className="text-[9px] text-slate-500">Critical exceptions</span>
+                </div>
+              </div>
+
+              {/* CATEGORY & STATUS FILTERS */}
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-3xs font-mono text-slate-400 uppercase font-bold mr-1">Category:</span>
+                  {logCategories.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setCategoryFilter(cat)}
+                      className={`px-2.5 py-1 rounded-lg border font-mono text-4xs font-bold uppercase transition-all cursor-pointer ${
+                        categoryFilter === cat
+                          ? isLight 
+                            ? 'bg-blue-900 text-white border-blue-900 shadow-sm' 
+                            : 'bg-cyan-500 text-slate-950 border-cyan-400 font-black shadow-[0_0_10px_rgba(34,211,238,0.3)]'
+                          : isLight 
+                            ? 'border-slate-200 text-slate-600 hover:bg-slate-100' 
+                            : 'border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {cat}
                     </button>
                   ))}
                 </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+                  <input
+                    type="text"
+                    placeholder="Search logs by action, details, email, or workshop name..."
+                    value={searchLog}
+                    onChange={(e) => setSearchLog(e.target.value)}
+                    className={`w-full sm:max-w-md rounded-xl px-3 py-2 text-3xs font-mono border focus:outline-none focus:ring-1 ${
+                      isLight
+                        ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500'
+                        : 'bg-[#111]/80 border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-450'
+                    }`}
+                  />
+                  
+                  <div className="flex gap-1 self-start sm:self-auto">
+                    {(['ALL', 'SUCCESS', 'ERROR', 'INFO'] as const).map(f => (
+                      <button
+                        key={f}
+                        onClick={() => setStatusFilter(f)}
+                        className={`px-2.5 py-1.5 rounded-lg border font-mono text-4xs font-bold uppercase transition-all cursor-pointer ${
+                          statusFilter === f
+                            ? (isLight ? 'bg-amber-100 border-amber-500 text-amber-950' : 'bg-cyan-950/80 border-cyan-400/85 text-cyan-400')
+                            : (isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-100' : 'border-cyan-500/5 text-slate-450 hover:text-white hover:bg-[#111]')
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              {/* Log List */}
-              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+              {/* LOGS LIST STREAM */}
+              <div className="space-y-2 max-h-[550px] overflow-y-auto pr-1">
                 {filteredLogs.length === 0 ? (
                   <div className={`p-8 text-center rounded-2xl border ${
                     isLight ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-[#111]/40 border-cyan-500/5 text-slate-500'
                   }`}>
-                    <p className="text-3xs font-mono">No telemetry events found matching the criteria.</p>
+                    <p className="text-3xs font-mono">No telemetry events found matching the active criteria.</p>
                   </div>
                 ) : (
                   filteredLogs.map(log => {
@@ -3004,6 +3219,23 @@ export default function AdminDashboard({
                     } else {
                       statusBg = isLight ? 'bg-slate-50 text-slate-700 border-slate-200' : 'bg-zinc-900/60 text-zinc-400 border-cyan-500/5';
                     }
+
+                    const categoryBadgeClass = () => {
+                      switch (log.category) {
+                        case 'WORKSHOP':
+                          return isLight ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-purple-950/50 text-purple-300 border-purple-500/30';
+                        case 'SECURITY':
+                          return isLight ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-rose-950/50 text-rose-300 border-rose-500/30';
+                        case 'AUTH':
+                          return isLight ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-amber-950/50 text-amber-300 border-amber-500/30';
+                        case 'DATABASE':
+                          return isLight ? 'bg-cyan-100 text-cyan-800 border-cyan-200' : 'bg-cyan-950/50 text-cyan-300 border-cyan-500/30';
+                        case 'CERTIFICATE':
+                          return isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-emerald-950/50 text-emerald-300 border-emerald-500/30';
+                        default:
+                          return isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-slate-800 text-slate-400 border-slate-700';
+                      }
+                    };
 
                     return (
                       <div
@@ -3017,6 +3249,11 @@ export default function AdminDashboard({
                             <span className={`px-1.5 py-0.5 rounded text-4xs uppercase font-extrabold border ${statusBg}`}>
                               {log.status}
                             </span>
+                            {log.category && (
+                              <span className={`px-1.5 py-0.5 rounded text-4xs font-black uppercase border ${categoryBadgeClass()}`}>
+                                {log.category}
+                              </span>
+                            )}
                             <span className={`font-extrabold uppercase text-2xs ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
                               {log.action}
                             </span>
