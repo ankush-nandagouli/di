@@ -1,3 +1,5 @@
+import { DakshyamDatabase } from './db';
+
 /**
  * Utility for uploading photos, videos, and 3D models via server-side proxy
  * Supports both Cloudinary and resilient server static storage fallback
@@ -35,9 +37,17 @@ export async function uploadMediaToCloudinary(
   }
 
   try {
+    const token = DakshyamDatabase.getAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const res = await fetch('/api/upload', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ file: base64Data, resourceType, fileName: resolvedFileName })
     });
 

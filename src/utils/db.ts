@@ -167,15 +167,40 @@ export class DakshyamDatabase {
     }
   }
 
+  static getAuthToken(): string | null {
+    try {
+      return localStorage.getItem('dakshyam_auth_token');
+    } catch {
+      return null;
+    }
+  }
+
+  static setAuthToken(token: string | null): void {
+    try {
+      if (token) {
+        localStorage.setItem('dakshyam_auth_token', token);
+      } else {
+        localStorage.removeItem('dakshyam_auth_token');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   static set<T>(key: string, data: T): void {
     try {
       localStorage.setItem(`dakshyam_db_${key}`, JSON.stringify(data));
-      // Asynchronously synchronize with MongoDB Atlas
+      // Asynchronously synchronize with MongoDB Atlas using Bearer token
+      const token = this.getAuthToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       fetch(`/api/db/${key}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({ data })
       }).catch(err => console.warn(`Background MongoDB sync warning for key ${key}:`, err));
     } catch (e) {
@@ -286,7 +311,8 @@ export class DakshyamDatabase {
   static setLoggedInUser(user: any) {
     try {
       if (user) {
-        localStorage.setItem('dakshyam_logged_in_user', JSON.stringify(user));
+        const { password, passwordHash, ...safeUser } = user;
+        localStorage.setItem('dakshyam_logged_in_user', JSON.stringify(safeUser));
       } else {
         localStorage.removeItem('dakshyam_logged_in_user');
       }
@@ -311,7 +337,6 @@ export class DakshyamDatabase {
       name,
       email,
       role: 'student',
-      password: password || '123456',
       profile,
       createdAt: new Date().toISOString().split('T')[0]
     };
@@ -334,8 +359,7 @@ export class DakshyamDatabase {
       name,
       email,
       role: 'trainer',
-      isApproved, // Set depending on code verification or admin approval
-      password: password || '123456',
+      isApproved,
       createdAt: new Date().toISOString().split('T')[0]
     };
 
@@ -421,7 +445,7 @@ export class DakshyamDatabase {
   }
 
   static getSupervisorPin(): string {
-    return this.get<string>('supervisor_pin', '427752');
+    return this.get<string>('supervisor_pin', '');
   }
 
   static saveSupervisorPin(pin: string): void {

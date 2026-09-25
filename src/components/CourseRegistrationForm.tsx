@@ -4,6 +4,7 @@ import { Send, CheckCircle2, User, Phone, School, Mail, ShieldAlert, LogIn, User
 import { Course, CourseApplication } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
+import { NotificationService } from '../utils/notificationService';
 
 interface CourseRegistrationFormProps {
   courses: Course[];
@@ -98,6 +99,35 @@ export default function CourseRegistrationForm({
 
           apps.push(newApp);
           DakshyamDatabase.saveApplications(apps);
+
+          // Dispatch real-time notifications
+          try {
+            const courseTitle = courses.find(c => c.id === selectedCourseId)?.title || 'Vocational Course';
+            // Alert Admin
+            NotificationService.dispatchNotification({
+              title: `New Admission Application: ${courseTitle}`,
+              message: `${fullName.trim()} (${institution.trim()}) applied for admission.`,
+              targetRole: 'admin',
+              category: 'enrollment',
+              priority: 'normal',
+              linkTab: 'portal'
+            });
+
+            // Student confirmation alert (isolated to student role/user)
+            if (currentUser?.id || email) {
+              NotificationService.dispatchNotification({
+                title: `Application Received: ${courseTitle}`,
+                message: `Your application for ${courseTitle} has been submitted for verification.`,
+                targetRole: 'student',
+                targetUserId: currentUser?.id || email,
+                category: 'course',
+                priority: 'normal',
+                linkTab: 'services'
+              });
+            }
+          } catch (notifErr) {
+            console.warn('Silent notification handling:', notifErr);
+          }
 
           setIsSubmitting(false);
           setIsDone(true);

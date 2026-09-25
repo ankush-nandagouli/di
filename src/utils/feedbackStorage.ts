@@ -2,7 +2,7 @@ import { db } from './firebase';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { WorkshopFeedbackSubmission, WorkshopFeedbackConfig, WorkshopItem } from '../types';
 import { DakshyamDatabase } from './db';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
 
 // Canonical deployed Vercel domain for public student feedback links
@@ -636,76 +636,87 @@ export class WorkshopFeedbackStorage {
     }
   }
 
-  // --- EXPORT TO EXCEL (.XLSX) ---
-  static exportToExcel(submissions: WorkshopFeedbackSubmission[], filename = 'Dakshyam_Workshop_Feedback_Report.xlsx'): void {
+  // --- EXPORT TO EXCEL (.XLSX) VIA SECURE EXCELJS ---
+  static async exportToExcel(submissions: WorkshopFeedbackSubmission[], filename = 'Dakshyam_Workshop_Feedback_Report.xlsx'): Promise<void> {
     try {
-      const formattedData = submissions.map((sub, index) => ({
-        'S.No': index + 1,
-        'Feedback ID': sub.id,
-        'Workshop Name': sub.workshopName,
-        'Workshop Date': sub.workshopDate,
-        'Venue / Campus': sub.workshopVenue,
-        'Category': sub.participantCategory.toUpperCase(),
-        'Full Name': sub.fullName,
-        'Email Address': sub.email,
-        'Phone Number': sub.phone,
-        'Institution / College / School': sub.institutionName,
-        'City': sub.city,
-        'State': sub.state,
-        'Branch / Grade / Dept': sub.branchOrGrade || 'N/A',
-        'Roll / ID / Emp No': sub.rollOrEmployeeId || 'N/A',
-        'Role / Designation': sub.designationOrRole || 'N/A',
-        'Overall Rating (1-5)': sub.overallRating,
-        'Trainer Knowledge (1-5)': sub.trainerKnowledgeRating,
-        'Hands-on Practical Kits (1-5)': sub.practicalHardwareRating,
-        'Industry Relevance (1-5)': sub.industryRelevanceRating,
-        'Lab Management (1-5)': sub.labManagementRating,
-        'Key Learnings': sub.keyLearnings,
-        'Favorite Exercise / Component': sub.favoriteComponent,
-        'Improvement Suggestions': sub.improvementSuggestions,
-        'Future Interests': Array.isArray(sub.futureInterests) ? sub.futureInterests.join(', ') : '',
-        'Recommend Dakshyam': sub.recommendDakshyam,
-        'Testimonial': sub.testimonial || '',
-        'Submitted At': new Date(sub.submittedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
-      }));
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Workshop Feedback');
 
-      const worksheet = XLSX.utils.json_to_sheet(formattedData);
-
-      // Set column widths for readability
-      worksheet['!cols'] = [
-        { wch: 6 },  // S.No
-        { wch: 15 }, // ID
-        { wch: 30 }, // Workshop Name
-        { wch: 12 }, // Date
-        { wch: 30 }, // Venue
-        { wch: 14 }, // Category
-        { wch: 22 }, // Name
-        { wch: 26 }, // Email
-        { wch: 14 }, // Phone
-        { wch: 28 }, // Institution
-        { wch: 14 }, // City
-        { wch: 16 }, // State
-        { wch: 22 }, // Branch
-        { wch: 16 }, // Roll
-        { wch: 18 }, // Role
-        { wch: 12 }, // Overall Rating
-        { wch: 12 }, // Trainer Rating
-        { wch: 12 }, // Practical Rating
-        { wch: 12 }, // Industry Rating
-        { wch: 12 }, // Lab Rating
-        { wch: 40 }, // Learnings
-        { wch: 30 }, // Favorite
-        { wch: 35 }, // Suggestions
-        { wch: 30 }, // Interests
-        { wch: 16 }, // Recommend
-        { wch: 35 }, // Testimonial
-        { wch: 20 }  // Submitted At
+      worksheet.columns = [
+        { header: 'S.No', key: 'sno', width: 6 },
+        { header: 'Feedback ID', key: 'id', width: 15 },
+        { header: 'Workshop Name', key: 'workshopName', width: 30 },
+        { header: 'Workshop Date', key: 'workshopDate', width: 12 },
+        { header: 'Venue / Campus', key: 'workshopVenue', width: 30 },
+        { header: 'Category', key: 'category', width: 14 },
+        { header: 'Full Name', key: 'fullName', width: 22 },
+        { header: 'Email Address', key: 'email', width: 26 },
+        { header: 'Phone Number', key: 'phone', width: 14 },
+        { header: 'Institution / College / School', key: 'institutionName', width: 28 },
+        { header: 'City', key: 'city', width: 14 },
+        { header: 'State', key: 'state', width: 16 },
+        { header: 'Branch / Grade / Dept', key: 'branchOrGrade', width: 22 },
+        { header: 'Roll / ID / Emp No', key: 'rollOrEmployeeId', width: 16 },
+        { header: 'Role / Designation', key: 'designationOrRole', width: 18 },
+        { header: 'Overall Rating (1-5)', key: 'overallRating', width: 12 },
+        { header: 'Trainer Knowledge (1-5)', key: 'trainerKnowledgeRating', width: 12 },
+        { header: 'Hands-on Practical Kits (1-5)', key: 'practicalHardwareRating', width: 12 },
+        { header: 'Industry Relevance (1-5)', key: 'industryRelevanceRating', width: 12 },
+        { header: 'Lab Management (1-5)', key: 'labManagementRating', width: 12 },
+        { header: 'Key Learnings', key: 'keyLearnings', width: 40 },
+        { header: 'Favorite Exercise / Component', key: 'favoriteComponent', width: 30 },
+        { header: 'Improvement Suggestions', key: 'improvementSuggestions', width: 35 },
+        { header: 'Future Interests', key: 'futureInterests', width: 30 },
+        { header: 'Recommend Dakshyam', key: 'recommendDakshyam', width: 16 },
+        { header: 'Testimonial', key: 'testimonial', width: 35 },
+        { header: 'Submitted At', key: 'submittedAt', width: 20 }
       ];
 
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Workshop Feedback');
+      submissions.forEach((sub, index) => {
+        worksheet.addRow({
+          sno: index + 1,
+          id: sub.id,
+          workshopName: sub.workshopName,
+          workshopDate: sub.workshopDate,
+          workshopVenue: sub.workshopVenue,
+          category: sub.participantCategory.toUpperCase(),
+          fullName: sub.fullName,
+          email: sub.email,
+          phone: sub.phone,
+          institutionName: sub.institutionName,
+          city: sub.city,
+          state: sub.state,
+          branchOrGrade: sub.branchOrGrade || 'N/A',
+          rollOrEmployeeId: sub.rollOrEmployeeId || 'N/A',
+          designationOrRole: sub.designationOrRole || 'N/A',
+          overallRating: sub.overallRating,
+          trainerKnowledgeRating: sub.trainerKnowledgeRating,
+          practicalHardwareRating: sub.practicalHardwareRating,
+          industryRelevanceRating: sub.industryRelevanceRating,
+          labManagementRating: sub.labManagementRating,
+          keyLearnings: sub.keyLearnings,
+          favoriteComponent: sub.favoriteComponent,
+          improvementSuggestions: sub.improvementSuggestions,
+          futureInterests: Array.isArray(sub.futureInterests) ? sub.futureInterests.join(', ') : '',
+          recommendDakshyam: sub.recommendDakshyam,
+          testimonial: sub.testimonial || '',
+          submittedAt: new Date(sub.submittedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+        });
+      });
 
-      XLSX.writeFile(workbook, filename);
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Excel export failure:', err);
       // Fallback to CSV

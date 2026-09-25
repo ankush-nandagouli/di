@@ -285,5 +285,24 @@ export interface WorkshopFeedbackSubmission {
   submittedAt: string;
 }
 
+// In-App Role-Based Notifications
+export type NotificationTargetRole = 'all' | 'admin' | 'trainer' | 'student' | 'public';
+export type NotificationCategory = 'course' | 'workshop' | 'feedback' | 'security' | 'certificate' | 'system' | 'enrollment';
+export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  targetRole: NotificationTargetRole; // 'all' | 'admin' | 'trainer' | 'student' | 'public'
+  targetUserId?: string; // Optional: student/trainer ID for direct private notifications
+  category: NotificationCategory;
+  priority: NotificationPriority;
+  isRead?: boolean;
+  linkTab?: 'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact' | 'feedback';
+  actionData?: Record<string, any>;
+}
+
 
 

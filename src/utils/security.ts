@@ -1,13 +1,10 @@
 /**
- * Dakshyam Innovations Enterprise Security Guard
+ * Dakshyam Innovations Classroom Kiosk / UI Presentation Helper
  * 
- * Enforces client-side protection:
- * - Restricts unauthorized right-click (context menu) except within form text controls
- * - Restricts developer inspection keyboard shortcuts (F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S)
- * - Restricts image asset dragging to protect proprietary graphics & certificates
- * - Emits security notifications for user feedback
- * - Displays enterprise console security warning banners
- * - Detects active devtools inspection
+ * NOTE: This is strictly a cosmetic UX wrapper intended for clean kiosk presentation
+ * on projector screens in school labs. It is NOT a security control and does NOT
+ * provide cryptographic protection or access control. Real security is enforced
+ * entirely server-side via JWT authentication and database access rules.
  */
 
 export type SecurityViolationType = 

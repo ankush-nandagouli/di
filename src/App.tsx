@@ -21,6 +21,8 @@ import ContactUs from './components/ContactUs';
 import PageLoader from './components/PageLoader';
 import WorkshopFeedbackForm from './components/WorkshopFeedbackForm';
 import AdminWorkshopFeedbackManager from './components/AdminWorkshopFeedbackManager';
+import NotificationBell from './components/NotificationBell';
+import { NotificationService } from './utils/notificationService';
 import { SecurityToast } from './components/SecurityToast';
 import { SecurityGuard } from './utils/security';
 import { syncStorageWithCookies } from './utils/secureCookie';
@@ -330,10 +332,6 @@ export default function App() {
   const [trainerRegCode, setTrainerRegCode] = useState('');
   const [authError, setAuthError] = useState('');
 
-  // Rate limiting & security lockout states
-  const [failedAttempts, setFailedAttempts] = useState<Record<string, number>>({});
-  const [lockoutTimers, setLockoutTimers] = useState<Record<string, number>>({});
-
   // Forgot Password Recovery states
   const [resetEmail, setResetEmail] = useState('');
   const [resetSuccessMessage, setResetSuccessMessage] = useState('');
@@ -395,30 +393,15 @@ export default function App() {
     }
   };
 
-  // Strict secure input sanitization and verification against SQL/Query injection or Cross-Site Scripting (XSS)
+  // Clean input validation: limits max length and blocks malicious script/HTML injection
   const isInputSafe = (val: string, fieldName = 'input'): { safe: boolean; error?: string } => {
     if (!val) return { safe: true };
-    if (val.length > 100) {
-      return { safe: false, error: `Invalid ${fieldName}: Input exceeds maximum secure length.` };
+    if (val.length > 250) {
+      return { safe: false, error: `${fieldName} exceeds maximum allowable length of 250 characters.` };
     }
-    const maliciousPatterns = [
-      /['";`]/g,
-      /--/g,
-      /union\s+select/gi,
-      /select\s+.*\s+from/gi,
-      /insert\s+into/gi,
-      /delete\s+from/gi,
-      /drop\s+table/gi,
-      /update\s+.*\s+set/gi,
-      /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-      /javascript:/gi,
-      /onload=/gi,
-      /onerror=/gi
-    ];
-    for (const pattern of maliciousPatterns) {
-      if (pattern.test(val)) {
-        return { safe: false, error: `Malicious characters or query injection detected in ${fieldName}. Special symbols and SQL syntax are strictly forbidden.` };
-      }
+    // Block script tags and javascript: URIs without restricting legitimate names with apostrophes/quotes
+    if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi.test(val) || /javascript:/gi.test(val)) {
+      return { safe: false, error: `Invalid characters or HTML markup detected in ${fieldName}.` };
     }
     return { safe: true };
   };
@@ -426,64 +409,6 @@ export default function App() {
   const isValidEmail = (emailStr: string): boolean => {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return emailRegex.test(emailStr);
-  };
-
-  // Secure SHA-256 Client-Side Hashing Generator
-  const hashPassword = async (pwd: string): Promise<string> => {
-    try {
-      const msgUint8 = new TextEncoder().encode(pwd);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    } catch {
-      let hash1 = 0x811c9dc5;
-      let hash2 = 0x55aa55aa;
-      for (let i = 0; i < pwd.length; i++) {
-        hash1 ^= pwd.charCodeAt(i);
-        hash1 += (hash1 << 1) + (hash1 << 4) + (hash1 << 7) + (hash1 << 8) + (hash1 << 24);
-        hash2 = (hash2 << 5) - hash2 + pwd.charCodeAt(i);
-        hash2 |= 0;
-      }
-      return 'sha_sim_' + Math.abs(hash1).toString(16) + Math.abs(hash2).toString(16);
-    }
-  };
-
-  const checkLockout = (emailStr: string): boolean => {
-    const lockTime = lockoutTimers[emailStr.toLowerCase()];
-    if (lockTime) {
-      const now = Date.now();
-      if (now < lockTime) {
-        const remaining = Math.ceil((lockTime - now) / 1000);
-        setAuthError(`❌ SECURITY BRACE LOCKOUT: Too many failed login attempts. Locked out. Please wait ${remaining} seconds before retrying.`);
-        return true;
-      } else {
-        const updatedLockouts = { ...lockoutTimers };
-        delete updatedLockouts[emailStr.toLowerCase()];
-        setLockoutTimers(updatedLockouts);
-        
-        const updatedAttempts = { ...failedAttempts };
-        delete updatedAttempts[emailStr.toLowerCase()];
-        setFailedAttempts(updatedAttempts);
-      }
-    }
-    return false;
-  };
-
-  const handleFailedAttempt = (emailStr: string) => {
-    const current = (failedAttempts[emailStr.toLowerCase()] || 0) + 1;
-    const updatedAttempts = { ...failedAttempts, [emailStr.toLowerCase()]: current };
-    setFailedAttempts(updatedAttempts);
-
-    if (current >= 5) {
-      const lockDuration = 30 * 1000; 
-      const lockUntil = Date.now() + lockDuration;
-      setLockoutTimers({ ...lockoutTimers, [emailStr.toLowerCase()]: lockUntil });
-      setAuthError(`❌ SECURITY LOCKOUT: 5 failed attempts reached. Brute-force safeguard active. Access is locked for 30 seconds.`);
-      DakshyamDatabase.logEvent('Security Lockout Engaged', `User/Admin account ${emailStr} locked out due to 5 consecutive authentication failures.`, emailStr, 'unknown', 'ERROR');
-    } else {
-      setAuthError(`❌ Incorrect secure credentials. Attempt ${current}/5. Access blocks after 5 failures.`);
-      DakshyamDatabase.logEvent('Failed Authentication Attempt', `Failed login attempt ${current}/5 for email: ${emailStr}`, emailStr, 'unknown', 'ERROR');
-    }
   };
 
   // --- FORGOT PASSWORD RECOVERY HANDLER ---
@@ -623,6 +548,7 @@ export default function App() {
         verification: 'DAKSHYAM INNOVATION | Verifiable Certificate Verification Engine',
         about: 'DAKSHYAM INNOVATION | Board of Directors, Founders & Mission Statement',
         contact: 'DAKSHYAM INNOVATION | Get In Touch - Dynamic Contact Desk',
+        feedback: 'DAKSHYAM INNOVATION | Workshop Evaluation & Participant Feedback Portal',
       };
 
       const descMapping: Record<string, string> = {
@@ -634,6 +560,7 @@ export default function App() {
         verification: 'Verify authentic certification credentials issued by Dakshyam Innovation. Examine student telemetry scores and download official print-ready PDFs.',
         about: 'Meet the founding members, technical developers, board of directors, and visionaries shaping India\'s vocational development pipeline.',
         contact: 'Connect directly with the Dakshyam team. Partner with us to construct modern computer literacy and IoT hardware labs inside your regional school.',
+        feedback: 'Official participant feedback, trainer evaluations, and learning outcomes submission for Dakshyam Innovations STEM & Robotics sessions.',
       };
 
       if (titleMapping[activeTab]) {
@@ -661,22 +588,21 @@ export default function App() {
   }, [activeTab]);
 
   useEffect(() => {
-    // Eagerly sync all database records from the backend to local cache
+    // Sync public catalog and UI settings without exposing user accounts
     const syncDatabaseOnBoot = async () => {
       try {
-        const response = await fetch('/api/db/all');
+        const response = await fetch('/api/public/data');
         if (response.ok) {
           const data = await response.json();
           if (data.connected !== undefined) {
             setIsDbConnected(!!data.connected);
           }
-          // Synchronize keys into local storage
-          const keys = [
-            'students', 'trainers', 'groups', 'videos', 'certificates', 
-            'applications', 'special_programs', 'special_enrollments', 
-            'company_about', 'supervisor_pin', 'courses', 'banners', 'gallery_images', 'app_logs', 'admins'
+          // Synchronize public catalog keys into local storage
+          const publicKeys = [
+            'courses', 'banners', 'gallery_images', 'company_about', 
+            'page_loader_config', 'workshop_feedback_config', 'videos', 'groups'
           ];
-          for (const key of keys) {
+          for (const key of publicKeys) {
             if (data[key] !== undefined && data[key] !== null) {
               localStorage.setItem(`dakshyam_db_${key}`, JSON.stringify(data[key]));
             }
@@ -684,7 +610,31 @@ export default function App() {
           refreshDb();
         }
       } catch (err) {
-        console.warn("Could not sync live MongoDB database on startup:", err);
+        console.warn("Could not sync public platform catalog on startup:", err);
+      }
+
+      // If user holds a valid auth token, verify session against server
+      const token = DakshyamDatabase.getAuthToken();
+      if (token) {
+        try {
+          const meRes = await fetch('/api/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            if (meData.user) {
+              DakshyamDatabase.setLoggedInUser(meData.user);
+              setCurrentUser(meData.user);
+            }
+          } else {
+            // Token expired or invalid
+            DakshyamDatabase.setAuthToken(null);
+            DakshyamDatabase.setLoggedInUser(null);
+            setCurrentUser(null);
+          }
+        } catch {
+          // Keep offline state
+        }
       }
     };
     
@@ -699,13 +649,20 @@ export default function App() {
 
       // Validate tabMatch whitelist
       if (tabMatch) {
-        const allowedTabs = ['home', 'services', 'leaderboard', 'social', 'portal', 'verification', 'about', 'contact'];
+        const allowedTabs = ['home', 'services', 'leaderboard', 'social', 'portal', 'verification', 'about', 'contact', 'feedback'];
         if (!allowedTabs.includes(tabMatch)) {
           console.warn('Security Warning: Corrupt tab parameter blocked.');
           setActiveTab('home');
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('tab');
           window.history.replaceState(null, '', cleanUrl.toString());
+        } else if (tabMatch === 'feedback') {
+          setActiveTab('feedback');
+          setFeedbackViewMode('form');
+          const workshopParam = searchParams.get('workshop') || searchParams.get('w') || searchParams.get('ws') || searchParams.get('slug');
+          if (workshopParam) {
+            setPreselectedWorkshopSlug(workshopParam);
+          }
         }
       }
       
@@ -720,12 +677,12 @@ export default function App() {
         if (accessMatch === 'admin') {
           setIsStaffAccessEnabled(true);
           setAuthRoleTab('admin');
-          setSecretCode('ADMIN2026');
+          setSecretCode('');
           setShowAuthModal(true);
         } else if (accessMatch === 'trainer') {
           setIsStaffAccessEnabled(true);
           setAuthRoleTab('trainer');
-          setStudentEmail('trainer@dakshyam.com');
+          setStudentEmail('');
           setShowAuthModal(true);
         }
       }
@@ -747,18 +704,31 @@ export default function App() {
     }
   };
 
-  const handleVerifyPinCode = (e?: React.FormEvent) => {
+  const handleVerifyPinCode = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const correctPin = DakshyamDatabase.getSupervisorPin();
-    if (enteredPin === correctPin) {
-      setIsStaffAccessEnabled(true);
-      setAuthRoleTab('admin');
-      setAuthMode('login');
-      setShowPinPrompt(false);
-      setShowAuthModal(true);
-      setPinError('');
-    } else {
-      setPinError('Invalid 6-digit Supervisor PIN code. Access Denied. Setup default: 123456');
+    if (!enteredPin || enteredPin.length !== 6) {
+      setPinError('Please enter a 6-digit Supervisor PIN code.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/auth/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: enteredPin.trim() })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsStaffAccessEnabled(true);
+        setAuthRoleTab('admin');
+        setAuthMode('login');
+        setShowPinPrompt(false);
+        setShowAuthModal(true);
+        setPinError('');
+      } else {
+        setPinError(data.error || 'Invalid 6-digit Supervisor PIN code. Access Denied.');
+      }
+    } catch {
+      setPinError('Could not verify Supervisor PIN.');
     }
   };
 
@@ -805,20 +775,28 @@ export default function App() {
     }
 
     try {
-      // HASHING PASSWORD PRIOR TO PERSISTENCE (Anti-Steal and DevTools protection)
-      const hashedPassword = await hashPassword(passwordInput);
-
-      const res = DakshyamDatabase.registerStudent(nameClean, emailClean, hashedPassword, {
-        phone: phoneClean,
-        institution: schoolClean,
-        gradeOrBranch: studentLevel
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: nameClean,
+          email: emailClean,
+          password: passwordInput,
+          role: 'student',
+          profile: {
+            phone: phoneClean,
+            institution: schoolClean,
+            gradeOrBranch: studentLevel
+          }
+        })
       });
+      const data = await res.json();
 
-      if (res.success) {
-        // Log them in immediately
-        const latestStudents = DakshyamDatabase.getStudents();
-        const createdUser = latestStudents.find(s => s.email.toLowerCase() === emailClean.toLowerCase());
-        DakshyamDatabase.setLoggedInUser(createdUser);
+      if (res.ok && data.success) {
+        if (data.token) {
+          DakshyamDatabase.setAuthToken(data.token);
+        }
+        DakshyamDatabase.setLoggedInUser(data.user);
         DakshyamDatabase.logEvent('Student Registered', `New student ${nameClean} (${emailClean}) registered and signed up successfully.`, emailClean, 'student', 'SUCCESS');
         
         // Reset states
@@ -847,8 +825,8 @@ export default function App() {
           navigateToTab('portal'); // Take directly to workspace
         }
       } else {
-        setAuthError(res.error || 'Registration failed.');
-        DakshyamDatabase.logEvent('Student Registration Failed', `Signup failed for ${emailClean}. Error: ${res.error}`, emailClean, 'student', 'ERROR');
+        setAuthError(data.error || 'Registration failed.');
+        DakshyamDatabase.logEvent('Student Registration Failed', `Signup failed for ${emailClean}. Error: ${data.error}`, emailClean, 'student', 'ERROR');
       }
     } catch {
       setAuthError('Registry server timeout.');
@@ -866,7 +844,6 @@ export default function App() {
       return;
     }
 
-    // Input Safeguard checks to prevent SQL/NoSQL injections
     const emailCheck = isInputSafe(emailClean, 'Email');
     if (!emailCheck.safe) {
       setAuthError(emailCheck.error || 'Invalid Email formatting.');
@@ -883,31 +860,18 @@ export default function App() {
       return;
     }
 
-    // Lockout verification
-    if (checkLockout(emailClean)) return;
-
     try {
-      const allStudents = DakshyamDatabase.getStudents();
-      const match = allStudents.find(s => s.email.toLowerCase() === emailClean.toLowerCase());
-      
-      if (match) {
-        const userPassword = match.password || '123456';
-        const inputHashed = await hashPassword(passwordInput);
-        const savedHashed = await hashPassword(userPassword);
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailClean, password: passwordInput, role: 'student' })
+      });
+      const data = await res.json();
 
-        // Allow match if input hashed equals the saved password or if saved password matches plain text (fallback for seeded accounts)
-        if (inputHashed !== userPassword && passwordInput !== userPassword && inputHashed !== savedHashed) {
-          handleFailedAttempt(emailClean);
-          return;
-        }
-
-        // Success - Clear lockout history
-        const updatedAttempts = { ...failedAttempts };
-        delete updatedAttempts[emailClean.toLowerCase()];
-        setFailedAttempts(updatedAttempts);
-
-        DakshyamDatabase.setLoggedInUser(match);
-        DakshyamDatabase.logEvent('Student Logged In', `Student ${match.name} (${match.email}) authenticated successfully.`, match.email, 'student', 'SUCCESS');
+      if (res.ok && data.success) {
+        DakshyamDatabase.setAuthToken(data.token);
+        DakshyamDatabase.setLoggedInUser(data.user);
+        DakshyamDatabase.logEvent('Student Logged In', `Student ${data.user.name} (${data.user.email}) authenticated successfully.`, data.user.email, 'student', 'SUCCESS');
         setShowAuthModal(false);
         setShowApplyAuthPrompt(false);
         setStudentEmail('');
@@ -917,7 +881,7 @@ export default function App() {
         if (pendingApplyCourseId) {
           const targetCourse = courses.find(c => c.id === pendingApplyCourseId);
           setPreselectedCourseId(pendingApplyCourseId);
-          setApplicationSuccessBanner(`Welcome back, ${match.name}! Your student credentials are verified. Complete your application for "${targetCourse?.title || 'Selected Course'}" below.`);
+          setApplicationSuccessBanner(`Welcome back, ${data.user.name}! Your student credentials are verified. Complete your application for "${targetCourse?.title || 'Selected Course'}" below.`);
           navigateToTab('services');
           setPendingApplyCourseId(null);
           try { sessionStorage.removeItem('dakshyam_pending_course_apply'); } catch {}
@@ -925,8 +889,7 @@ export default function App() {
           navigateToTab('portal');
         }
       } else {
-        // Registering failed attempt even for non-existent users to protect user enumeration
-        handleFailedAttempt(emailClean);
+        setAuthError(data.error || 'Invalid email or password.');
       }
     } catch {
       setAuthError('Exception: secure database timeout.');
@@ -944,7 +907,6 @@ export default function App() {
       return;
     }
 
-    // Input Safeguard checks
     const emailCheck = isInputSafe(emailClean, 'Trainer Email');
     if (!emailCheck.safe) {
       setAuthError(emailCheck.error || 'Invalid Email characters.');
@@ -961,42 +923,25 @@ export default function App() {
       return;
     }
 
-    // Lockout verification
-    if (checkLockout(emailClean)) return;
-
     try {
-      const trainers = DakshyamDatabase.getTrainers();
-      const match = trainers.find(t => t.email.toLowerCase() === emailClean.toLowerCase());
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailClean, password: passwordInput, role: 'trainer' })
+      });
+      const data = await res.json();
 
-      if (match) {
-        if (!match.isApproved) {
-          setAuthError('⚠ RESTRICTED ACCESS: Your Trainer profile registry ID is pending Admin authorization. Please ask admin leads to verify your account.');
-          return;
-        }
-
-        const userPassword = match.password || '123456';
-        const inputHashed = await hashPassword(passwordInput);
-        const savedHashed = await hashPassword(userPassword);
-
-        if (inputHashed !== userPassword && passwordInput !== userPassword && inputHashed !== savedHashed) {
-          handleFailedAttempt(emailClean);
-          return;
-        }
-
-        // Success - Clear lockout history
-        const updatedAttempts = { ...failedAttempts };
-        delete updatedAttempts[emailClean.toLowerCase()];
-        setFailedAttempts(updatedAttempts);
-
-        DakshyamDatabase.setLoggedInUser(match);
-        DakshyamDatabase.logEvent('Trainer Logged In', `Supervisor/Trainer ${match.name} (${match.email}) authenticated successfully.`, match.email, 'trainer', 'SUCCESS');
+      if (res.ok && data.success) {
+        DakshyamDatabase.setAuthToken(data.token);
+        DakshyamDatabase.setLoggedInUser(data.user);
+        DakshyamDatabase.logEvent('Trainer Logged In', `Supervisor/Trainer ${data.user.name} (${data.user.email}) authenticated successfully.`, data.user.email, 'trainer', 'SUCCESS');
         setShowAuthModal(false);
         setStudentEmail('');
         setPasswordInput('');
         refreshDb();
         navigateToTab('portal');
       } else {
-        handleFailedAttempt(emailClean);
+        setAuthError(data.error || 'Invalid trainer credentials or pending authorization.');
       }
     } catch {
       setAuthError('Trainer node access timeout.');
@@ -1016,7 +961,6 @@ export default function App() {
       return;
     }
 
-    // Input Safeguards
     const nameCheck = isInputSafe(nameClean, 'Trainer Name');
     if (!nameCheck.safe) { setAuthError(nameCheck.error); return; }
     const emailCheck = isInputSafe(emailClean, 'Trainer Email');
@@ -1030,27 +974,35 @@ export default function App() {
     }
 
     try {
-      // HASHING PRIOR TO DB SUBMISSION
-      const hashedPassword = await hashPassword(passwordInput);
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: nameClean,
+          email: emailClean,
+          password: passwordInput,
+          role: 'trainer',
+          trainerCode: trainerRegCode.trim()
+        })
+      });
+      const data = await res.json();
 
-      const isApprovedCode = trainerRegCode.trim() === 'trainer@dki2026';
-      const res = DakshyamDatabase.registerTrainer(nameClean, emailClean, hashedPassword, isApprovedCode);
-      if (res.success) {
+      if (res.ok && data.success) {
         setStudentName('');
         setStudentEmail('');
         setPasswordInput('');
         setTrainerRegCode('');
         refreshDb();
-        if (isApprovedCode) {
+        if (data.isApproved) {
           setAuthError('✓ TRAINER ACCOUNT ACTIVATED INSTANTLY! You entered a valid Trainer Access Code. You can now login directly and access your workspace.');
           DakshyamDatabase.logEvent('Trainer Self-Registered', `Trainer ${nameClean} (${emailClean}) auto-approved and activated using instant code.`, emailClean, 'trainer', 'SUCCESS');
         } else {
-          setAuthError('✓ APPLICATION REQUISITION SUBMITTED! Your account is held as "Pending Approval". Once a Dakshyam Admin grants access (or you supply a Trainer Registration Code), you can run courses.');
+          setAuthError('✓ APPLICATION REQUISITION SUBMITTED! Your account is held as "Pending Approval". Once a Dakshyam Admin grants access, you can run courses.');
           DakshyamDatabase.logEvent('Trainer Registration Submitted', `Trainer ${nameClean} (${emailClean}) submitted application queue request (Approval Pending).`, emailClean, 'trainer', 'INFO');
         }
       } else {
-        setAuthError(res.error || 'Trainer application failed.');
-        DakshyamDatabase.logEvent('Trainer Registration Failed', `Trainer registration failed for ${emailClean}. Error: ${res.error || 'Duplicate record'}`, emailClean, 'trainer', 'ERROR');
+        setAuthError(data.error || 'Trainer application failed.');
+        DakshyamDatabase.logEvent('Trainer Registration Failed', `Trainer registration failed for ${emailClean}. Error: ${data.error || 'Duplicate record'}`, emailClean, 'trainer', 'ERROR');
       }
     } catch {
       setAuthError('Storage exception. Retry later.');
@@ -1062,10 +1014,11 @@ export default function App() {
     e.preventDefault();
     setAuthError('');
 
-    const cleanCode = secretCode.trim().toUpperCase();
-    
-    // Lockout verification for admin as well
-    if (checkLockout('admin_account')) return;
+    const cleanCode = secretCode.trim();
+    if (!cleanCode) {
+      setAuthError('Please enter administrator passcode.');
+      return;
+    }
 
     const codeCheck = isInputSafe(cleanCode, 'Admin Passcode');
     if (!codeCheck.safe) {
@@ -1073,30 +1026,32 @@ export default function App() {
       return;
     }
 
-    if (secretCode.trim() === 'dki2026@w' || cleanCode === 'DKI2026@W' || cleanCode === 'ADMIN2026') {
-      try {
-        const adminUser = DakshyamDatabase.getAdmins()[0];
-        DakshyamDatabase.setLoggedInUser(adminUser);
-        DakshyamDatabase.logEvent('Admin Logged In', `Platform administrator authenticated successfully and opened system tools.`, adminUser.email, 'admin', 'SUCCESS');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: cleanCode })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        DakshyamDatabase.setAuthToken(data.token);
+        DakshyamDatabase.setLoggedInUser(data.user);
+        DakshyamDatabase.logEvent('Admin Logged In', `Platform administrator authenticated successfully and opened system tools.`, data.user.email, 'admin', 'SUCCESS');
         setShowAuthModal(false);
         setSecretCode('');
-        
-        // Clear attempts
-        const updatedAttempts = { ...failedAttempts };
-        delete updatedAttempts['admin_account'];
-        setFailedAttempts(updatedAttempts);
-
         refreshDb();
         navigateToTab('portal');
-      } catch {
-        setAuthError('Admin indexing node failure.');
+      } else {
+        setAuthError(data.error || 'Authentication failed: Invalid administrator passcode.');
       }
-    } else {
-      handleFailedAttempt('admin_account');
+    } catch {
+      setAuthError('Admin authentication request failed.');
     }
   };
 
   const handleLogout = () => {
+    DakshyamDatabase.setAuthToken(null);
     DakshyamDatabase.setLoggedInUser(null);
     refreshDb();
     navigateToTab('home');
@@ -1274,25 +1229,37 @@ export default function App() {
               CONTACT US
             </button>
 
-            {/* RESTRICTED ACCESS: WORKSHOP FEEDBACK (Admin & Trainer ONLY) */}
-            {currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') && (
-              <button
-                onClick={() => navigateToTab('feedback')}
-                className={`px-3 py-1.5 rounded-lg transition-all border flex items-center gap-1.5 font-mono ${
-                  activeTab === 'feedback' 
-                    ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold shadow-[0_0_12px_rgba(56,189,248,0.25)]') 
-                    : (isLight ? 'border-amber-500/25 bg-amber-50/70 text-amber-950 hover:bg-amber-100/70 font-semibold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20')
-                }`}
-                title="Workshop Participant Feedback Management Console"
-              >
-                <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
-                <span>FEEDBACK AUDIT</span>
-              </button>
-            )}
+            {/* WORKSHOP FEEDBACK: Accessible to everyone (Audit for Admin/Trainer, Direct Feedback Form for Students & Public) */}
+            <button
+              onClick={() => {
+                setFeedbackViewMode(currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') ? 'audit' : 'form');
+                navigateToTab('feedback');
+              }}
+              className={`px-3 py-1.5 rounded-lg transition-all border flex items-center gap-1.5 font-mono ${
+                activeTab === 'feedback' 
+                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold shadow-[0_0_12px_rgba(56,189,248,0.25)]') 
+                  : (isLight ? 'border-amber-500/25 bg-amber-50/70 text-amber-950 hover:bg-amber-100/70 font-semibold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20')
+              }`}
+              title={currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') ? "Workshop Participant Feedback Management Console" : "Submit Workshop Evaluation & Participant Feedback"}
+            >
+              <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
+              <span>
+                {currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer')
+                  ? 'FEEDBACK AUDIT'
+                  : 'FEEDBACK FORM'}
+              </span>
+            </button>
           </nav>
 
-          {/* Right Theme & Auth Action button segment */}
+          {/* Right Theme, Notifications & Auth Action button segment */}
           <div className="flex items-center gap-2">
+            {/* Real-time Role-Aware Notification Center */}
+            <NotificationBell 
+              currentUser={currentUser} 
+              theme={theme} 
+              onNavigateTab={(tab) => navigateToTab(tab as any)} 
+            />
+
             {/* Mode shift toggle button */}
             <button
               onClick={() => setTheme(isLight ? 'dark' : 'light')}
@@ -1459,20 +1426,25 @@ export default function App() {
                   CONTACT US
                 </button>
 
-                {/* RESTRICTED ACCESS: WORKSHOP FEEDBACK (Admin & Trainer ONLY) */}
-                {currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') && (
-                  <button
-                    onClick={() => navigateToTab('feedback')}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all flex items-center gap-2 font-mono ${
-                      activeTab === 'feedback' 
-                        ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold') 
-                        : (isLight ? 'border-amber-500/25 bg-amber-50 text-amber-950 font-bold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300')
-                    }`}
-                  >
-                    <ClipboardList className="w-4 h-4 text-amber-400" />
-                    <span>WORKSHOP FEEDBACK AUDIT</span>
-                  </button>
-                )}
+                {/* WORKSHOP FEEDBACK (Audit for Admin/Trainer, Direct Feedback Form for Students & Public) */}
+                <button
+                  onClick={() => {
+                    setFeedbackViewMode(currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') ? 'audit' : 'form');
+                    navigateToTab('feedback');
+                  }}
+                  className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all flex items-center gap-2 font-mono ${
+                    activeTab === 'feedback' 
+                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold') 
+                      : (isLight ? 'border-amber-500/25 bg-amber-50 text-amber-950 font-bold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300')
+                  }`}
+                >
+                  <ClipboardList className="w-4 h-4 text-amber-400" />
+                  <span>
+                    {currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') 
+                      ? 'WORKSHOP FEEDBACK AUDIT' 
+                      : 'WORKSHOP FEEDBACK FORM'}
+                  </span>
+                </button>
 
                 <div className="pt-2 border-t border-slate-500/10">
                   {currentUser ? (
@@ -1880,6 +1852,11 @@ export default function App() {
                           setTimeout(() => {
                             setIsPageLoading(false);
                           }, Math.max(pageLoaderConfig.minDurationMs || 900, 800));
+                        }}
+                        onOpenPublicFeedbackForm={(slug) => {
+                          if (slug) setPreselectedWorkshopSlug(slug);
+                          setFeedbackViewMode('form');
+                          navigateToTab('feedback');
                         }}
                       />
                     )}
@@ -2655,7 +2632,7 @@ export default function App() {
                           type="password"
                           value={trainerRegCode}
                           onChange={(e) => setTrainerRegCode(e.target.value)}
-                          placeholder="trainer@dki2026 for instant approval"
+                          placeholder="Enter invitation code for instant approval"
                           className={isLight 
                             ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900" 
                             : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-40"

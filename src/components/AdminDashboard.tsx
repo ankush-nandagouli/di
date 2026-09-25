@@ -16,6 +16,7 @@ import OfficialCertificate from './OfficialCertificate';
 import PageLoaderSettingsTab from './PageLoaderSettingsTab';
 import Home3DArtSettingsTab from './Home3DArtSettingsTab';
 import AdminWorkshopFeedbackManager from './AdminWorkshopFeedbackManager';
+import AdminMasterGuide from './AdminMasterGuide';
 import { SecurityGuard } from '../utils/security';
 
 interface AdminDashboardProps {
@@ -27,6 +28,7 @@ interface AdminDashboardProps {
   theme?: 'light' | 'dark';
   isDbConnected?: boolean;
   onTestLoader?: () => void;
+  onOpenPublicFeedbackForm?: (slug?: string) => void;
 }
 
 export default function AdminDashboard({
@@ -37,11 +39,12 @@ export default function AdminDashboard({
   onRefresh,
   theme = 'dark',
   isDbConnected = false,
-  onTestLoader
+  onTestLoader,
+  onOpenPublicFeedbackForm
 }: AdminDashboardProps) {
   const isLight = theme === 'light';
   // Navigation tabs
-  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'promotions' | 'gallery' | 'special_training' | 'certificates' | 'about_editor' | 'page_loader' | 'home_3d_art' | 'logs' | 'workshop_feedback';
+  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'promotions' | 'gallery' | 'special_training' | 'certificates' | 'about_editor' | 'page_loader' | 'home_3d_art' | 'logs' | 'workshop_feedback' | 'admin_guide';
   const [adminTab, setAdminTab] = useState<TabType>('analytics');
 
   // Audit Logs Filtering States
@@ -873,16 +876,29 @@ export default function AdminDashboard({
             <p className={`text-xs font-sans ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>Full Database Access • No-Code Dynamic Editing Active</p>
           </div>
           
-          <button
-            onClick={handlePurgeDatabase}
-            className={`text-[10px] font-mono font-bold border px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer ${
-              isLight
-                ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-                : 'border-red-500/25 bg-red-950/20 text-red-400 hover:bg-red-900/30 hover:border-red-500/40'
-            }`}
-          >
-            <Trash className="w-3.5 h-3.5" /> Purge Seed & User-Related Data
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setAdminTab('admin_guide')}
+              className={`text-[10px] font-mono font-bold border px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer ${
+                adminTab === 'admin_guide'
+                  ? (isLight ? 'bg-blue-900 text-white border-blue-900' : 'bg-sky-500/20 border-sky-400 text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.3)]')
+                  : (isLight ? 'border-blue-900/30 bg-blue-50 text-blue-900 hover:bg-blue-100' : 'border-sky-500/30 bg-sky-950/30 text-sky-300 hover:bg-sky-900/40')
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" /> 📖 Admin Master Guide
+            </button>
+
+            <button
+              onClick={handlePurgeDatabase}
+              className={`text-[10px] font-mono font-bold border px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer ${
+                isLight
+                  ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                  : 'border-red-500/25 bg-red-950/20 text-red-400 hover:bg-red-900/30 hover:border-red-500/40'
+              }`}
+            >
+              <Trash className="w-3.5 h-3.5" /> Purge Seed & User-Related Data
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2 text-3xs font-mono">
@@ -1027,7 +1043,7 @@ export default function AdminDashboard({
       <div className={`flex flex-wrap gap-1.5 border-b pb-0.5 font-mono text-3xs uppercase font-extrabold scrollbar-none overflow-x-auto ${
         isLight ? 'border-slate-200' : 'border-cyan-500/10'
       }`}>
-        {(['analytics', 'courses', 'applications', 'trainers', 'promotions', 'gallery', 'special_training', 'certificates', 'about_editor', 'page_loader', 'home_3d_art', 'workshop_feedback', 'logs'] as const).map(tab => (
+        {(['analytics', 'courses', 'applications', 'trainers', 'promotions', 'gallery', 'special_training', 'certificates', 'about_editor', 'page_loader', 'home_3d_art', 'workshop_feedback', 'logs', 'admin_guide'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setAdminTab(tab)}
@@ -1050,6 +1066,7 @@ export default function AdminDashboard({
             {tab === 'home_3d_art' && '🧊 Home 3D Art (.obj)'}
             {tab === 'workshop_feedback' && '📋 Workshop Feedbacks'}
             {tab === 'logs' && '🛡️ System Audit Logs'}
+            {tab === 'admin_guide' && '📖 Admin Master Guide'}
           </button>
         ))}
       </div>
@@ -3281,7 +3298,21 @@ export default function AdminDashboard({
         {/* TAB: WORKSHOP FEEDBACK MANAGER */}
         {adminTab === 'workshop_feedback' && (
           <div className="w-full">
-            <AdminWorkshopFeedbackManager theme={theme} currentUserRole="admin" />
+            <AdminWorkshopFeedbackManager 
+              theme={theme} 
+              currentUserRole="admin" 
+              onOpenPublicForm={onOpenPublicFeedbackForm}
+            />
+          </div>
+        )}
+
+        {/* TAB: ADMIN MASTER OPERATIONAL GUIDE */}
+        {adminTab === 'admin_guide' && (
+          <div className="w-full">
+            <AdminMasterGuide 
+              theme={theme} 
+              onNavigateTab={(tab) => setAdminTab(tab as any)}
+            />
           </div>
         )}
 

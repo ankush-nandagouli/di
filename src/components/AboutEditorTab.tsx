@@ -115,7 +115,7 @@ export function AboutEditorTab({ onRefresh, theme }: AboutEditorTabProps) {
                 const val = e.target.value.replace(/\D/g, ''); // Numeric only
                 setSupervisorPin(val);
               }}
-              placeholder="e.g. 123456"
+              placeholder="6-digit PIN"
             />
           </div>
           <button

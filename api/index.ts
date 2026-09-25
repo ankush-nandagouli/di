@@ -5,15 +5,22 @@ import dotenv from 'dotenv';
 import { MongoClient, Db } from 'mongodb';
 import nodemailer from 'nodemailer';
 import { v2 as cloudinary } from 'cloudinary';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
 const app = express();
 
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+// Trust reverse proxy (Google Cloud Run / load balancers) so client IPs are correctly resolved from X-Forwarded-For
+app.set('trust proxy', 1);
 
-// Enterprise Security & Caching headers middleware (Edge, Brave, Safari, Firefox, Chrome)
+// Body parser with secure size limits (reduced from 100mb to 15mb for media/models)
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+
+// Enterprise Security & Caching headers middleware
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -33,7 +40,6 @@ app.use((req, res, next) => {
 
 // URL normalizer middleware: handles Vercel rewrites and direct subpaths
 app.use((req, res, next) => {
-  // If on Vercel with a rewrite to /api, check x-matched-path or originalUrl
   const matchedPath = (req.headers['x-matched-path'] as string) || '';
   if ((req.url === '/api' || req.url === '/api/') && matchedPath && matchedPath.startsWith('/api/')) {
     req.url = matchedPath;
@@ -44,7 +50,8 @@ app.use((req, res, next) => {
     req.url.startsWith('/health') || 
     req.url.startsWith('/upload') || 
     req.url.startsWith('/verify') || 
-    req.url.startsWith('/test-db')
+    req.url.startsWith('/test-db') ||
+    req.url.startsWith('/auth')
   )) {
     req.url = `/api${req.url}`;
   }
@@ -62,6 +69,63 @@ if (!fs.existsSync(uploadsDir)) {
 }
 app.use('/uploads', express.static(uploadsDir));
 
+// --- SECURITY & SECRETS CONFIGURATION ---
+const JWT_SECRET = process.env.JWT_SECRET || 'dakshyam-prod-security-token-secret-2026-key';
+const ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || 'DakshyamAdmin#2026!Secure';
+const SUPERVISOR_PIN = process.env.SUPERVISOR_PIN || '849201';
+const TRAINER_REG_CODE = process.env.TRAINER_REG_CODE || 'DakshyamTrainer#2026!Secure';
+
+// Rate limiters for security protection (configured for reverse proxy compatibility)
+const rateLimitValidateConfig = {
+  trustProxy: false,
+  xForwardedForHeader: false,
+  forwardedHeader: false,
+};
+
+const globalPostLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: rateLimitValidateConfig,
+  message: { error: 'Too many requests from this client. Please slow down.' }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 attempts per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: rateLimitValidateConfig,
+  message: { error: 'Too many login attempts from this network. Please wait 15 minutes before retrying.' }
+});
+
+const otpTriggerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5, // 5 requests per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: rateLimitValidateConfig,
+  message: { error: 'Too many verification code requests. Maximum 5 attempts per 15 minutes allowed.' }
+});
+
+const otpConfirmLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: rateLimitValidateConfig,
+  message: { error: 'Too many verification code confirmations. Please wait 15 minutes before retrying.' }
+});
+
+// Apply global rate limiting to all POST API endpoints
+app.use('/api', (req, res, next) => {
+  if (req.method === 'POST') {
+    return globalPostLimiter(req, res, next);
+  }
+  next();
+});
+
 // Lazy configuration function for Cloudinary
 function getCloudinary() {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
@@ -69,7 +133,7 @@ function getCloudinary() {
   const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
   if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error('Cloudinary credentials are not configured. Please define CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in your settings.');
+    throw new Error('Cloudinary credentials are not configured.');
   }
 
   cloudinary.config({
@@ -87,10 +151,20 @@ let mongoDb: Db | null = (global as any)._mongoDb || null;
 let isMongoConnected = !!mongoDb;
 let lastMongoError: string | null = null;
 
-// Safe fallback in-memory data store in case MongoDB is not configured or offline
+// Safe fallback in-memory data store
 const memoryDb: Record<string, any> = {
   students: [],
   trainers: [],
+  admins: [
+    {
+      id: 'usr-admin-1',
+      name: 'Dakshyam Administrator',
+      email: 'admin@dakshyam.com',
+      role: 'admin',
+      passwordHash: bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'DakshyamAdmin#2026!', 10),
+      createdAt: '2026-01-01'
+    }
+  ],
   groups: [],
   videos: [],
   certificates: [],
@@ -130,7 +204,7 @@ const memoryDb: Record<string, any> = {
       { name: 'Rohit Bhajipale', role: 'Co-Founder & Regional Coordinator', bio: 'Leads educational outreach programs, public relations, regional technical campaigns, and on-site training sessions.', avatarText: 'RB' }
     ]
   },
-  supervisor_pin: '427752',
+  supervisor_pin: SUPERVISOR_PIN,
   courses: [
     {
       id: 'CRS-IOT-101',
@@ -304,7 +378,68 @@ const memoryDb: Record<string, any> = {
   }
 };
 
-// Helper function to diagnose and provide actionable troubleshooting guidance for MongoDB Atlas issues
+// --- DATA SANITIZATION HELPERS ---
+// CRITICAL: Never include password or passwordHash fields in any response for any role!
+function sanitizeUser(user: any) {
+  if (!user) return null;
+  const { password, passwordHash, ...safeUser } = user;
+  return safeUser;
+}
+
+function sanitizeCollection(items: any[]) {
+  if (!Array.isArray(items)) return items;
+  return items.map(item => sanitizeUser(item));
+}
+
+// Password verification helper supporting bcrypt with legacy plain fallback migration
+async function verifyPassword(user: any, plainText: string): Promise<boolean> {
+  const hash = user.passwordHash || user.password;
+  if (!hash) return false;
+  if (typeof hash === 'string' && (hash.startsWith('$2a$') || hash.startsWith('$2b$'))) {
+    return bcrypt.compare(plainText, hash);
+  }
+  // Legacy plaintext fallback for older accounts
+  if (hash === plainText) return true;
+  return false;
+}
+
+// --- AUTHENTICATION MIDDLEWARE ---
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  role: 'student' | 'trainer' | 'admin';
+  name: string;
+}
+
+export interface AuthenticatedRequest extends express.Request {
+  user?: AuthenticatedUser;
+}
+
+function authenticateToken(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+  if (!token) {
+    return res.status(401).json({ error: 'Access denied. Authentication token required.' });
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired authentication token.' });
+  }
+}
+
+function requireRole(...roles: string[]) {
+  return (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Forbidden. Insufficient permissions for this resource.' });
+    }
+    next();
+  };
+}
+
+// Helper function to diagnose MongoDB Atlas issues
 function getMongoAdvice(errStr: string): string {
   if (
     errStr.includes("SSL alert") || 
@@ -314,18 +449,18 @@ function getMongoAdvice(errStr: string): string {
     errStr.includes("ECONNREFUSED") ||
     errStr.includes("ENOTFOUND")
   ) {
-    return "MongoDB Atlas is blocking connections from Vercel's serverless IP addresses. In your MongoDB Atlas Dashboard, go to 'Network Access' -> click 'Add IP Address' -> select 'Allow Access From Anywhere' (0.0.0.0/0). Once saved in Atlas, connection requests will succeed immediately.";
+    return "MongoDB Atlas is blocking connection requests. Ensure Network Access has 0.0.0.0/0 enabled.";
   }
   if (errStr.includes("bad auth") || errStr.includes("AuthenticationFailed") || errStr.includes("auth failed")) {
-    return "MongoDB Atlas authentication failed. Please verify your database username and password in MONGODB_URI. If your password contains special characters (e.g. @, #, $, %, +), ensure they are URL-encoded in the connection string (e.g. @ becomes %40).";
+    return "MongoDB Atlas authentication failed. Verify database username and password in MONGODB_URI.";
   }
   if (!process.env.MONGODB_URI && !process.env.MONGO_URI && !process.env.MONGODB_URL && !process.env.DATABASE_URL) {
-    return "MONGODB_URI is not configured in environment variables. In your Vercel Project Settings -> Environment Variables, add MONGODB_URI with your Atlas connection string, select Production, Preview & Development, and redeploy.";
+    return "MONGODB_URI is not configured in environment variables.";
   }
-  return "Verify that MONGODB_URI follows the standard format: mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/<database>?retryWrites=true&w=majority and that MongoDB Atlas Network Access has 0.0.0.0/0 enabled.";
+  return "Verify that MONGODB_URI follows standard format and MongoDB Atlas Network Access has 0.0.0.0/0 enabled.";
 }
 
-// Safe resilient MongoDB Atlas connection initializer with global pooling
+// Resilient MongoDB connection initializer
 async function getMongoDb(): Promise<Db | null> {
   if (mongoDb) return mongoDb;
   if ((global as any)._mongoDb) {
@@ -368,8 +503,7 @@ async function getMongoDb(): Promise<Db | null> {
     (global as any)._mongoDb = mongoDb;
     isMongoConnected = true;
     lastMongoError = null;
-    console.log("🚀 Successfully connected to live MongoDB Atlas Database!");
-    
+
     // Ensure settings defaults exist in MongoDB settings collection
     try {
       const settingsCol = mongoDb.collection('settings');
@@ -378,12 +512,23 @@ async function getMongoDb(): Promise<Db | null> {
         await settingsCol.insertOne({ id: 'company_about', value: memoryDb.company_about });
       }
       const pinDoc = await settingsCol.findOne({ id: 'supervisor_pin' });
-      if (!pinDoc) {
-        await settingsCol.insertOne({ id: 'supervisor_pin', value: memoryDb.supervisor_pin });
+      if (!pinDoc || pinDoc.value === '427752' || pinDoc.value === '123456') {
+        await settingsCol.updateOne(
+          { id: 'supervisor_pin' },
+          { $set: { value: SUPERVISOR_PIN } },
+          { upsert: true }
+        );
       }
       const feedbackCfgDoc = await settingsCol.findOne({ id: 'workshop_feedback_config' });
       if (!feedbackCfgDoc) {
         await settingsCol.insertOne({ id: 'workshop_feedback_config', value: memoryDb.workshop_feedback_config });
+      }
+      
+      // Ensure root admin account exists in MongoDB
+      const adminCol = mongoDb.collection('admins');
+      const rootAdmin = await adminCol.findOne({ email: 'admin@dakshyam.com' });
+      if (!rootAdmin) {
+        await adminCol.insertOne(memoryDb.admins[0]);
       }
     } catch (initErr) {
       console.warn("MongoDB initial collections setup notice:", initErr);
@@ -397,11 +542,307 @@ async function getMongoDb(): Promise<Db | null> {
     const errStr = error instanceof Error ? error.message : String(error);
     lastMongoError = errStr;
     isMongoConnected = false;
-    const advice = getMongoAdvice(errStr);
-    console.error(`❌ MongoDB Atlas connection failed. Falling back to local in-memory store.\n💡 Advice: ${advice}`, error);
     return null;
   }
 }
+
+// ==========================================
+// AUTHENTICATION & IDENTITY ENDPOINTS
+// ==========================================
+
+// POST /api/auth/login
+app.post('/api/auth/login', authLimiter, async (req, res) => {
+  try {
+    const { email, password, passcode, role } = req.body;
+
+    // 1. Admin Passcode authentication flow
+    if (passcode) {
+      const cleanPasscode = String(passcode).trim();
+      const configuredPasscode = ADMIN_PASSCODE.trim();
+
+      if (cleanPasscode === configuredPasscode || cleanPasscode.toUpperCase() === configuredPasscode.toUpperCase()) {
+        const adminPayload: AuthenticatedUser = {
+          id: 'usr-admin-master',
+          name: 'Platform Administrator',
+          email: 'admin@dakshyam.com',
+          role: 'admin'
+        };
+        const token = jwt.sign(adminPayload, JWT_SECRET, { expiresIn: '7d' });
+        return res.json({
+          success: true,
+          token,
+          user: adminPayload
+        });
+      } else {
+        return res.status(401).json({ error: 'Invalid administrator signature passcode.' });
+      }
+    }
+
+    // 2. Email & Password authentication flow
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required.' });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const db = await getMongoDb();
+
+    let user: any = null;
+    let collectionName = '';
+
+    if (db) {
+      user = await db.collection('admins').findOne({ email: cleanEmail });
+      if (user) {
+        collectionName = 'admins';
+      } else {
+        user = await db.collection('trainers').findOne({ email: cleanEmail });
+        if (user) {
+          collectionName = 'trainers';
+        } else {
+          user = await db.collection('students').findOne({ email: cleanEmail });
+          if (user) {
+            collectionName = 'students';
+          }
+        }
+      }
+    } else {
+      user = (memoryDb.admins || []).find((u: any) => u.email.toLowerCase() === cleanEmail);
+      if (user) {
+        collectionName = 'admins';
+      } else {
+        user = (memoryDb.trainers || []).find((u: any) => u.email.toLowerCase() === cleanEmail);
+        if (user) {
+          collectionName = 'trainers';
+        } else {
+          user = (memoryDb.students || []).find((u: any) => u.email.toLowerCase() === cleanEmail);
+          if (user) {
+            collectionName = 'students';
+          }
+        }
+      }
+    }
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    // Role check if explicit role requested
+    if (role && user.role !== role) {
+      return res.status(401).json({ error: `Account exists but is not registered under the '${role}' role.` });
+    }
+
+    // Trainer approval validation
+    if (user.role === 'trainer' && !user.isApproved) {
+      return res.status(403).json({ error: 'Your Trainer profile registry is pending Admin authorization. Please contact platform leads.' });
+    }
+
+    const passwordValid = await verifyPassword(user, String(password));
+    if (!passwordValid) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    // Automatically migrate legacy password to secure bcrypt hash
+    if (!user.passwordHash || !user.passwordHash.startsWith('$2')) {
+      const newHash = await bcrypt.hash(String(password), 10);
+      user.passwordHash = newHash;
+      delete user.password;
+      if (db && collectionName) {
+        await db.collection(collectionName).updateOne(
+          { email: cleanEmail },
+          { $set: { passwordHash: newHash }, $unset: { password: "" } }
+        );
+      }
+    }
+
+    const payload: AuthenticatedUser = {
+      id: user.id || `usr-${Date.now()}`,
+      email: user.email,
+      role: user.role,
+      name: user.name || user.email.split('@')[0]
+    };
+
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+
+    return res.json({
+      success: true,
+      token,
+      user: sanitizeUser(user)
+    });
+  } catch (error: any) {
+    console.error('Login processing error:', error);
+    res.status(500).json({ error: 'Internal authentication server exception.' });
+  }
+});
+
+// POST /api/auth/register
+app.post('/api/auth/register', authLimiter, async (req, res) => {
+  try {
+    const { name, email, password, role = 'student', profile, trainerCode } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required fields.' });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanName = String(name).trim();
+
+    if (!cleanEmail.includes('@') || cleanEmail.length < 5) {
+      return res.status(400).json({ error: 'Invalid email address format.' });
+    }
+
+    if (String(password).length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+
+    const db = await getMongoDb();
+
+    // Check duplicate registrations
+    let exists = false;
+    if (db) {
+      const s = await db.collection('students').findOne({ email: cleanEmail });
+      const t = await db.collection('trainers').findOne({ email: cleanEmail });
+      const a = await db.collection('admins').findOne({ email: cleanEmail });
+      if (s || t || a) exists = true;
+    } else {
+      const s = (memoryDb.students || []).some((u: any) => u.email.toLowerCase() === cleanEmail);
+      const t = (memoryDb.trainers || []).some((u: any) => u.email.toLowerCase() === cleanEmail);
+      const a = (memoryDb.admins || []).some((u: any) => u.email.toLowerCase() === cleanEmail);
+      if (s || t || a) exists = true;
+    }
+
+    if (exists) {
+      return res.status(400).json({ error: 'This email address is already registered.' });
+    }
+
+    const passwordHash = await bcrypt.hash(String(password), 10);
+
+    if (role === 'trainer') {
+      const isApproved = !!(trainerCode && String(trainerCode).trim() === TRAINER_REG_CODE);
+      const newTrainer = {
+        id: `usr-t${Date.now()}`,
+        name: cleanName,
+        email: cleanEmail,
+        role: 'trainer',
+        isApproved,
+        passwordHash,
+        createdAt: new Date().toISOString().split('T')[0]
+      };
+
+      if (db) {
+        await db.collection('trainers').insertOne(newTrainer);
+      } else {
+        if (!memoryDb.trainers) memoryDb.trainers = [];
+        memoryDb.trainers.push(newTrainer);
+      }
+
+      return res.json({
+        success: true,
+        isApproved,
+        user: sanitizeUser(newTrainer),
+        message: isApproved 
+          ? 'Trainer account activated immediately.' 
+          : 'Trainer registration received. Pending administrator approval.'
+      });
+    }
+
+    // Student Registration
+    const newStudent = {
+      id: `usr-s${Date.now()}`,
+      name: cleanName,
+      email: cleanEmail,
+      role: 'student',
+      profile: profile || {},
+      passwordHash,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+
+    if (db) {
+      await db.collection('students').insertOne(newStudent);
+    } else {
+      if (!memoryDb.students) memoryDb.students = [];
+      memoryDb.students.push(newStudent);
+    }
+
+    const payload: AuthenticatedUser = {
+      id: newStudent.id,
+      email: newStudent.email,
+      role: 'student',
+      name: newStudent.name
+    };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+
+    return res.json({
+      success: true,
+      token,
+      user: sanitizeUser(newStudent)
+    });
+  } catch (error: any) {
+    console.error('Registration processing error:', error);
+    res.status(500).json({ error: 'Registration processing failed.' });
+  }
+});
+
+// POST /api/auth/verify-pin (Server-side validation for Supervisor PIN)
+app.post('/api/auth/verify-pin', authLimiter, async (req, res) => {
+  const { pin } = req.body;
+  if (!pin) {
+    return res.status(400).json({ error: 'PIN code is required.' });
+  }
+
+  const cleanPin = String(pin).trim();
+  let correctPin = SUPERVISOR_PIN;
+
+  try {
+    const db = await getMongoDb();
+    if (db) {
+      const pinDoc = await db.collection('settings').findOne({ id: 'supervisor_pin' });
+      if (pinDoc && pinDoc.value) {
+        correctPin = String(pinDoc.value).trim();
+      }
+    } else if (memoryDb.supervisor_pin) {
+      correctPin = String(memoryDb.supervisor_pin).trim();
+    }
+  } catch (err) {
+    console.warn('Supervisor PIN read warning:', err);
+  }
+
+  if (cleanPin === correctPin) {
+    return res.json({ success: true, valid: true });
+  } else {
+    return res.status(401).json({ success: false, error: 'Invalid 6-digit Supervisor PIN code. Access denied.' });
+  }
+});
+
+// GET /api/me (Current user authenticated profile, never exposes password)
+app.get('/api/me', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { email, role } = req.user!;
+    const db = await getMongoDb();
+    let userDoc: any = null;
+
+    if (db) {
+      const colName = role === 'admin' ? 'admins' : (role === 'trainer' ? 'trainers' : 'students');
+      userDoc = await db.collection(colName).findOne({ email: email.toLowerCase() });
+    } else {
+      const colName = role === 'admin' ? 'admins' : (role === 'trainer' ? 'trainers' : 'students');
+      userDoc = (memoryDb[colName] || []).find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+    }
+
+    if (!userDoc) {
+      return res.json({ success: true, user: req.user });
+    }
+
+    return res.json({
+      success: true,
+      user: sanitizeUser(userDoc)
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// CORE PLATFORM & ROLE-RESTRICTED ENDPOINTS
+// ==========================================
 
 // Base route for health & verification
 app.get('/api', (req, res) => {
@@ -430,7 +871,7 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// Dedicated Diagnostic ping test endpoint for admin checks
+// Ping test endpoint for database checks
 app.get('/api/test-db', async (req, res) => {
   const startTime = Date.now();
   try {
@@ -446,7 +887,6 @@ app.get('/api/test-db', async (req, res) => {
       });
     }
     
-    // Run real ping on Atlas cluster
     await db.command({ ping: 1 });
     const latencyMs = Date.now() - startTime;
     return res.json({
@@ -467,8 +907,154 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
-// Module-level transient memory cache for secure OTP dispatch verification
-const verificationCodes: Record<string, string> = {};
+// Public bootstrap endpoint for visitors (NEVER exposes user records or credentials)
+app.get('/api/public/data', async (req, res) => {
+  try {
+    const db = await getMongoDb();
+    const publicData: Record<string, any> = {
+      connected: isMongoConnected,
+      courses: memoryDb.courses,
+      banners: memoryDb.banners,
+      gallery_images: memoryDb.gallery_images,
+      company_about: memoryDb.company_about,
+      page_loader_config: memoryDb.page_loader_config,
+      workshop_feedback_config: memoryDb.workshop_feedback_config,
+      videos: memoryDb.videos,
+      groups: (memoryDb.groups || []).map((g: any) => ({
+        id: g.id,
+        name: g.name,
+        points: g.points,
+        projectTitle: g.projectTitle,
+        membersCount: g.members?.length || 0
+      }))
+    };
+
+    if (db) {
+      const settingsCol = db.collection('settings');
+      const aboutDoc = await settingsCol.findOne({ id: 'company_about' });
+      if (aboutDoc) publicData.company_about = aboutDoc.value;
+      const loaderDoc = await settingsCol.findOne({ id: 'page_loader_config' });
+      if (loaderDoc) publicData.page_loader_config = loaderDoc.value;
+      const feedbackCfgDoc = await settingsCol.findOne({ id: 'workshop_feedback_config' });
+      if (feedbackCfgDoc) publicData.workshop_feedback_config = feedbackCfgDoc.value;
+      const modelDoc = await settingsCol.findOne({ id: 'home_3d_model' });
+      if (modelDoc) publicData.home_3d_model = modelDoc.value;
+
+      const publicCollections = ['courses', 'banners', 'gallery_images', 'videos'];
+      for (const colName of publicCollections) {
+        const list = await db.collection(colName).find({}).toArray();
+        publicData[colName] = list.map(({ _id, ...rest }) => rest);
+      }
+      const groupsList = await db.collection('groups').find({}).toArray();
+      publicData.groups = groupsList.map(({ _id, ...rest }) => rest);
+    }
+
+    res.json(publicData);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/students — Admin & Trainer only, paginated, NEVER includes passwords
+app.get('/api/students', authenticateToken, requireRole('admin', 'trainer'), async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 200);
+    const skip = (page - 1) * limit;
+
+    const db = await getMongoDb();
+    let students: any[] = [];
+    let total = 0;
+
+    if (db) {
+      total = await db.collection('students').countDocuments();
+      students = await db.collection('students')
+        .find({}, { projection: { password: 0, passwordHash: 0 } })
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+      students = students.map(({ _id, ...rest }) => rest);
+    } else {
+      const all = (memoryDb.students || []).map(sanitizeUser);
+      total = all.length;
+      students = all.slice(skip, skip + limit);
+    }
+
+    return res.json({
+      success: true,
+      students,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/certificates/:serial — Public verification endpoint (returns ONLY certificate display fields)
+app.get('/api/certificates/:serial', async (req, res) => {
+  try {
+    const { serial } = req.params;
+    const cleanSerial = String(serial).trim().toUpperCase();
+
+    const db = await getMongoDb();
+    let cert: any = null;
+
+    if (db) {
+      cert = await db.collection('certificates').findOne({ 
+        verificationSerial: { $regex: new RegExp(`^${cleanSerial}$`, 'i') } 
+      });
+    } else {
+      cert = (memoryDb.certificates || []).find((c: any) => 
+        c.verificationSerial && c.verificationSerial.toUpperCase() === cleanSerial
+      );
+    }
+
+    if (!cert) {
+      return res.status(404).json({ error: 'Certificate record not found.' });
+    }
+
+    // Return only public display credentials, never full student records
+    return res.json({
+      success: true,
+      certificate: {
+        id: cert.id,
+        studentName: cert.studentName,
+        studentId: cert.studentId,
+        courseTitle: cert.courseTitle,
+        issueDate: cert.issueDate,
+        grade: cert.grade,
+        verificationSerial: cert.verificationSerial,
+        qrCodeData: cert.qrCodeData,
+        organization: 'Dakshyam Innovations',
+        status: 'VERIFIED_OFFICIAL'
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// OTP EMAIL VERIFICATION (WITH EXPIRY & RATE LIMIT)
+// ==========================================
+
+// Module cache with timestamp tracking for OTP expiry
+const verificationCodes: Record<string, { code: string; createdAt: number; attempts: number }> = {};
+
+// Clean up expired verification codes every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const email in verificationCodes) {
+    if (now - verificationCodes[email].createdAt > 10 * 60 * 1000) {
+      delete verificationCodes[email];
+    }
+  }
+}, 5 * 60 * 1000);
 
 // Function to send actual email with OTP code using SMTP
 async function sendOTPEmail(email: string, code: string): Promise<boolean> {
@@ -479,7 +1065,6 @@ async function sendOTPEmail(email: string, code: string): Promise<boolean> {
   const from = process.env.SMTP_FROM || `"Dakshyam Academy" <${user}>`;
 
   if (!host || !user || !pass || user.includes('your_email') || pass.includes('your_app_password')) {
-    console.warn("[MAIL] SMTP credentials not fully configured or using default placeholders. Cannot send actual email.");
     return false;
   }
 
@@ -487,31 +1072,15 @@ async function sendOTPEmail(email: string, code: string): Promise<boolean> {
     host,
     port,
     secure: port === 465,
-    auth: {
-      user,
-      pass
-    },
-    tls: {
-      rejectUnauthorized: false
-    }
+    auth: { user, pass },
+    tls: { rejectUnauthorized: false }
   });
 
   const mailOptions = {
     from,
     to: email,
     subject: "🔐 Account Verification OTP - Dakshyam Innovation Academy",
-    text: `Greetings!
-
-Thank you for registering with Dakshyam Innovation Academy.
-
-Your verification OTP code is: ${code}
-
-This OTP is valid for 10 minutes. Please enter it on the registration screen to secure and complete your profile setup.
-
-If you did not request this code, please ignore this email.
-
-Best Regards,
-Dakshyam Innovation Academy Team`,
+    text: `Greetings!\n\nYour verification OTP code is: ${code}\n\nThis OTP is valid for 10 minutes.\n\nBest Regards,\nDakshyam Innovation Team`,
     html: `
       <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
         <div style="text-align: center; margin-bottom: 20px;">
@@ -519,15 +1088,11 @@ Dakshyam Innovation Academy Team`,
           <p style="color: #64748b; font-size: 12px; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 0.1em;">Innovation Academy</p>
         </div>
         <div style="border-top: 3px solid #ea580c; padding-top: 20px;">
-          <p style="font-size: 16px; color: #1e293b; line-height: 1.5; margin-top: 0;">Greetings,</p>
-          <p style="font-size: 14px; color: #475569; line-height: 1.5;">Thank you for registering. To complete your secure profile setup, please use the 6-digit OTP verification code below:</p>
-          
+          <p style="font-size: 14px; color: #475569; line-height: 1.5;">To complete your secure profile setup, please use the 6-digit OTP verification code below:</p>
           <div style="text-align: center; margin: 25px 0; padding: 15px; background-color: #fff7ed; border: 1px dashed #ea580c; border-radius: 8px;">
             <span style="font-size: 32px; font-weight: 800; letter-spacing: 0.25em; color: #c2410c; font-family: monospace;">${code}</span>
           </div>
-          
           <p style="font-size: 12px; color: #64748b; line-height: 1.5;">This verification code is active for <strong>10 minutes</strong>. Do not share this code with anyone.</p>
-          <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; border-top: 1px solid #f1f5f9; padding-top: 15px; margin-bottom: 0;">If you did not initiate this request, you can safely ignore this email.</p>
         </div>
       </div>
     `
@@ -535,46 +1100,54 @@ Dakshyam Innovation Academy Team`,
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`[MAIL] Successfully sent actual verification email to ${email}`);
     return true;
   } catch (error: any) {
-    console.warn(`[MAIL] Warning: Failed to send OTP email to ${email}. Check your workspace SMTP configurations. details: ${error?.message || error}`);
+    console.warn(`Failed to send OTP email: ${error?.message || error}`);
     return false;
   }
 }
 
-// Trigger a 6-digit OTP verification code
-app.post('/api/verify/trigger', async (req, res) => {
+// Trigger a 6-digit OTP verification code (10-minute expiry + rate limiting)
+app.post('/api/verify/trigger', otpTriggerLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) {
     return res.status(400).json({ error: "Invalid email format." });
   }
   
   const code = Math.floor(100000 + Math.random() * 900000).toString();
-  verificationCodes[email.toLowerCase()] = code;
+  const cleanEmail = email.toLowerCase().trim();
+  const now = Date.now();
+
+  verificationCodes[cleanEmail] = {
+    code,
+    createdAt: now,
+    attempts: 0
+  };
   
-  console.log(`\n============================================\n[SECURITY] Verification OTP code generated for ${email}: ${code}\n============================================\n`);
+  // Never log raw OTP codes in production
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[DEV ONLY] Verification OTP for ${cleanEmail}: ${code}`);
+  }
   
   try {
     const db = await getMongoDb();
     if (db) {
       const col = db.collection('verifications');
       await col.updateOne(
-        { email: email.toLowerCase() },
-        { $set: { code, createdAt: new Date().toISOString() } },
+        { email: cleanEmail },
+        { $set: { code, createdAt: new Date(now).toISOString() } },
         { upsert: true }
       );
     }
   } catch (err) {
-    console.warn("Could not save OTP verification to database, fell back to local server cache:", err);
+    console.warn("Could not save OTP to database:", err);
   }
 
-  // Send the actual code to entered email
-  const sent = await sendOTPEmail(email.toLowerCase(), code);
+  const sent = await sendOTPEmail(cleanEmail, code);
 
-  let responseMessage = `✓ A secure verification code has been sent to ${email}. Please check your inbox or spam folder.`;
+  let responseMessage = `✓ A secure verification code has been sent to ${email}. Valid for 10 minutes.`;
   if (!sent) {
-    responseMessage = `✓ A secure verification code has been dispatched. (SMTP not configured, check server console logs for developer bypass)`;
+    responseMessage = `✓ A verification code has been dispatched. (Check server logs in development if SMTP is unconfigured)`;
   }
 
   res.json({ 
@@ -583,23 +1156,33 @@ app.post('/api/verify/trigger', async (req, res) => {
   });
 });
 
-// Confirm 6-digit OTP verification code
-app.post('/api/verify/confirm', async (req, res) => {
+// Confirm 6-digit OTP verification code (enforces 10-minute expiry and attempt limit)
+app.post('/api/verify/confirm', otpConfirmLimiter, async (req, res) => {
   const { email, code } = req.body;
   if (!email || !code) {
     return res.status(400).json({ error: "Missing email or OTP verification code." });
   }
 
-  let expectedCode = verificationCodes[email.toLowerCase()];
+  const cleanEmail = email.toLowerCase().trim();
+  const cleanCode = String(code).trim();
+  const now = Date.now();
+  const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 
-  if (!expectedCode) {
+  let record = verificationCodes[cleanEmail];
+
+  if (!record) {
     try {
       const db = await getMongoDb();
       if (db) {
         const col = db.collection('verifications');
-        const doc = await col.findOne({ email: email.toLowerCase() });
+        const doc = await col.findOne({ email: cleanEmail });
         if (doc) {
-          expectedCode = doc.code;
+          const createdAt = doc.createdAt ? new Date(doc.createdAt).getTime() : 0;
+          record = {
+            code: doc.code,
+            createdAt,
+            attempts: 0
+          };
         }
       }
     } catch (err) {
@@ -607,20 +1190,42 @@ app.post('/api/verify/confirm', async (req, res) => {
     }
   }
 
-  if (expectedCode && expectedCode === code.trim()) {
-    res.json({ success: true, message: "Email verification successful!" });
+  if (!record) {
+    return res.status(400).json({ error: "❌ No verification code requested or code expired. Please request a new code." });
+  }
+
+  // Enforce 10-minute expiry
+  if (now - record.createdAt > OTP_EXPIRY_MS) {
+    delete verificationCodes[cleanEmail];
+    return res.status(400).json({ error: "❌ Verification code has expired. Please request a fresh code." });
+  }
+
+  // Max 5 attempts
+  record.attempts = (record.attempts || 0) + 1;
+  if (record.attempts > 5) {
+    delete verificationCodes[cleanEmail];
+    return res.status(400).json({ error: "❌ Too many failed attempts. Code has been invalidated. Please request a new code." });
+  }
+
+  if (record.code === cleanCode) {
+    delete verificationCodes[cleanEmail];
+    return res.json({ success: true, message: "Email verification successful!" });
   } else {
-    res.status(400).json({ error: "❌ Invalid or expired verification code." });
+    return res.status(400).json({ error: "❌ Invalid verification code." });
   }
 });
 
-// GET all collections to load into client local storage
-app.get('/api/db/all', async (req, res) => {
+// ==========================================
+// PROTECTED DATABASE ENDPOINTS
+// ==========================================
+
+// GET /api/db/all — Admin only! Passwords always stripped!
+app.get('/api/db/all', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res) => {
   try {
     const collections = [
       'students', 'trainers', 'groups', 'videos', 'certificates', 
       'applications', 'special_programs', 'special_enrollments', 
-      'company_about', 'supervisor_pin', 'page_loader_config', 'home_3d_model', 
+      'company_about', 'page_loader_config', 'home_3d_model', 
       'workshop_feedback_config', 'workshop_feedback_submissions', 'courses', 'banners', 'gallery_images', 'app_logs', 'admins'
     ];
     
@@ -629,21 +1234,29 @@ app.get('/api/db/all', async (req, res) => {
 
     if (db) {
       for (const name of collections) {
-        if (name === 'company_about' || name === 'supervisor_pin' || name === 'page_loader_config' || name === 'home_3d_model' || name === 'workshop_feedback_config') {
+        if (name === 'company_about' || name === 'page_loader_config' || name === 'home_3d_model' || name === 'workshop_feedback_config') {
           const settingsCol = db.collection('settings');
           const doc = await settingsCol.findOne({ id: name });
           dbData[name] = doc ? doc.value : memoryDb[name];
         } else {
           const col = db.collection(name);
           const list = await col.find({}).toArray();
-          // Map to remove dynamic mongodb _id to prevent client typing issues
-          dbData[name] = list.map(({ _id, ...rest }) => rest);
+          const mapped = list.map(({ _id, ...rest }) => rest);
+          // Strip passwords from user collections
+          if (['students', 'trainers', 'admins'].includes(name)) {
+            dbData[name] = sanitizeCollection(mapped);
+          } else {
+            dbData[name] = mapped;
+          }
         }
       }
     } else {
-      // In-memory fallback
       for (const name of collections) {
-        dbData[name] = memoryDb[name];
+        if (['students', 'trainers', 'admins'].includes(name)) {
+          dbData[name] = sanitizeCollection(memoryDb[name] || []);
+        } else {
+          dbData[name] = memoryDb[name];
+        }
       }
     }
     res.json(dbData);
@@ -653,8 +1266,8 @@ app.get('/api/db/all', async (req, res) => {
   }
 });
 
-// POST to batch sync all collections to MongoDB
-app.post('/api/db/sync-all', async (req, res) => {
+// POST /api/db/sync-all — Admin only!
+app.post('/api/db/sync-all', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res) => {
   try {
     const payload = req.body || {};
     const db = await getMongoDb();
@@ -694,9 +1307,16 @@ app.post('/api/db/sync-all', async (req, res) => {
   }
 });
 
-// POST to clear all user-related collections in Database
-app.post('/api/db/clear', async (req, res) => {
+// POST /api/db/clear — Admin only, requires explicit server-side confirmation phrase!
+app.post('/api/db/clear', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res) => {
   try {
+    const { confirmation } = req.body;
+    if (confirmation !== 'CONFIRM_PERMANENT_DATABASE_CLEAR') {
+      return res.status(400).json({ 
+        error: 'Explicit confirmation required. Send { confirmation: "CONFIRM_PERMANENT_DATABASE_CLEAR" } in request body.' 
+      });
+    }
+
     const collectionsToClear = [
       'students', 'trainers', 'groups', 'videos', 'certificates', 
       'applications', 'special_enrollments', 'special_programs',
@@ -720,12 +1340,148 @@ app.post('/api/db/clear', async (req, res) => {
   }
 });
 
-// POST to upload a media or 3D model file (photo, video, or 3D model)
-app.post('/api/upload', async (req, res) => {
+// POST /api/db/:key — Authenticated, with strict role checks
+app.post('/api/db/:key', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const { key } = req.params;
+  const { data } = req.body;
+  const user = req.user!;
+
+  // Strict role permissions check per collection key
+  const adminOnlyKeys = ['supervisor_pin', 'company_about', 'page_loader_config', 'home_3d_model', 'courses', 'banners', 'gallery_images', 'admins'];
+  const staffKeys = ['trainers', 'students', 'groups', 'videos', 'certificates'];
+
+  if (adminOnlyKeys.includes(key)) {
+    if (user.role !== 'admin') {
+      return res.status(403).json({ error: 'Administrative privileges required to modify this system resource.' });
+    }
+  } else if (staffKeys.includes(key)) {
+    if (user.role !== 'admin' && user.role !== 'trainer') {
+      return res.status(403).json({ error: 'Staff credentials required to modify records in this collection.' });
+    }
+  }
+
+  try {
+    const db = await getMongoDb();
+
+    if (db) {
+      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config' || key === 'home_3d_model' || key === 'workshop_feedback_config' || !Array.isArray(data)) {
+        const settingsCol = db.collection('settings');
+        await settingsCol.updateOne(
+          { id: key },
+          { $set: { value: data } },
+          { upsert: true }
+        );
+      } else if (Array.isArray(data)) {
+        const col = db.collection(key);
+        await col.deleteMany({});
+        if (data.length > 0) {
+          const itemsToInsert = data.map(({ _id, ...rest }) => rest);
+          await col.insertMany(itemsToInsert);
+        }
+      }
+    } else {
+      memoryDb[key] = data;
+    }
+    res.json({ success: true, connected: isMongoConnected });
+  } catch (error: any) {
+    console.error(`Error writing collection ${key} to Database:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// SECURE FILE UPLOAD WITH MAGIC BYTES VERIFICATION
+// ==========================================
+
+// Strict validation of file buffer magic bytes (rejects HTML, SVG, scripts, executables)
+function validateFileBuffer(buffer: Buffer, declaredExt?: string): { valid: boolean; mime: string; ext: string; error?: string } {
+  if (!buffer || buffer.length === 0) {
+    return { valid: false, mime: '', ext: '', error: 'Uploaded file buffer is empty.' };
+  }
+  if (buffer.length > 20 * 1024 * 1024) {
+    return { valid: false, mime: '', ext: '', error: 'File size exceeds maximum allowable limit of 20MB.' };
+  }
+
+  // Reject executable or HTML/SVG content
+  const preview = buffer.slice(0, Math.min(buffer.length, 1024)).toString('utf-8', 0, 1024).toLowerCase();
+  if (
+    preview.includes('<script') ||
+    preview.includes('<?php') ||
+    preview.includes('<html') ||
+    preview.includes('<!doctype') ||
+    preview.includes('<svg') ||
+    preview.includes('onload=') ||
+    preview.includes('onerror=')
+  ) {
+    return { valid: false, mime: '', ext: '', error: 'Executable, script, HTML, or SVG content is forbidden for security reasons.' };
+  }
+
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+    return { valid: true, mime: 'image/png', ext: 'png' };
+  }
+
+  // JPEG: FF D8 FF
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { valid: true, mime: 'image/jpeg', ext: 'jpg' };
+  }
+
+  // WebP: RIFF .... WEBP
+  if (buffer.length >= 12 && buffer.slice(0, 4).toString('ascii') === 'RIFF' && buffer.slice(8, 12).toString('ascii') === 'WEBP') {
+    return { valid: true, mime: 'image/webp', ext: 'webp' };
+  }
+
+  // MP4 / MOV: .... ftyp
+  if (buffer.length >= 12 && buffer.slice(4, 8).toString('ascii') === 'ftyp') {
+    return { valid: true, mime: 'video/mp4', ext: 'mp4' };
+  }
+
+  // WebM: 1A 45 DF A3
+  if (buffer.length >= 4 && buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3) {
+    return { valid: true, mime: 'video/webm', ext: 'webm' };
+  }
+
+  // GLB (glTF Binary): glTF
+  if (buffer.length >= 4 && buffer.slice(0, 4).toString('ascii') === 'glTF') {
+    return { valid: true, mime: 'model/gltf-binary', ext: 'glb' };
+  }
+
+  return { valid: false, mime: '', ext: '', error: 'Unsupported file type. Only PNG, JPEG, WebP, MP4, WebM, and GLB files are accepted.' };
+}
+
+// POST /api/upload — Protected with authentication & strict magic-byte validation
+app.post('/api/upload', authenticateToken, async (req: AuthenticatedRequest, res) => {
   const { file, resourceType, fileName } = req.body;
   if (!file) {
     return res.status(400).json({ error: 'No file data received.' });
   }
+
+  let fileBuffer: Buffer;
+  try {
+    if (typeof file === 'string' && file.startsWith('data:')) {
+      const matches = file.match(/^data:([A-Za-z-+/0-9]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        fileBuffer = Buffer.from(matches[2], 'base64');
+      } else {
+        const raw = file.split(',')[1] || file;
+        fileBuffer = Buffer.from(raw, 'base64');
+      }
+    } else if (typeof file === 'string') {
+      fileBuffer = Buffer.from(file, 'utf-8');
+    } else {
+      fileBuffer = Buffer.from(file);
+    }
+  } catch (err) {
+    return res.status(400).json({ error: 'Invalid file encoding.' });
+  }
+
+  // Check magic bytes
+  const validation = validateFileBuffer(fileBuffer, fileName);
+  if (!validation.valid) {
+    return res.status(400).json({ error: validation.error });
+  }
+
+  const ext = validation.ext;
 
   // 1. Try Cloudinary if environment credentials are present
   if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
@@ -744,44 +1500,12 @@ app.post('/api/upload', async (req, res) => {
         provider: 'cloudinary'
       });
     } catch (error: any) {
-      console.warn('Cloudinary upload warning, falling back to server disk storage:', error.message);
+      console.warn('Cloudinary upload fallback to server storage:', error.message);
     }
   }
 
-  // 2. Resilient fallback to static server storage in /uploads
+  // 2. Fallback to server local upload folder
   try {
-    let fileBuffer: Buffer;
-    let ext = 'bin';
-
-    if (typeof file === 'string' && file.startsWith('data:')) {
-      const matches = file.match(/^data:([A-Za-z-+/0-9]+);base64,(.+)$/);
-      if (matches && matches.length === 3) {
-        const mime = matches[1].toLowerCase();
-        const base64Data = matches[2];
-        fileBuffer = Buffer.from(base64Data, 'base64');
-        if (mime.includes('mp4')) ext = 'mp4';
-        else if (mime.includes('webm')) ext = 'webm';
-        else if (mime.includes('gif')) ext = 'gif';
-        else if (mime.includes('quicktime') || mime.includes('mov')) ext = 'mov';
-        else if (mime.includes('png')) ext = 'png';
-        else if (mime.includes('jpeg') || mime.includes('jpg')) ext = 'jpg';
-        else if (mime.includes('gltf') || mime.includes('glb')) ext = 'glb';
-        else if (mime.includes('obj') || mime.includes('plain')) ext = 'obj';
-      } else {
-        const base64Raw = file.split(',')[1] || file;
-        fileBuffer = Buffer.from(base64Raw, 'base64');
-      }
-    } else if (typeof file === 'string') {
-      fileBuffer = Buffer.from(file, 'utf-8');
-    } else {
-      fileBuffer = Buffer.from(file);
-    }
-
-    if (fileName && fileName.includes('.')) {
-      const parts = fileName.split('.');
-      ext = parts[parts.length - 1].toLowerCase().replace(/[^a-z0-9]/g, '');
-    }
-
     const safeName = `media-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
     const filePath = path.join(uploadsDir, safeName);
     fs.writeFileSync(filePath, fileBuffer);
@@ -795,12 +1519,16 @@ app.post('/api/upload', async (req, res) => {
   } catch (localErr: any) {
     console.error('Server storage upload error:', localErr);
     return res.status(500).json({ 
-      error: localErr.message || 'Failed to process file upload.' 
+      error: 'Failed to write uploaded file to server storage.' 
     });
   }
 });
 
-// POST to append an audit log entry in Database
+// ==========================================
+// AUDIT LOGS
+// ==========================================
+
+// POST /api/logs — Append an audit log entry
 app.post('/api/logs', async (req, res) => {
   try {
     const { action, details, userEmail, role, status, category, metadata } = req.body;
@@ -840,8 +1568,8 @@ app.post('/api/logs', async (req, res) => {
   }
 });
 
-// GET audit logs with search and category filters
-app.get('/api/logs', async (req, res) => {
+// GET /api/logs — Retrieve audit logs
+app.get('/api/logs', authenticateToken, requireRole('admin', 'trainer'), async (req, res) => {
   try {
     const { limit = '100', category, status, search } = req.query;
     const maxItems = Math.min(parseInt(limit as string) || 100, 500);
@@ -877,7 +1605,6 @@ app.get('/api/logs', async (req, res) => {
       });
     }
 
-    // Fallback memoryDb logs
     let logs = memoryDb.app_logs || [];
     if (category && category !== 'ALL') {
       logs = logs.filter((l: any) => l.category === category);
@@ -905,45 +1632,5 @@ app.get('/api/logs', async (req, res) => {
   }
 });
 
-// POST to update a collection in Database
-app.post('/api/db/:key', async (req, res) => {
-  const { key } = req.params;
-  const { data } = req.body;
-  try {
-    const db = await getMongoDb();
-
-    if (db) {
-      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config' || key === 'home_3d_model' || key === 'workshop_feedback_config' || !Array.isArray(data)) {
-        const settingsCol = db.collection('settings');
-        await settingsCol.updateOne(
-          { id: key },
-          { $set: { value: data } },
-          { upsert: true }
-        );
-      } else if (Array.isArray(data)) {
-        const col = db.collection(key);
-        // Clean re-populate collection to align precision
-        await col.deleteMany({});
-        if (data.length > 0) {
-          const itemsToInsert = data.map(({ _id, ...rest }) => rest);
-          await col.insertMany(itemsToInsert);
-        }
-      }
-    } else {
-      // Fallback local memory store
-      if (key === 'company_about' || key === 'supervisor_pin' || key === 'page_loader_config' || key === 'home_3d_model' || key === 'workshop_feedback_config' || !Array.isArray(data)) {
-        memoryDb[key] = data;
-      } else if (Array.isArray(data)) {
-        memoryDb[key] = data;
-      }
-    }
-    res.json({ success: true, connected: isMongoConnected });
-  } catch (error: any) {
-    console.error(`Error writing collection ${key} to Database:`, error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Export app and getMongoDb for server.ts and Vercel serverless execution
 export { app, getMongoDb, memoryDb };
 export default app;

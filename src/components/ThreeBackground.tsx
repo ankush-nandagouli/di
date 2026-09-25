@@ -40,7 +40,7 @@ export default function ThreeBackground({ theme = 'dark' }: { theme?: 'light' | 
       alpha: false,
       powerPreference: 'high-performance',
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setClearColor(clearColorVal, 1);
     container.appendChild(renderer.domElement);
@@ -49,8 +49,8 @@ export default function ThreeBackground({ theme = 'dark' }: { theme?: 'light' | 
     // 4. Create Waves Geometry (BufferGeometry)
     const width = 85;
     const depth = 85;
-    const wSegments = 45;
-    const dSegments = 45;
+    const wSegments = 32;
+    const dSegments = 32;
     
     const count = (wSegments + 1) * (dSegments + 1);
     const positions = new Float32Array(count * 3);
@@ -185,6 +185,11 @@ export default function ThreeBackground({ theme = 'dark' }: { theme?: 'light' | 
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
+
+      // Skip render calculations when browser tab is inactive to eliminate lag & save resources
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
 
       const time = ((performance.now() - startTime) / 1000) * 0.45;
 

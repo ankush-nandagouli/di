@@ -11,6 +11,7 @@ import {
   WorkshopItem, ParticipantCategory 
 } from '../types';
 import { WorkshopFeedbackStorage, toWorkshopSlug, getWorkshopShareUrl, VERCEL_DOMAIN } from '../utils/feedbackStorage';
+import { NotificationService } from '../utils/notificationService';
 import DakshyamLogo from './DakshyamLogo';
 
 interface WorkshopFeedbackFormProps {
@@ -340,6 +341,22 @@ export default function WorkshopFeedbackForm({
       if (result.success && result.id) {
         setSubmittedResult({ id: result.id });
         window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // Dispatch real-time notification to Administrators (securely isolated to admin role)
+        try {
+          const wsName = config.workshops.find(w => w.id === selectedWorkshopId)?.name || 'Technical Workshop';
+          NotificationService.dispatchNotification({
+            title: `New Workshop Feedback: ${wsName}`,
+            message: `${fullName.trim()} (${institutionName.trim() || 'Attendee'}) submitted an evaluation rating of ${overallRating}/5.`,
+            targetRole: 'admin',
+            category: 'feedback',
+            priority: overallRating >= 4 ? 'normal' : 'high',
+            linkTab: 'feedback',
+            actionData: { feedbackId: result.id, workshopId: selectedWorkshopId, rating: overallRating }
+          });
+        } catch (notifErr) {
+          console.warn('Notification dispatch handled silently:', notifErr);
+        }
       } else {
         setErrors({ submit: result.error || 'Failed to submit feedback. Please try again.' });
       }
