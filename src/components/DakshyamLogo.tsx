@@ -335,6 +335,16 @@ export default function DakshyamLogo({
           >
             INNOVATION
           </motion.p>
+
+          {/* Official Tagline */}
+          <motion.p
+            variants={textLettersEntrance}
+            className={`mt-1.5 text-[9px] md:text-[10px] font-mono tracking-[0.35em] font-extrabold uppercase transition-all duration-300 ${
+              theme === 'light' ? 'text-slate-600' : 'text-slate-400'
+            }`}
+          >
+            LEARN • BUILD • INNOVATE
+          </motion.p>
         </motion.div>
       )}
     </div>

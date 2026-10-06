@@ -1,4 +1,55 @@
-import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder, AppLog, LogCategory, PageLoaderConfig } from '../types';
+import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder, CompanyService, AppLog, LogCategory, PageLoaderConfig } from '../types';
+
+export const DEFAULT_SERVICES: CompanyService[] = [
+  {
+    id: 'srv-programming',
+    category: 'PROGRAMMING',
+    title: 'Programming & Software Development',
+    technologies: ['C', 'C++', 'Python', 'JavaScript'],
+    description: 'Foundational and advanced computer programming tracks. Master algorithmic logic, data structures, object-oriented design, system memory mechanics in C/C++, rapid automation with Python, and interactive web runtime mechanics with JavaScript.',
+    badge: 'CORE CODE'
+  },
+  {
+    id: 'srv-web-dev',
+    category: 'WEB DEVELOPMENT',
+    title: 'Full-Stack Web Development',
+    technologies: ['HTML5', 'CSS3', 'JavaScript', 'Django', 'MERN Stack'],
+    description: 'Production-ready web development from clean semantic HTML5, modern CSS3 layouts, and core JavaScript to scalable backend systems with Python Django REST Framework and the modern MERN (MongoDB, Express, React, Node.js) technology stack.',
+    badge: 'INDUSTRY READY'
+  },
+  {
+    id: 'srv-app-dev',
+    category: 'APP DEVELOPMENT',
+    title: 'Mobile Application Development',
+    technologies: ['Flutter', 'Dart', 'Android', 'iOS', 'State Management'],
+    description: 'High-performance cross-platform mobile application development for iOS and Android powered by Flutter and Dart. Build responsive mobile interfaces, native device integrations, state management, and real-time backend synchronization.',
+    badge: 'MOBILE SUITE'
+  },
+  {
+    id: 'srv-iot-robotics',
+    category: 'IOT & ROBOTICS',
+    title: 'IoT & Robotics Engineering',
+    technologies: ['ESP32', 'Arduino', 'Sensors', 'Robotics Hardware', 'Microcontrollers', 'PWM Motors'],
+    description: 'Hands-on embedded systems and physical robotics. Assembling autonomous rovers, calibrating environmental sensors (ultrasonic, infrared, temperature), configuring ESP32 Wi-Fi microcontrollers, and building motor driver kinematics circuits.',
+    badge: 'HANDS-ON HARDWARE'
+  },
+  {
+    id: 'srv-integrated-tech',
+    category: 'INTEGRATED TECH',
+    title: 'Web Development + IoT + AI',
+    technologies: ['Full-Stack Web', 'IoT (ESP32/Sensors)', 'AI Models', 'Real-time Telemetry'],
+    description: 'Next-generation interdisciplinary engineering track synthesizing physical IoT microcontroller hardware, live sensor telemetry streams, full-stack web monitoring dashboards, and applied Artificial Intelligence (AI) predictive models.',
+    badge: 'FUTURE SYSTEMS'
+  },
+  {
+    id: 'srv-computer-training',
+    category: 'COMPUTER TRAINING',
+    title: 'Comprehensive Computer Training',
+    technologies: ['Computer Fundamentals', 'Operating Systems', 'Office Productivity', 'Cyber Hygiene'],
+    description: 'Practical, skill-based computer literacy and vocational training for school learners and beginners. Covers computer operations, operating system workflows, office productivity suites, keyboard dexterity, and cyber security fundamentals.',
+    badge: 'DIGITAL LITERACY'
+  }
+];
 
 // Default seeded courses requested by the user
 export const DEFAULT_COURSES: Course[] = [
@@ -410,33 +461,59 @@ export class DakshyamDatabase {
   static getCompanyAbout(): CompanyAbout {
     const defaultAbout: CompanyAbout = {
       companyName: 'Dakshyam Innovations',
-      description: 'Dakshyam Innovations is a premier engineering education technology developer and skill incubator. We specialize in physical-digital integrated vocational training, making modern embedded labs, microcontrollers, IoT equipment, and programming frameworks accessible directly to students, primary setups, and regional schools. Under the visionary guidelines of India\'s National Education Policy (NEP 2020), our mission is to eliminate technical literacy barriers through custom physical teaching kits and high-performance, real-time feedback systems.',
-      mission: 'To democratize access to 21st-century technology tools, physical computing, and web engineering. We provide state-of-the-art diagnostic kits and hardware resources, ensuring that students in Tier-2, Tier-3 and rural setups get hands-on workspace training.',
-      vision: 'To build a standard vocational platform where beginners can smoothly transition from intuitive logical block models into building industrial-level internet of things telemetry systems and back-end web engines.',
-      officeLocation: 'Waraseoni, Balaghat District, Madhya Pradesh, India',
+      tagline: 'Learn • Build • Innovate',
+      description: 'To make practical technology education accessible to every student, empowering both rural and urban learners to understand, create, and innovate with technology, to provide hands-on, skill-based and project-driven learning in Programming, Web & App Development, AI, IoT and Robotics — aligned with the NEP 2020 vision of experiential learning, skill development and holistic education.',
+      mission: 'To make practical technology education accessible to every student, empowering both rural and urban learners to understand, create, and innovate with technology.',
+      vision: 'To provide hands-on, skill-based and project-driven learning in Programming, Web & App Development, AI, IoT and Robotics — aligned with the NEP 2020 vision of experiential learning, skill development and holistic education.',
+      officeLocation: 'Ward No. 4, Siddhivinayak Complex, First Floor, Balaghat Road, Waraseoni - 481331',
       socialGithub: 'https://github.com/dakshyam-innovations',
       socialLinkedin: 'https://linkedin.com/company/dakshyam-innovations',
       socialTwitter: 'https://twitter.com/dakshyam_in',
       socialYoutube: 'https://youtube.com/@dakshyaminnovations',
-      founders: [
-        { name: 'Himanshu Patle', role: 'Co-Founder & Chief Director', bio: 'Directs strategic planning & corporate relations, aligning industrial skills development targets with institutions and regional secondary setups.', avatarText: 'HP' },
-        { name: 'Ankush Nandagouli', role: 'Co-Founder & Chief Software Architect', bio: 'Directs physical/digital telemetry integrations, cloud-hosted API backends, real-time WebSocket pipelines, and educational platforms.', avatarText: 'AN' },
-        { name: 'Anand Gautam', role: 'Co-Founder & Embedded Hardware Head', bio: 'Directs circuit diagnostics, micro-controller register calibrations, multi-H-bridge motor kinetics, sensor logic systems, and diagnostic kits.', avatarText: 'AG' },
-        { name: 'Shikhar Bisen', role: 'Co-Founder & Laboratory Setup Lead', bio: 'Manages physical laboratory logistics, equipment distributions, electrical integrity checks, and field-stage support frameworks.', avatarText: 'SB' },
-        { name: 'Kunal Raut', role: 'Co-Founder & Director of Operations', bio: 'Directs vocational logistics, community outreach campaigns, local school partnerships, and ensures flawless distribution of laboratory teaching kits.', avatarText: 'KR' },
-        { name: 'Rohit Bhajipale', role: 'Co-Founder & Regional Coordinator', bio: 'Leads educational outreach programs, public relations, regional technical campaigns, and on-site training sessions.', avatarText: 'RB' }
-      ]
+      founders: [],
+      services: DEFAULT_SERVICES
     };
+
     const currentAbout = this.get<CompanyAbout>('company_about', defaultAbout);
-    if (currentAbout && currentAbout.founders && !currentAbout.founders.some(f => f.name.toLowerCase().includes('kunal raut'))) {
-      currentAbout.founders.splice(4, 0, {
-        name: 'Kunal Raut',
-        role: 'Co-Founder & Director of Operations',
-        bio: 'Directs vocational logistics, community outreach campaigns, local school partnerships, and ensures flawless distribution of laboratory teaching kits.',
-        avatarText: 'KR'
-      });
+
+    // Ensure migration of updated fields if previously cached
+    let needsUpdate = false;
+    if (!currentAbout.tagline) {
+      currentAbout.tagline = defaultAbout.tagline;
+      needsUpdate = true;
+    }
+    if (!currentAbout.services || currentAbout.services.length === 0) {
+      currentAbout.services = DEFAULT_SERVICES;
+      needsUpdate = true;
+    } else if (!currentAbout.services.some(s => s.id === 'srv-iot-robotics' || s.category.includes('ROBOTICS'))) {
+      const iotRobotics = DEFAULT_SERVICES.find(s => s.id === 'srv-iot-robotics');
+      if (iotRobotics) {
+        currentAbout.services.splice(3, 0, iotRobotics);
+        needsUpdate = true;
+      }
+    }
+    // Remove founders details per request
+    if (currentAbout.founders && currentAbout.founders.length > 0) {
+      currentAbout.founders = [];
+      needsUpdate = true;
+    }
+    // Update address if old default
+    if (!currentAbout.officeLocation || currentAbout.officeLocation.includes('Madhya Pradesh, India') || currentAbout.officeLocation.toLowerCase().includes('delhi')) {
+      currentAbout.officeLocation = defaultAbout.officeLocation;
+      needsUpdate = true;
+    }
+    // Update mission and vision if older default
+    if (currentAbout.mission && currentAbout.mission.includes('democratize access to 21st-century')) {
+      currentAbout.mission = defaultAbout.mission;
+      currentAbout.vision = defaultAbout.vision;
+      currentAbout.description = defaultAbout.description;
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
       this.saveCompanyAbout(currentAbout);
     }
+
     return currentAbout;
   }
 

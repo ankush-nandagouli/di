@@ -64,9 +64,9 @@ export default function ContactUs({ theme }: ContactUsProps) {
               <div className="space-y-1">
                 <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Registered Office</h3>
                 <p className={`text-xs leading-relaxed font-sans ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
-                  Dakshyam Innovations LLC<br />
-                  Delhi/NCR STEM Cluster Area<br />
-                  India
+                  Ward No. 4, Siddhivinayak Complex, First Floor<br />
+                  Balaghat Road, Waraseoni - 481331<br />
+                  Madhya Pradesh, India
                 </p>
               </div>
             </div>

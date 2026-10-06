@@ -160,8 +160,18 @@ export interface CompanyFounder {
   avatarText?: string;
 }
 
+export interface CompanyService {
+  id: string;
+  category: string;
+  title: string;
+  technologies: string[];
+  description: string;
+  badge?: string;
+}
+
 export interface CompanyAbout {
   companyName: string;
+  tagline: string;
   description: string;
   mission: string;
   vision: string;
@@ -170,7 +180,8 @@ export interface CompanyAbout {
   socialLinkedin: string;
   socialTwitter: string;
   socialYoutube: string;
-  founders: CompanyFounder[];
+  founders?: CompanyFounder[];
+  services: CompanyService[];
 }
 
 export interface SpecialProgramEnrollment {

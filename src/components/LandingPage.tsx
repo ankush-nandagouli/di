@@ -269,10 +269,18 @@ export default function LandingPage({
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.8 }}
-          className="space-y-4 max-w-lg mx-auto"
+          className="space-y-4 max-w-xl mx-auto"
         >
-          <p className={`text-3xs sm:text-xs font-mono tracking-widest uppercase ${textMuted}`}>
-            Sovereign Skill Systems & Robotics Integration
+          <div className="flex justify-center">
+            <div className={`inline-flex items-center gap-2 px-3.5 py-1 rounded-full border font-mono text-[10px] font-black tracking-widest uppercase ${
+              isLight ? 'bg-amber-500/10 border-amber-600/30 text-amber-900' : 'bg-amber-400/10 border-amber-400/30 text-amber-300'
+            }`}>
+              <Sparkles className="w-3.5 h-3.5 text-current" /> LEARN • BUILD • INNOVATE
+            </div>
+          </div>
+
+          <p className={`text-xs sm:text-sm font-sans font-medium leading-relaxed ${textMuted}`}>
+            To make practical technology education accessible to every student, empowering both rural and urban learners to understand, create, and innovate with technology.
           </p>
 
           <div className="pt-1">
@@ -339,69 +347,131 @@ export default function LandingPage({
       {/* --- SECTION C: SERVICING WORKSPACES SPOTLIGHT --- */}
       <div className="max-w-4xl mx-auto px-4 space-y-8">
         <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
-          <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${textGold}`}>Dakshyam Capabilities</span>
-          <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Comprehensive Vocational Services & Delivery</h2>
+          <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${textGold}`}>Core Offerings</span>
+          <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Comprehensive Technical Services & Curriculum Tracks</h2>
           <p className={`text-xs max-w-2xl ${textMuted}`}>
-            Dakshyam Innovations designs and deploys customized, turn-key computational labs and robotic work benches. Our services bridge hardware-level physical instrumentation with professional diagnostic code frameworks, aligning with modern industrial standards.
+            Hands-on, skill-based, and project-driven learning in Programming, Web & App Development, AI, IoT, and Robotics — aligned with NEP 2020 experiential education.
           </p>
         </div>
 
         {/* Premium services grids */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left font-sans text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left font-sans text-xs">
           
-          <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3`}>
-            <div className="flex items-center gap-3">
-              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>S1</span>
-              <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>On-Demand High-Spec Computer Leases</h4>
+          {/* Service 1: Programming */}
+          <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3 flex flex-col justify-between`}>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>01</span>
+                <span className="text-[9px] font-mono font-bold uppercase text-sky-500 bg-sky-500/10 px-2 py-0.5 rounded">Core Code</span>
+              </div>
+              <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>Programming & Logic</h4>
+              <p className={`${textMuted}`}>
+                Master computer programming fundamentals and algorithmic problem-solving in C, C++, Python, and JavaScript. Covers data structures, object-oriented concepts, and memory execution.
+              </p>
             </div>
-            <p className={`${textMuted}`}>
-              We deliver fully configured mobile laptop arrays directly to local and rural schools. These systems come pre-loaded with localized offline development compilation tools, terminal diagnostics softwares, and electronic circuit emulators. This mitigates infrastructure constraints for standard schools and ensures 100% participation.
-            </p>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">✓ Leased Free of Charge</span>
-              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">✓ No Internet Necessary</span>
-            </div>
-          </div>
-
-          <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3`}>
-            <div className="flex items-center gap-3">
-              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>S2</span>
-              <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>Hands-On Hardware Kit Provision</h4>
-            </div>
-            <p className={`${textMuted}`}>
-              Every student gets individual access to premium hardware kits including ESP32 Wi-Fi modules, DC geared motors, optical incremental encoder discs, L298N dual-H-bridge power modules, custom solar cells, infrared line trackers, and HC-SR04 ultrasonic sound wave receptors. No simulation models; purely physical assembly and diagnostics.
-            </p>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">✓ Individual Kit Ownership</span>
-              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">✓ Complete Spare Spares</span>
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">C</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">C++</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Python</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">JavaScript</span>
             </div>
           </div>
 
-          <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3`}>
-            <div className="flex items-center gap-3">
-              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>S3</span>
-              <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>Sovereign Evaluation & Micro-Credentials</h4>
+          {/* Service 2: Web Development */}
+          <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3 flex flex-col justify-between`}>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>02</span>
+                <span className="text-[9px] font-mono font-bold uppercase text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">Full-Stack</span>
+              </div>
+              <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>Web Development</h4>
+              <p className={`${textMuted}`}>
+                End-to-end modern web applications. From foundational HTML5, responsive CSS3, and core JavaScript to scalable backend systems using Python Django and the MERN stack.
+              </p>
             </div>
-            <p className={`${textMuted}`}>
-              We replace standard text examinations with verifiable project reviews. Students build a functional end-product (such as a smart solar watering pump or an autonomous pathfinder), present its diagnostic performance on telemetry charts, write a brief lab record, and receive blockchain-traceable, industry-approved, downloadable completion certificates.
-            </p>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">✓ 100% Practical Grading</span>
-              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">✓ Shared Video Presentations</span>
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">HTML5 / CSS</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">JavaScript</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Django</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">MERN</span>
             </div>
           </div>
 
-          <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3`}>
-            <div className="flex items-center gap-3">
-              <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>S4</span>
-              <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>Institutional Lab Integrations</h4>
+          {/* Service 3: App Development */}
+          <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3 flex flex-col justify-between`}>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>03</span>
+                <span className="text-[9px] font-mono font-bold uppercase text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">Mobile Apps</span>
+              </div>
+              <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>Mobile App Development</h4>
+              <p className={`${textMuted}`}>
+                High-performance cross-platform mobile apps for Android and iOS using Google's Flutter framework and Dart. Build responsive UI, native features, and live cloud sync.
+              </p>
             </div>
-            <p className={`${textMuted}`}>
-              For schools and science institutions seeking continuous, permanent technical excellence, we offer complete turn-key laboratory configuration services. We design and install safe wiring setups, physical server nodes, visual diagnostic telemetry banners, and custom instructional trainer guidelines fitted to local schedules.
-            </p>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">✓ Turn-key physical lab designs</span>
-              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">✓ Certified Supervisor handshakes</span>
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Flutter</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Dart</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Android & iOS</span>
+            </div>
+          </div>
+
+          {/* Service 4: IoT & Robotics */}
+          <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3 flex flex-col justify-between`}>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>04</span>
+                <span className="text-[9px] font-mono font-bold uppercase text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded">Robotics & HW</span>
+              </div>
+              <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>IoT & Robotics</h4>
+              <p className={`${textMuted}`}>
+                Physical computing and embedded robotics. Hands-on wiring of ESP32 Wi-Fi boards, Arduino microcontrollers, ultrasonic/infrared sensors, and dual H-bridge motor kinematics for autonomous rovers.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">ESP32 & Arduino</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Robotics Kits</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Sensors & Telemetry</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Motor Kinetics</span>
+            </div>
+          </div>
+
+          {/* Service 5: Web Dev + IoT + AI */}
+          <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3 flex flex-col justify-between`}>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>05</span>
+                <span className="text-[9px] font-mono font-bold uppercase text-violet-500 bg-violet-500/10 px-2 py-0.5 rounded">Next-Gen</span>
+              </div>
+              <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>Web Dev + IoT + AI</h4>
+              <p className={`${textMuted}`}>
+                Interdisciplinary engineering connecting physical IoT microcontrollers (ESP32/sensors) with real-time web telemetry dashboards and Artificial Intelligence models.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">ESP32 & Sensors</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Web Dashboards</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Applied AI</span>
+            </div>
+          </div>
+
+          {/* Service 6: Computer Training */}
+          <div className={`p-6 rounded-2xl border ${cardCourseBg} space-y-3 flex flex-col justify-between`}>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isLight ? 'bg-blue-900/10 text-blue-950' : 'bg-blue-950/60 text-sky-400'}`}>06</span>
+                <span className="text-[9px] font-mono font-bold uppercase text-cyan-500 bg-cyan-500/10 px-2 py-0.5 rounded">Vocational Literacy</span>
+              </div>
+              <h4 className={`font-black text-xs uppercase tracking-wide ${textTitle}`}>Computer Training & Literacy</h4>
+              <p className={`${textMuted}`}>
+                Hands-on, skill-based digital literacy and vocational training empowering school learners. Covers computer fundamentals, operating systems, productivity suites, keyboard speed, and cyber hygiene.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Computer Fundamentals</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Office Suites</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">OS Navigation</span>
+              <span className="text-[10px] font-mono text-slate-400 bg-black/30 border border-slate-500/10 px-2 py-0.5 rounded">Cyber Safety</span>
             </div>
           </div>
 
@@ -806,7 +876,7 @@ export default function LandingPage({
             <div className={`px-4 py-2 rounded-2xl border font-mono text-[10px] tracking-wide leading-relaxed font-bold w-fit ${
               isLight ? 'bg-blue-50 border-blue-900/15 text-blue-950' : 'bg-blue-950/40 border-blue-700/40 text-sky-300'
             }`}>
-              📍 Location Node: Waraseoni, District Balaghat, MP
+              📍 Ward No. 4, Siddhivinayak Complex, 1st Floor, Balaghat Road, Waraseoni - 481331
             </div>
           </div>
 

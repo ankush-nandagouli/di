@@ -325,7 +325,7 @@ export default function App() {
   const [studentName, setStudentName] = useState('');
   const [studentPhone, setStudentPhone] = useState('');
   const [studentSchool, setStudentSchool] = useState('');
-  const [studentLevel, setStudentLevel] = useState('Grade 10');
+  const [studentLevel, setStudentLevel] = useState('');
 
   // Secret passcode states (Trainer/Admin URL security)
   const [secretCode, setSecretCode] = useState('');
@@ -540,25 +540,25 @@ export default function App() {
 
       // Update document titles and meta tags dynamically based on the active vocational page
       const titleMapping: Record<string, string> = {
-        home: 'DAKSHYAM INNOVATION | Physical-Digital Technical Vocational Training Labs',
-        services: 'DAKSHYAM INNOVATION | Vocational Courses & IoT Training Programs',
+        home: 'DAKSHYAM INNOVATION | Learn • Build • Innovate | Technical Vocational Labs',
+        services: 'DAKSHYAM INNOVATION | Vocational Courses & Technical Training Programs',
         leaderboard: 'DAKSHYAM INNOVATION | Students Leaderboard & Matrix Performance',
         social: 'DAKSHYAM INNOVATION | Social Telemetry Feed & Live Projects',
         portal: 'DAKSHYAM INNOVATION | Student & Trainer Logins',
         verification: 'DAKSHYAM INNOVATION | Verifiable Certificate Verification Engine',
-        about: 'DAKSHYAM INNOVATION | Board of Directors, Founders & Mission Statement',
+        about: 'DAKSHYAM INNOVATION | Mission, Vision & Specialized Technical Services',
         contact: 'DAKSHYAM INNOVATION | Get In Touch - Dynamic Contact Desk',
         feedback: 'DAKSHYAM INNOVATION | Workshop Evaluation & Participant Feedback Portal',
       };
 
       const descMapping: Record<string, string> = {
-        home: 'Dakshyam Innovation is India\'s premier skill incubator under NEP 2020. Discover physical-digital integrated labs, embedded systems training, and modern technology camps.',
+        home: 'Dakshyam Innovation is India\'s premier skill incubator under NEP 2020. Learn • Build • Innovate with hands-on Programming, Web & App Development, AI, and IoT.',
         services: 'Explore our hand-crafted, industry-oriented computer literacy, IoT hardware training, and robotic engineering syllabus modules.',
         leaderboard: 'Track student laboratory points, group capstone submissions, and real-time active grading matrices.',
         social: 'See what our students are building. Experience live project diagnostic feeds, solar hardware telemetry streams, and social tech logs.',
         portal: 'Secure access gateway for authenticated student users, authorized trainers, and system administrators.',
         verification: 'Verify authentic certification credentials issued by Dakshyam Innovation. Examine student telemetry scores and download official print-ready PDFs.',
-        about: 'Meet the founding members, technical developers, board of directors, and visionaries shaping India\'s vocational development pipeline.',
+        about: 'To make practical technology education accessible to every student, empowering both rural and urban learners with hands-on, skill-based, and project-driven learning.',
         contact: 'Connect directly with the Dakshyam team. Partner with us to construct modern computer literacy and IoT hardware labs inside your regional school.',
         feedback: 'Official participant feedback, trainer evaluations, and learning outcomes submission for Dakshyam Innovations STEM & Robotics sessions.',
       };
@@ -1186,16 +1186,18 @@ export default function App() {
             >
               SERVICES & SYLLABUS
             </button>
-            <button
-              onClick={() => navigateToTab('leaderboard')}
-              className={`px-3 py-1.5 rounded-lg transition-all border ${
-                activeTab === 'leaderboard' 
-                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]') 
-                  : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
-              }`}
-            >
-              LEADERBOARD
-            </button>
+            {currentUser && (
+              <button
+                onClick={() => navigateToTab('leaderboard')}
+                className={`px-3 py-1.5 rounded-lg transition-all border ${
+                  activeTab === 'leaderboard' 
+                    ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]') 
+                    : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
+                }`}
+              >
+                LEADERBOARD
+              </button>
+            )}
             <button
               onClick={() => navigateToTab('social')}
               className={`px-3 py-1.5 rounded-lg transition-all border ${
@@ -1385,16 +1387,18 @@ export default function App() {
                 >
                   SERVICES & PROGRAM CATALOGS
                 </button>
-                <button
-                  onClick={() => navigateToTab('leaderboard')}
-                  className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${
-                    activeTab === 'leaderboard' 
-                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold') 
-                      : (isLight ? 'border-transparent text-slate-700' : 'border-transparent text-slate-300')
-                  }`}
-                >
-                  LEADERBOARD TRACKER
-                </button>
+                {currentUser && (
+                  <button
+                    onClick={() => navigateToTab('leaderboard')}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${
+                      activeTab === 'leaderboard' 
+                        ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold') 
+                        : (isLight ? 'border-transparent text-slate-700' : 'border-transparent text-slate-300')
+                    }`}
+                  >
+                    LEADERBOARD TRACKER
+                  </button>
+                )}
                 <button
                   onClick={() => navigateToTab('social')}
                   className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all ${
@@ -1736,7 +1740,50 @@ export default function App() {
 
             {/* VIEW 3: GLOBAL LEADERBOARD */}
             {activeTab === 'leaderboard' && (
-              <LeaderboardComp groups={groups} students={students} />
+              currentUser ? (
+                <LeaderboardComp groups={groups} students={students} />
+              ) : (
+                <div className="max-w-xl mx-auto px-4 py-12 text-center">
+                  <div className={`p-8 rounded-3xl border shadow-xl space-y-5 ${
+                    isLight ? 'bg-white border-blue-900/15' : 'bg-[#0d1f38]/90 border-blue-700/40'
+                  }`}>
+                    <div className={`w-14 h-14 mx-auto rounded-2xl flex items-center justify-center border ${
+                      isLight ? 'bg-blue-50 border-blue-900/20 text-blue-950' : 'bg-blue-950/80 border-blue-500/40 text-sky-400'
+                    }`}>
+                      <Lock className="w-7 h-7" />
+                    </div>
+                    <div className="space-y-2">
+                      <span className={`text-[10px] font-mono tracking-widest uppercase font-black ${isLight ? 'text-blue-900' : 'text-sky-400'}`}>
+                        Authorized Members Only
+                      </span>
+                      <h2 className={`text-xl font-black uppercase tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                        Student Leaderboard Access
+                      </h2>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                        The laboratory performance leaderboard and group matrix are visible only to registered and logged-in users. Please log in to view rankings, project scores, and achievement points.
+                      </p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                      <button
+                        onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
+                        className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-mono text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md ${
+                          isLight ? 'bg-blue-950 hover:bg-blue-900 text-white' : 'bg-white hover:bg-slate-100 text-[#0a192f]'
+                        }`}
+                      >
+                        Sign In to Your Account
+                      </button>
+                      <button
+                        onClick={() => { setAuthMode('register'); setShowAuthModal(true); }}
+                        className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                          isLight ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800' : 'bg-blue-950/40 hover:bg-blue-900/60 border-blue-700/40 text-sky-300'
+                        }`}
+                      >
+                        Register New Student
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
             )}
 
             {/* VIEW 4: SOCIAL VIDEO EXHIBITION */}
@@ -1993,18 +2040,29 @@ export default function App() {
       </main>
 
       {/* FOOTER COOPERATING SIGNATURE */}
-      <footer className={`relative z-20 w-full py-6 text-center text-3xs font-mono tracking-[0.3em] border-t no-print flex flex-col items-center justify-center gap-1 transition-colors duration-300 ${
-        isLight ? 'text-slate-500 border-blue-900/10 bg-white/70' : 'text-slate-500 border-blue-900/20 bg-[#071326]/60 backdrop-blur-md'
+      <footer className={`relative z-20 w-full py-6 text-center text-3xs font-mono tracking-wider border-t no-print flex flex-col items-center justify-center gap-1.5 transition-colors duration-300 ${
+        isLight ? 'text-slate-600 border-blue-900/10 bg-white/70' : 'text-slate-400 border-blue-900/20 bg-[#071326]/60 backdrop-blur-md'
       }`}>
+        <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.25em]">
+          <span className={isLight ? 'text-blue-950' : 'text-white'}>DAKSHYAM INNOVATIONS</span>
+          <span className="text-slate-500">•</span>
+          <span className={isLight ? 'text-amber-800' : 'text-amber-300'}>LEARN • BUILD • INNOVATE</span>
+        </div>
+
+        <div className="text-[9px] tracking-normal text-slate-500 font-sans max-w-xl px-4 text-center">
+          Ward No. 4, Siddhivinayak Complex, First Floor, Balaghat Road, Waraseoni - 481331 (M.P.), India
+        </div>
+
         <div 
           onClick={handleStaffAccessTrigger}
-          className="cursor-pointer hover:text-blue-900 dark:hover:text-sky-400 transition-colors py-1"
+          className="cursor-pointer hover:text-blue-900 dark:hover:text-sky-400 transition-colors py-0.5 text-[8.5px] uppercase tracking-widest font-mono text-slate-400"
           title="Supervisory Node Overlap (Click to reveal panel)"
         >
-          © 2026 Dakshyam innovations
+          © 2026 Dakshyam Innovations • NEP 2020 Aligned Experiential Learning
         </div>
+
         <div className="text-[8px] tracking-normal text-slate-400/60 uppercase flex items-center gap-2">
-          <span>NEP-Aligned School IoT & Full-Stack Robotics Integrations</span>
+          <span>Programming • Web & App Development • AI • IoT • Robotics</span>
           <span className="text-slate-500">•</span>
           <button
             onClick={() => {
@@ -2548,22 +2606,19 @@ export default function App() {
 
                       <div className="space-y-1">
                         <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-blue-900 font-bold' : 'text-sky-300'}`}>
-                          Class Level
+                          Class / Level
                         </label>
-                        <select
+                        <input
+                          type="text"
+                          required
                           value={studentLevel}
                           onChange={(e) => setStudentLevel(e.target.value)}
+                          placeholder="Enter your class or grade (e.g. Class 10, 12th, B.Tech CSE)"
                           className={isLight 
                             ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900 focus:bg-white" 
-                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none"
+                            : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-sky-400"
                           }
-                        >
-                          <option value="Grade 10">Grade 10 High School Setup</option>
-                          <option value="Grade 11">Grade 11 High School Setup</option>
-                          <option value="Grade 12">Grade 12 High School Setup</option>
-                          <option value="Diploma Core">Diploma CS/Kinematics Branch</option>
-                          <option value="General Batch">Open Professional Sector</option>
-                        </select>
+                        />
                       </div>
 
                       <button
