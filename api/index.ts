@@ -1320,7 +1320,8 @@ app.post('/api/db/clear', authenticateToken, requireRole('admin'), async (req: A
     const collectionsToClear = [
       'students', 'trainers', 'groups', 'videos', 'certificates', 
       'applications', 'special_enrollments', 'special_programs',
-      'courses', 'banners', 'gallery_images', 'app_logs'
+      'courses', 'banners', 'gallery_images', 'app_logs',
+      'workshop_feedbacks'
     ];
     const db = await getMongoDb();
 
@@ -1336,6 +1337,36 @@ app.post('/api/db/clear', authenticateToken, requireRole('admin'), async (req: A
     res.json({ success: true, message: "Successfully wiped all user-related collections in database!" });
   } catch (error: any) {
     console.error("Error clearing database collections:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/db/purge-workshop-feedbacks — Admin only, purge all workshop evaluation testing data
+app.post('/api/db/purge-workshop-feedbacks', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { confirmation } = req.body;
+    const validCodes = [
+      'PURGE_WORKSHOP_FEEDBACK_2026',
+      'CONFIRM_PURGE_WORKSHOPS',
+      'CONFIRM_PERMANENT_DATABASE_CLEAR'
+    ];
+    if (!confirmation || !validCodes.includes(confirmation)) {
+      return res.status(400).json({ 
+        error: 'Explicit confirmation required. Send { confirmation: "PURGE_WORKSHOP_FEEDBACK_2026" } in request body.' 
+      });
+    }
+
+    const db = await getMongoDb();
+    if (db) {
+      await db.collection('workshop_feedbacks').deleteMany({});
+    }
+    if (memoryDb['workshop_feedbacks']) {
+      memoryDb['workshop_feedbacks'] = [];
+    }
+
+    res.json({ success: true, message: "Successfully purged all workshop evaluation testing records from database!" });
+  } catch (error: any) {
+    console.error("Error purging workshop feedbacks:", error);
     res.status(500).json({ error: error.message });
   }
 });

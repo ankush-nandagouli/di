@@ -821,6 +821,8 @@ export default function App() {
           navigateToTab('services');
           setPendingApplyCourseId(null);
           try { sessionStorage.removeItem('dakshyam_pending_course_apply'); } catch {}
+        } else if (activeTab === 'feedback') {
+          navigateToTab('feedback');
         } else {
           navigateToTab('portal'); // Take directly to workspace
         }
@@ -885,6 +887,8 @@ export default function App() {
           navigateToTab('services');
           setPendingApplyCourseId(null);
           try { sessionStorage.removeItem('dakshyam_pending_course_apply'); } catch {}
+        } else if (activeTab === 'feedback') {
+          navigateToTab('feedback');
         } else {
           navigateToTab('portal');
         }
@@ -939,7 +943,11 @@ export default function App() {
         setStudentEmail('');
         setPasswordInput('');
         refreshDb();
-        navigateToTab('portal');
+        if (activeTab === 'feedback') {
+          navigateToTab('feedback');
+        } else {
+          navigateToTab('portal');
+        }
       } else {
         setAuthError(data.error || 'Invalid trainer credentials or pending authorization.');
       }
@@ -1229,26 +1237,28 @@ export default function App() {
               CONTACT US
             </button>
 
-            {/* WORKSHOP FEEDBACK: Accessible to everyone (Audit for Admin/Trainer, Direct Feedback Form for Students & Public) */}
-            <button
-              onClick={() => {
-                setFeedbackViewMode(currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') ? 'audit' : 'form');
-                navigateToTab('feedback');
-              }}
-              className={`px-3 py-1.5 rounded-lg transition-all border flex items-center gap-1.5 font-mono ${
-                activeTab === 'feedback' 
-                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold shadow-[0_0_12px_rgba(56,189,248,0.25)]') 
-                  : (isLight ? 'border-amber-500/25 bg-amber-50/70 text-amber-950 hover:bg-amber-100/70 font-semibold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20')
-              }`}
-              title={currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') ? "Workshop Participant Feedback Management Console" : "Submit Workshop Evaluation & Participant Feedback"}
-            >
-              <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
-              <span>
-                {currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer')
-                  ? 'FEEDBACK AUDIT'
-                  : 'FEEDBACK FORM'}
-              </span>
-            </button>
+            {/* WORKSHOP FEEDBACK: Only visible to authenticated logged-in users */}
+            {currentUser && (
+              <button
+                onClick={() => {
+                  setFeedbackViewMode((currentUser.role === 'admin' || currentUser.role === 'trainer') ? 'audit' : 'form');
+                  navigateToTab('feedback');
+                }}
+                className={`px-3 py-1.5 rounded-lg transition-all border flex items-center gap-1.5 font-mono ${
+                  activeTab === 'feedback' 
+                    ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold shadow-[0_0_12px_rgba(56,189,248,0.25)]') 
+                    : (isLight ? 'border-amber-500/25 bg-amber-50/70 text-amber-950 hover:bg-amber-100/70 font-semibold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20')
+                }`}
+                title={(currentUser.role === 'admin' || currentUser.role === 'trainer') ? "Workshop Participant Feedback Management Console" : "Submit Workshop Evaluation & Participant Feedback"}
+              >
+                <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
+                <span>
+                  {(currentUser.role === 'admin' || currentUser.role === 'trainer')
+                    ? 'FEEDBACK AUDIT'
+                    : 'FEEDBACK FORM'}
+                </span>
+              </button>
+            )}
           </nav>
 
           {/* Right Theme, Notifications & Auth Action button segment */}
@@ -1426,25 +1436,28 @@ export default function App() {
                   CONTACT US
                 </button>
 
-                {/* WORKSHOP FEEDBACK (Audit for Admin/Trainer, Direct Feedback Form for Students & Public) */}
-                <button
-                  onClick={() => {
-                    setFeedbackViewMode(currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') ? 'audit' : 'form');
-                    navigateToTab('feedback');
-                  }}
-                  className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all flex items-center gap-2 font-mono ${
-                    activeTab === 'feedback' 
-                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold') 
-                      : (isLight ? 'border-amber-500/25 bg-amber-50 text-amber-950 font-bold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300')
-                  }`}
-                >
-                  <ClipboardList className="w-4 h-4 text-amber-400" />
-                  <span>
-                    {currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') 
-                      ? 'WORKSHOP FEEDBACK AUDIT' 
-                      : 'WORKSHOP FEEDBACK FORM'}
-                  </span>
-                </button>
+                {/* WORKSHOP FEEDBACK: Only visible to authenticated logged-in users */}
+                {currentUser && (
+                  <button
+                    onClick={() => {
+                      setFeedbackViewMode((currentUser.role === 'admin' || currentUser.role === 'trainer') ? 'audit' : 'form');
+                      navigateToTab('feedback');
+                      setMenuOpen(false);
+                    }}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all flex items-center gap-2 font-mono ${
+                      activeTab === 'feedback' 
+                        ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold') 
+                        : (isLight ? 'border-amber-500/25 bg-amber-50 text-amber-950 font-bold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300')
+                    }`}
+                  >
+                    <ClipboardList className="w-4 h-4 text-amber-400" />
+                    <span>
+                      {(currentUser.role === 'admin' || currentUser.role === 'trainer') 
+                        ? 'WORKSHOP FEEDBACK AUDIT' 
+                        : 'WORKSHOP FEEDBACK FORM'}
+                    </span>
+                  </button>
+                )}
 
                 <div className="pt-2 border-t border-slate-500/10">
                   {currentUser ? (
@@ -1746,10 +1759,90 @@ export default function App() {
               <ContactUs theme={theme} />
             )}
 
-            {/* VIEW 8: WORKSHOP EVALUATION & FEEDBACK (Student Direct Form via Link & Admin/Trainer Management Audit) */}
+            {/* VIEW 8: WORKSHOP EVALUATION & FEEDBACK (Student Direct Form & Admin/Trainer Management Audit) */}
             {activeTab === 'feedback' && (
               <div className="w-full">
-                {currentUser && (currentUser.role === 'admin' || currentUser.role === 'trainer') ? (
+                {!currentUser ? (
+                  <div className="max-w-xl mx-auto px-4 py-16 text-center">
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      className={`border p-8 sm:p-10 rounded-3xl space-y-6 shadow-2xl transition-all ${
+                        isLight 
+                          ? 'bg-white border-blue-900/15 text-slate-800' 
+                          : 'bg-[#0a192f]/95 border-blue-800/40 text-white backdrop-blur-xl'
+                      }`}
+                    >
+                      <div className={`mx-auto w-16 h-16 rounded-2xl flex items-center justify-center border shadow-inner ${
+                        isLight ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                      }`}>
+                        <Lock className="w-8 h-8" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider border ${
+                          isLight ? 'bg-amber-50 text-amber-900 border-amber-200' : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                        }`}>
+                          <ShieldAlert className="w-3.5 h-3.5" /> Authentication Required
+                        </span>
+                        <h2 className={`text-xl sm:text-2xl font-black uppercase tracking-tight font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                          Workshop Feedback Form
+                        </h2>
+                        <p className={`text-xs sm:text-sm max-w-md mx-auto leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                          The workshop feedback portal is strictly protected and not open for public submissions. Please log in with your credentials to access the evaluation form.
+                        </p>
+                      </div>
+
+                      {preselectedWorkshopSlug && (
+                        <div className={`p-3 rounded-xl border text-xs font-mono inline-block max-w-md ${
+                          isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-white/5 border-white/10 text-slate-300'
+                        }`}>
+                          <span className="text-slate-400">Workshop Session: </span>
+                          <strong className={isLight ? 'text-blue-950' : 'text-sky-300'}>{preselectedWorkshopSlug}</strong>
+                        </div>
+                      )}
+
+                      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                        <button
+                          onClick={() => {
+                            setAuthMode('login');
+                            setShowAuthModal(true);
+                          }}
+                          className={`w-full sm:w-auto px-6 py-3 rounded-xl font-bold font-mono text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
+                            isLight
+                              ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-blue-950/20'
+                              : 'bg-cyan-500 hover:bg-cyan-400 text-black shadow-cyan-500/20 font-black'
+                          }`}
+                        >
+                          <LogIn className="w-4 h-4" /> Sign In To Continue
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAuthMode('register');
+                            setShowAuthModal(true);
+                          }}
+                          className={`w-full sm:w-auto px-5 py-3 rounded-xl font-bold font-mono text-xs uppercase tracking-wider flex items-center justify-center gap-2 border transition-all cursor-pointer ${
+                            isLight
+                              ? 'bg-white border-slate-300 text-slate-800 hover:bg-slate-50'
+                              : 'bg-white/5 border-white/15 text-white hover:bg-white/10'
+                          }`}
+                        >
+                          <UserPlus className="w-4 h-4" /> Register New Account
+                        </button>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-500/10 flex items-center justify-between text-2xs font-mono text-slate-400">
+                        <button
+                          onClick={() => navigateToTab('home')}
+                          className="hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          ← Return to Home
+                        </button>
+                        <span>Dakshyam Innovations Portal</span>
+                      </div>
+                    </motion.div>
+                  </div>
+                ) : (currentUser.role === 'admin' || currentUser.role === 'trainer') ? (
                   <div className="space-y-4">
                     {/* View Switcher: Audit Console vs Participant Form Preview */}
                     <div className="flex flex-wrap items-center justify-between max-w-7xl mx-auto px-4 gap-2">
@@ -1794,16 +1887,27 @@ export default function App() {
                     ) : (
                       <WorkshopFeedbackForm
                         theme={theme}
+                        currentUser={currentUser}
                         onNavigateHome={() => setFeedbackViewMode('audit')}
                         preselectedWorkshopId={preselectedWorkshopSlug}
+                        isPreviewMode={true}
+                        onRequestLogin={() => {
+                          setAuthMode('login');
+                          setShowAuthModal(true);
+                        }}
                       />
                     )}
                   </div>
                 ) : (
                   <WorkshopFeedbackForm
                     theme={theme}
+                    currentUser={currentUser}
                     onNavigateHome={() => navigateToTab('home')}
                     preselectedWorkshopId={preselectedWorkshopSlug}
+                    onRequestLogin={() => {
+                      setAuthMode('login');
+                      setShowAuthModal(true);
+                    }}
                   />
                 )}
               </div>
@@ -1822,6 +1926,8 @@ export default function App() {
                         certificates={certificates}
                         applications={applications}
                         onRefresh={refreshDb}
+                        onNavigateTab={(tab) => navigateToTab(tab as any)}
+                        theme={theme}
                       />
                     )}
 

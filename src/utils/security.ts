@@ -57,25 +57,8 @@ class SecurityGuardService {
   }
 
   public notifyViolation(type: SecurityViolationType, message: string): void {
-    const now = Date.now();
-    if (now - this.lastNotificationTime < this.notificationCooldownMs) {
-      return;
-    }
-    this.lastNotificationTime = now;
-
-    const detail: SecurityEventDetail = {
-      type,
-      message,
-      timestamp: now
-    };
-
-    this.listeners.forEach(fn => {
-      try {
-        fn(detail);
-      } catch (err) {
-        console.warn('Error in security listener:', err);
-      }
-    });
+    // Silenced per instruction: "Don't pop messages for right click or any other Short cuts for inspection tools are blocked users doesn't need to know"
+    return;
   }
 
   public setBypass(bypass: boolean): void {

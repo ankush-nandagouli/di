@@ -20,6 +20,8 @@ interface WorkshopFeedbackFormProps {
   preselectedWorkshopId?: string | null;
   isPreviewMode?: boolean;
   onClosePreview?: () => void;
+  currentUser?: any;
+  onRequestLogin?: () => void;
 }
 
 const COMMON_INTEREST_TAGS = [
@@ -38,7 +40,9 @@ export default function WorkshopFeedbackForm({
   onNavigateHome,
   preselectedWorkshopId,
   isPreviewMode = false,
-  onClosePreview
+  onClosePreview,
+  currentUser,
+  onRequestLogin
 }: WorkshopFeedbackFormProps) {
   const isLight = theme === 'light';
 
@@ -223,6 +227,17 @@ export default function WorkshopFeedbackForm({
         .catch(() => {});
     }
   }, [preselectedWorkshopId]);
+
+  // Automatically prefill registered candidate credentials when logged in
+  useEffect(() => {
+    if (currentUser) {
+      if (currentUser.name) setFullName(prev => prev || currentUser.name);
+      if (currentUser.email) setEmail(prev => prev || currentUser.email);
+      if (currentUser.profile?.phone) setPhone(prev => prev || currentUser.profile.phone);
+      if (currentUser.profile?.institution) setInstitutionName(prev => prev || currentUser.profile.institution);
+      if (currentUser.profile?.gradeOrBranch) setBranchOrGrade(prev => prev || currentUser.profile.gradeOrBranch);
+    }
+  }, [currentUser]);
 
   const activeWorkshop = config.workshops.find(w => w.id === selectedWorkshopId) || config.workshops[0];
 
@@ -532,6 +547,54 @@ export default function WorkshopFeedbackForm({
     );
   }
 
+  // IF USER IS NOT LOGGED IN (RESTRICT ACCESS TO AUTHENTICATED USERS)
+  if (!currentUser && !isPreviewMode) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-6 animate-fadeIn">
+        <div className={`p-8 sm:p-10 rounded-3xl border shadow-2xl backdrop-blur-xl ${
+          isLight ? 'bg-white border-blue-900/15 text-slate-800' : 'bg-[#0a192f]/90 border-blue-800/40 text-white'
+        }`}>
+          <div className={`w-16 h-16 rounded-2xl border flex items-center justify-center mx-auto mb-4 ${
+            isLight ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+          }`}>
+            <Lock className="w-8 h-8" />
+          </div>
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider border ${
+            isLight ? 'bg-amber-50 text-amber-900 border-amber-200' : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+          }`}>
+            <AlertCircle className="w-3.5 h-3.5" /> Authentication Required
+          </span>
+          <h2 className="text-xl sm:text-2xl font-black font-mono uppercase mt-2">Workshop Feedback Portal</h2>
+          <p className={`text-xs sm:text-sm mt-2 max-w-md mx-auto leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+            Workshop evaluation and participant feedback is restricted to logged-in members and students. Please sign in to submit your workshop feedback.
+          </p>
+          <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+            {onRequestLogin && (
+              <button
+                type="button"
+                onClick={onRequestLogin}
+                className={`w-full sm:w-auto px-6 py-3 rounded-xl font-mono text-xs font-bold uppercase transition-all cursor-pointer shadow-lg ${
+                  isLight ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-blue-950/20' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-cyan-500/20'
+                }`}
+              >
+                Sign In To Account →
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onNavigateHome}
+              className={`w-full sm:w-auto px-6 py-3 rounded-xl border font-mono text-xs font-bold uppercase cursor-pointer ${
+                isLight ? 'border-slate-300 text-slate-700 hover:bg-slate-50' : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              Return Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // IF FORM IS CLOSED BY ADMIN
   if (!config.isOpen) {
     return (
@@ -659,6 +722,33 @@ export default function WorkshopFeedbackForm({
           </div>
         )}
       </div>
+
+      {/* AUTHENTICATED USER VERIFICATION BADGE */}
+      {currentUser && (
+        <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-3 text-xs font-mono transition-all ${
+          isLight ? 'bg-emerald-50/80 border-emerald-300/80 text-emerald-950' : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 ${
+              isLight ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+            }`}>
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-bold flex items-center gap-2">
+                <span>{currentUser.name}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md uppercase font-bold bg-emerald-500/15 border border-emerald-500/25">
+                  {currentUser.role}
+                </span>
+              </div>
+              <span className={`text-[11px] font-sans ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{currentUser.email}</span>
+            </div>
+          </div>
+          <span className="text-2xs font-mono uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-bold">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Authenticated Feedback Session
+          </span>
+        </div>
+      )}
 
       {/* FORM CONTAINER */}
       <form onSubmit={handleSubmit} className="space-y-8">

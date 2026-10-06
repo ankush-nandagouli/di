@@ -636,6 +636,74 @@ export class WorkshopFeedbackStorage {
     }
   }
 
+  /**
+   * Admin Purge: Permanently purges all workshop evaluation testing submissions
+   * across LocalStorage, Firestore, and MongoDB server collections.
+   */
+  static async purgeAllFeedbackSubmissions(confirmationCode: string): Promise<{ success: boolean; count: number; error?: string }> {
+    const validCodes = [
+      'PURGE_WORKSHOP_FEEDBACK_2026',
+      'CONFIRM_PURGE_WORKSHOPS',
+      'CONFIRM_PERMANENT_DATABASE_CLEAR'
+    ];
+    if (!confirmationCode || !validCodes.includes(confirmationCode.trim())) {
+      return { 
+        success: false, 
+        count: 0, 
+        error: 'Invalid confirmation code. Please enter: PURGE_WORKSHOP_FEEDBACK_2026' 
+      };
+    }
+
+    try {
+      const currentList = this.getSubmissions();
+      const count = currentList.length;
+
+      // 1. Clear LocalStorage
+      this.saveLocalSubmissions([]);
+
+      // 2. Clear Firestore workshop_feedbacks collection
+      try {
+        const q = query(collection(db, 'workshop_feedbacks'));
+        const snapshot = await getDocs(q);
+        const deleteOps = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
+        await Promise.all(deleteOps);
+      } catch (fbErr) {
+        console.warn('Firestore bulk delete warning:', fbErr);
+      }
+
+      // 3. Clear MongoDB backend via authenticated API
+      try {
+        const token = DakshyamDatabase.getAuthToken();
+        if (token) {
+          await fetch('/api/db/purge-workshop-feedbacks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ confirmation: confirmationCode.trim() })
+          });
+        }
+      } catch (apiErr) {
+        console.warn('API purge call warning:', apiErr);
+      }
+
+      // 4. Log event in audit trail
+      DakshyamDatabase.logEvent(
+        'Workshop Feedbacks Purged',
+        `Admin purged all ${count} workshop evaluation testing records permanently.`,
+        'admin@dakshyam.com',
+        'admin',
+        'WARNING'
+      );
+
+      return { success: true, count };
+    } catch (err: any) {
+      console.error('Purge error:', err);
+      return { success: false, count: 0, error: err.message || 'Failed to purge records.' };
+    }
+  }
+
   // --- EXPORT TO EXCEL (.XLSX) VIA SECURE EXCELJS ---
   static async exportToExcel(submissions: WorkshopFeedbackSubmission[], filename = 'Dakshyam_Workshop_Feedback_Report.xlsx'): Promise<void> {
     try {

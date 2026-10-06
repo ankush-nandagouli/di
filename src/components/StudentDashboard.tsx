@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Award, Users, FileText, CheckCircle2, Clock, MapPin, Phone, Briefcase, BookOpen, Camera, Eye } from 'lucide-react';
+import { User, Award, Users, FileText, CheckCircle2, Clock, MapPin, Phone, Briefcase, BookOpen, Camera, Eye, ClipboardList } from 'lucide-react';
 import { StudentUser, StudentGroup, Course, CourseApplication, Certificate } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import SyllabusExplorer from './SyllabusExplorer';
@@ -14,6 +14,7 @@ interface StudentDashboardProps {
   certificates: Certificate[];
   applications: CourseApplication[];
   onRefresh: () => void;
+  onNavigateTab?: (tab: string) => void;
   theme?: 'light' | 'dark';
 }
 
@@ -24,6 +25,7 @@ export default function StudentDashboard({
   certificates,
   applications,
   onRefresh,
+  onNavigateTab,
   theme = 'dark'
 }: StudentDashboardProps) {
   const isLight = theme === 'light';
@@ -314,6 +316,40 @@ export default function StudentDashboard({
                 </button>
               </form>
             </div>
+
+            {/* Quick Link: Workshop Feedback Portal */}
+            {onNavigateTab && (
+              <div className={`border rounded-2xl p-4.5 space-y-3 transition-all ${
+                isLight ? 'bg-gradient-to-br from-amber-50/70 to-white border-amber-200/80 shadow-xs' : 'bg-[#0a192f]/60 border-amber-500/25'
+              }`}>
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-2 rounded-xl border ${
+                    isLight ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                  }`}>
+                    <ClipboardList className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className={`text-xs font-bold font-mono uppercase tracking-wider ${isLight ? 'text-amber-950' : 'text-amber-300'}`}>
+                      Workshop Feedback
+                    </h4>
+                    <p className={`text-[10px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      Attended a hands-on lab or bootcamp? Submit your evaluation.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab('feedback')}
+                  className={`w-full py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                    isLight
+                      ? 'bg-amber-900 hover:bg-amber-800 text-white'
+                      : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold'
+                  }`}
+                >
+                  Open Feedback Form →
+                </button>
+              </div>
+            )}
           </div>
 
           {/* RIGHT COLUMN: Active details */}

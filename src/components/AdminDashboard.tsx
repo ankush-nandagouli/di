@@ -18,6 +18,7 @@ import Home3DArtSettingsTab from './Home3DArtSettingsTab';
 import AdminWorkshopFeedbackManager from './AdminWorkshopFeedbackManager';
 import AdminMasterGuide from './AdminMasterGuide';
 import { SecurityGuard } from '../utils/security';
+import { WorkshopFeedbackStorage } from '../utils/feedbackStorage';
 
 interface AdminDashboardProps {
   courses: Course[];
@@ -263,21 +264,37 @@ export default function AdminDashboard({
   };
 
   const handlePurgeDatabase = async () => {
-    if (confirm("🚨 WARNING: Are you sure you want to permanently delete each and every user and user-related record (Students, Trainers, Applications, Certificates, Student Groups, Social Videos, and Special Enrollments) from BOTH Firestore and Client Cache? This action is IRREVERSIBLE.")) {
-      try {
-        DakshyamDatabase.clearUserRelatedData();
-        const res = await fetch('/api/db/clear', { method: 'POST' });
-        if (res.ok) {
-          alert('✓ Success: All seeded user databases and server directories successfully wiped clean!');
-        } else {
-          alert('✓ Client Cache wiped. Server directory response pending.');
-        }
-        onRefresh();
-      } catch (err) {
-        console.error("Purge fail:", err);
-        alert('✓ Client cache cleared successfully!');
-        onRefresh();
+    const confirmation = prompt(
+      "🚨 ADMIN PURGE ALL TESTING DATA CONFIRMATION:\n\nTo permanently delete all seed and test records (Students, Trainers, Applications, Certificates, Groups, Videos, Special Enrollments, and Workshop Feedbacks) from BOTH server and client cache, enter confirmation code:\n\nCONFIRM_PERMANENT_DATABASE_CLEAR"
+    );
+    if (!confirmation) return;
+    if (confirmation.trim() !== 'CONFIRM_PERMANENT_DATABASE_CLEAR') {
+      alert("❌ Invalid confirmation code. You must enter exact code: CONFIRM_PERMANENT_DATABASE_CLEAR");
+      return;
+    }
+
+    try {
+      DakshyamDatabase.clearUserRelatedData();
+      await WorkshopFeedbackStorage.purgeAllFeedbackSubmissions('CONFIRM_PERMANENT_DATABASE_CLEAR');
+      const token = DakshyamDatabase.getAuthToken();
+      const res = await fetch('/api/db/clear', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ confirmation: 'CONFIRM_PERMANENT_DATABASE_CLEAR' })
+      });
+      if (res.ok) {
+        alert('✓ Success: All seeded user databases, testing records, and server directories successfully wiped clean!');
+      } else {
+        alert('✓ Client Cache and workshop test records wiped clean.');
       }
+      onRefresh();
+    } catch (err) {
+      console.error("Purge fail:", err);
+      alert('✓ Client cache cleared successfully!');
+      onRefresh();
     }
   };
 
