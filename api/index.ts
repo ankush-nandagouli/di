@@ -798,6 +798,7 @@ app.post('/api/auth/verify-pin', pinLimiter, async (req, res) => {
   }
 
   const cleanPin = String(pin).trim();
+  const strippedPin = cleanPin.replace(/\s+/g, '');
   let correctPin = SUPERVISOR_PIN;
 
   try {
@@ -815,19 +816,26 @@ app.post('/api/auth/verify-pin', pinLimiter, async (req, res) => {
   }
 
   // Multi-tier validation: configured PIN, factory default, client-saved PIN, or master passcode
+  const configuredAdminPasscode = ADMIN_PASSCODE.trim();
   const isMatch = 
     cleanPin === correctPin ||
+    strippedPin === correctPin ||
     cleanPin === SUPERVISOR_PIN ||
+    strippedPin === SUPERVISOR_PIN ||
     cleanPin === '849201' ||
-    cleanPin === ADMIN_PASSCODE.trim() ||
-    (clientPin && cleanPin === String(clientPin).trim());
+    strippedPin === '849201' ||
+    cleanPin === configuredAdminPasscode ||
+    strippedPin === configuredAdminPasscode ||
+    cleanPin.toLowerCase() === configuredAdminPasscode.toLowerCase() ||
+    strippedPin.toLowerCase() === configuredAdminPasscode.toLowerCase() ||
+    (clientPin && (cleanPin === String(clientPin).trim() || strippedPin === String(clientPin).trim()));
 
   if (isMatch) {
     return res.json({ success: true, valid: true });
   } else {
     return res.status(401).json({ 
       success: false, 
-      error: 'Invalid Supervisor PIN code. The default factory PIN is 849201.' 
+      error: 'Invalid Supervisor PIN code. Access denied.' 
     });
   }
 });
@@ -1716,6 +1724,109 @@ app.get('/api/logs', authenticateToken, requireRole('admin', 'trainer'), async (
   } catch (error: any) {
     console.error('Audit log fetch error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// SUPPORT TICKETS & BUG REPORTS ENDPOINTS
+// ==========================================
+
+// GET /api/tickets - Fetch tickets
+app.get('/api/tickets', async (req, res) => {
+  try {
+    const db = await getMongoDb();
+    if (db) {
+      const tickets = await db.collection('support_tickets').find({}).sort({ createdAt: -1 }).toArray();
+      return res.json({ success: true, tickets: tickets.map(({ _id, ...rest }) => rest) });
+    }
+    const tickets = memoryDb.support_tickets || [];
+    res.json({ success: true, tickets });
+  } catch (err: any) {
+    console.error('Tickets fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch tickets.' });
+  }
+});
+
+// POST /api/tickets - Create or sync tickets
+app.post('/api/tickets', async (req, res) => {
+  try {
+    const { ticket, tickets } = req.body;
+    const db = await getMongoDb();
+
+    if (Array.isArray(tickets)) {
+      memoryDb.support_tickets = tickets;
+      if (db) {
+        for (const t of tickets) {
+          if (t && t.id) {
+            await db.collection('support_tickets').updateOne({ id: t.id }, { $set: t }, { upsert: true });
+          }
+        }
+      }
+      return res.json({ success: true, count: tickets.length });
+    }
+
+    if (ticket && ticket.id) {
+      if (!Array.isArray(memoryDb.support_tickets)) memoryDb.support_tickets = [];
+      memoryDb.support_tickets = [ticket, ...memoryDb.support_tickets.filter((t: any) => t.id !== ticket.id)];
+      if (db) {
+        await db.collection('support_tickets').updateOne({ id: ticket.id }, { $set: ticket }, { upsert: true });
+      }
+      return res.json({ success: true, ticket });
+    }
+
+    res.status(400).json({ error: 'Invalid ticket payload.' });
+  } catch (err: any) {
+    console.error('Tickets save error:', err);
+    res.status(500).json({ error: 'Failed to save ticket.' });
+  }
+});
+
+// PATCH /api/tickets/:id - Update ticket status / admin response
+app.patch('/api/tickets/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const db = await getMongoDb();
+
+    if (Array.isArray(memoryDb.support_tickets)) {
+      const idx = memoryDb.support_tickets.findIndex((t: any) => t.id === id);
+      if (idx !== -1) {
+        memoryDb.support_tickets[idx] = { ...memoryDb.support_tickets[idx], ...updates, updatedAt: new Date().toISOString() };
+      }
+    }
+
+    if (db) {
+      await db.collection('support_tickets').updateOne(
+        { id },
+        { $set: { ...updates, updatedAt: new Date().toISOString() } }
+      );
+    }
+
+    res.json({ success: true, id, updates });
+  } catch (err: any) {
+    console.error('Ticket update error:', err);
+    res.status(500).json({ error: 'Failed to update ticket.' });
+  }
+});
+
+// DELETE /api/tickets/:id - Delete ticket
+app.delete('/api/tickets/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getMongoDb();
+
+    if (Array.isArray(memoryDb.support_tickets)) {
+      memoryDb.support_tickets = memoryDb.support_tickets.filter((t: any) => t.id !== id);
+    }
+
+    if (db) {
+      await db.collection('support_tickets').deleteOne({ id });
+    }
+
+    res.json({ success: true, id });
+  } catch (err: any) {
+    console.error('Ticket deletion error:', err);
+    res.status(500).json({ error: 'Failed to delete ticket.' });
   }
 });
 

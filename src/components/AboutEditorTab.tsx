@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Plus, Trash2, Sparkles, Layers, Building2, MapPin, Compass, Eye, Share2 } from 'lucide-react';
+import { ShieldCheck, Plus, Trash2, Sparkles, Layers, Building2, MapPin, Compass, Eye, EyeOff, Share2 } from 'lucide-react';
 import { CompanyAbout, CompanyService } from '../types';
 import { DakshyamDatabase, DEFAULT_SERVICES } from '../utils/db';
 
@@ -26,6 +26,7 @@ export function AboutEditorTab({ onRefresh, theme }: AboutEditorTabProps) {
 
   // Dynamic 6-digit access PIN manager state
   const [supervisorPin, setSupervisorPin] = useState(() => DakshyamDatabase.getSupervisorPin());
+  const [showPin, setShowPin] = useState(false);
   const [pinUpdateMsg, setPinUpdateMsg] = useState('');
 
   const handleSavePin = (e: React.FormEvent) => {
@@ -143,23 +144,33 @@ export function AboutEditorTab({ onRefresh, theme }: AboutEditorTabProps) {
             <label className={`block text-4xs font-mono uppercase tracking-widest ${textLabel}`}>
               6-Digit Security access PIN
             </label>
-            <input
-              type="text"
-              maxLength={6}
-              pattern="[0-9]{6}"
-              required
-              className={`w-full font-mono text-center tracking-widest font-black rounded-xl px-3 py-2 text-md focus:outline-none border ${
-                isLight 
-                  ? 'bg-white border-slate-300 text-blue-950 focus:border-blue-900' 
-                  : 'bg-[#071326] border-blue-800/40 text-sky-300 focus:border-sky-400'
-              }`}
-              value={supervisorPin}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, ''); // Numeric only
-                setSupervisorPin(val);
-              }}
-              placeholder="6-digit PIN"
-            />
+            <div className="relative">
+              <input
+                type={showPin ? "text" : "password"}
+                maxLength={6}
+                pattern="[0-9]{6}"
+                required
+                className={`w-full font-mono text-center tracking-widest font-black rounded-xl px-3 py-2 pr-9 text-md focus:outline-none border ${
+                  isLight 
+                    ? 'bg-white border-slate-300 text-blue-950 focus:border-blue-900' 
+                    : 'bg-[#071326] border-blue-800/40 text-sky-300 focus:border-sky-400'
+                }`}
+                value={supervisorPin}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, ''); // Numeric only
+                  setSupervisorPin(val);
+                }}
+                placeholder="••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPin(!showPin)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 cursor-pointer"
+                title={showPin ? "Mask PIN" : "Show PIN"}
+              >
+                {showPin ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <button
             type="button"

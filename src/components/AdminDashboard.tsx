@@ -17,6 +17,8 @@ import PageLoaderSettingsTab from './PageLoaderSettingsTab';
 import Home3DArtSettingsTab from './Home3DArtSettingsTab';
 import AdminWorkshopFeedbackManager from './AdminWorkshopFeedbackManager';
 import AdminMasterGuide from './AdminMasterGuide';
+import AdminAccountsManager from './AdminAccountsManager';
+import SupportTicketManager from './SupportTicketManager';
 import { SecurityGuard } from '../utils/security';
 import { WorkshopFeedbackStorage } from '../utils/feedbackStorage';
 
@@ -45,7 +47,7 @@ export default function AdminDashboard({
 }: AdminDashboardProps) {
   const isLight = theme === 'light';
   // Navigation tabs
-  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'promotions' | 'gallery' | 'special_training' | 'certificates' | 'about_editor' | 'page_loader' | 'home_3d_art' | 'logs' | 'workshop_feedback' | 'admin_guide';
+  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'accounts' | 'tickets' | 'promotions' | 'gallery' | 'special_training' | 'certificates' | 'about_editor' | 'page_loader' | 'home_3d_art' | 'logs' | 'workshop_feedback' | 'admin_guide';
   const [adminTab, setAdminTab] = useState<TabType>('analytics');
 
   // Audit Logs Filtering States
@@ -1060,7 +1062,7 @@ export default function AdminDashboard({
       <div className={`flex flex-wrap gap-1.5 border-b pb-0.5 font-mono text-3xs uppercase font-extrabold scrollbar-none overflow-x-auto ${
         isLight ? 'border-slate-200' : 'border-cyan-500/10'
       }`}>
-        {(['analytics', 'courses', 'applications', 'trainers', 'promotions', 'gallery', 'special_training', 'certificates', 'about_editor', 'page_loader', 'home_3d_art', 'workshop_feedback', 'logs', 'admin_guide'] as const).map(tab => (
+        {(['analytics', 'courses', 'applications', 'trainers', 'accounts', 'tickets', 'promotions', 'gallery', 'special_training', 'certificates', 'about_editor', 'page_loader', 'home_3d_art', 'workshop_feedback', 'logs', 'admin_guide'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setAdminTab(tab)}
@@ -1074,6 +1076,8 @@ export default function AdminDashboard({
             {tab === 'courses' && 'Publisher'}
             {tab === 'applications' && 'Admissions'}
             {tab === 'trainers' && 'Verify Trainers'}
+            {tab === 'accounts' && '👥 Registered Accounts'}
+            {tab === 'tickets' && '🎫 Support & Bug Tickets'}
             {tab === 'promotions' && 'Promo Banners'}
             {tab === 'gallery' && 'Class Gallery'}
             {tab === 'special_training' && '🎓 Special Training Forms'}
@@ -1521,15 +1525,28 @@ export default function AdminDashboard({
         {/* TAB 4: VERIFY TRAINERS (ADMIN RIGHTS TO APPROVE TRAINER ID FIRST) */}
         {adminTab === 'trainers' && (
           <div className="space-y-4">
-            <div className="text-left space-y-1">
-              <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
-                isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
-              }`}>
-                Trainer ID Verification Desk
-              </h3>
-              <p className={`text-3xs leading-relaxed max-w-xl ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                Dakshyam security guidelines mandate that newly registered Trainer profiles cannot access active grading grids, create peer groups, or issue dynamic student certificates until authorized below.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left border-b pb-3 border-slate-200 dark:border-cyan-500/10">
+              <div className="space-y-1">
+                <h3 className={`text-xs font-bold tracking-wider uppercase ${
+                  isLight ? 'text-amber-800' : 'text-white'
+                }`}>
+                  Trainer ID Verification & Provisioning Desk
+                </h3>
+                <p className={`text-3xs leading-relaxed max-w-xl ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                  Authorize newly registered Trainer profiles or directly provision new faculty accounts for workshop sessions and student grading.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setAdminTab('accounts')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shrink-0 transition-all ${
+                  isLight ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-xs' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black'
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Create Trainer</span>
+              </button>
             </div>
 
             <div className="space-y-3">
@@ -3322,6 +3339,32 @@ export default function AdminDashboard({
               theme={theme} 
               currentUserRole="admin" 
               onOpenPublicForm={onOpenPublicFeedbackForm}
+            />
+          </div>
+        )}
+
+        {/* TAB: REGISTERED ACCOUNTS REGISTRY */}
+        {adminTab === 'accounts' && (
+          <div className="w-full">
+            <AdminAccountsManager 
+              theme={theme}
+              onRefresh={onRefresh}
+            />
+          </div>
+        )}
+
+        {/* TAB: SUPPORT TICKETS & BUG REPORTS */}
+        {adminTab === 'tickets' && (
+          <div className="w-full">
+            <SupportTicketManager
+              currentUser={{
+                id: 'usr-admin-master',
+                name: 'Platform Administrator',
+                email: 'admin@dakshyam.com',
+                role: 'admin'
+              }}
+              theme={theme}
+              isAdminView={true}
             />
           </div>
         )}

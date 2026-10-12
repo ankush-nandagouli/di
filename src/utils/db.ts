@@ -1,4 +1,4 @@
-import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder, CompanyService, AppLog, LogCategory, PageLoaderConfig } from '../types';
+import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder, CompanyService, AppLog, LogCategory, PageLoaderConfig, SupportTicket, TicketCategory, TicketPriority, TicketStatus } from '../types';
 
 export const DEFAULT_SERVICES: CompanyService[] = [
   {
@@ -772,5 +772,170 @@ export class DakshyamDatabase {
     } catch (e) {
       console.error('Cookie write warning:', e);
     }
+  }
+
+  // ==========================================
+  // SUPPORT TICKETS & BUG REPORTING PROTOCOL
+  // ==========================================
+  static getTickets(): SupportTicket[] {
+    return this.get<SupportTicket[]>('support_tickets', []);
+  }
+
+  static saveTickets(tickets: SupportTicket[]): void {
+    this.set('support_tickets', tickets);
+    if (typeof fetch !== 'undefined') {
+      fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tickets })
+      }).catch(() => {});
+    }
+  }
+
+  static createTicket(ticketData: Omit<SupportTicket, 'id' | 'createdAt' | 'updatedAt' | 'status'>): SupportTicket {
+    const tickets = this.getTickets();
+    const newTicket: SupportTicket = {
+      ...ticketData,
+      id: `TCK-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      status: 'OPEN',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    tickets.unshift(newTicket);
+    this.saveTickets(tickets);
+
+    this.logEvent(
+      'Support Ticket Created',
+      `Ticket [${newTicket.id}] "${newTicket.subject}" logged by ${newTicket.userName} (${newTicket.userEmail}) [${newTicket.category}]`,
+      newTicket.userEmail,
+      newTicket.userRole,
+      'INFO',
+      'SYSTEM'
+    );
+
+    return newTicket;
+  }
+
+  static updateTicket(ticketId: string, updates: Partial<SupportTicket>): boolean {
+    const tickets = this.getTickets();
+    const index = tickets.findIndex(t => t.id === ticketId);
+    if (index === -1) return false;
+
+    tickets[index] = {
+      ...tickets[index],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (updates.status === 'RESOLVED') {
+      tickets[index].resolvedAt = new Date().toISOString();
+    }
+
+    this.saveTickets(tickets);
+
+    this.logEvent(
+      'Support Ticket Updated',
+      `Ticket [${ticketId}] status changed to ${updates.status || 'Updated'}${updates.adminResponse ? ' with administrative response' : ''}`,
+      'admin@dakshyam.com',
+      'admin',
+      'SUCCESS',
+      'SYSTEM'
+    );
+
+    return true;
+  }
+
+  static deleteTicket(ticketId: string): boolean {
+    const tickets = this.getTickets();
+    const filtered = tickets.filter(t => t.id !== ticketId);
+    if (filtered.length === tickets.length) return false;
+    this.saveTickets(filtered);
+    return true;
+  }
+
+  // ==========================================
+  // UNIFIED REGISTERED ACCOUNTS VIEW
+  // ==========================================
+  static getAllRegisteredAccounts(): Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: 'student' | 'trainer' | 'admin';
+    createdAt?: string;
+    isApproved?: boolean;
+    phone?: string;
+    institution?: string;
+  }> {
+    const students = this.getStudents();
+    const trainers = this.getTrainers();
+
+    const accounts: Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: 'student' | 'trainer' | 'admin';
+      createdAt?: string;
+      isApproved?: boolean;
+      phone?: string;
+      institution?: string;
+    }> = [
+      {
+        id: 'usr-admin-master',
+        name: 'Platform Administrator',
+        email: 'admin@dakshyam.com',
+        role: 'admin',
+        createdAt: '2026-01-01',
+        isApproved: true,
+        phone: '+91 94258 92000',
+        institution: 'Dakshyam Central Headquarters'
+      }
+    ];
+
+    trainers.forEach(t => {
+      accounts.push({
+        id: t.id,
+        name: t.name,
+        email: t.email,
+        role: 'trainer',
+        createdAt: t.createdAt || '2026-02-15',
+        isApproved: t.isApproved ?? true,
+        phone: t.profile?.phone || '',
+        institution: t.profile?.institution || 'Dakshyam Trainer Faculty'
+      });
+    });
+
+    students.forEach(s => {
+      accounts.push({
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        role: 'student',
+        createdAt: s.createdAt || '2026-03-01',
+        isApproved: true,
+        phone: s.profile?.phone || '',
+        institution: s.profile?.institution || 'Student Candidate'
+      });
+    });
+
+    return accounts;
+  }
+
+  static deleteAccount(id: string, role: 'student' | 'trainer' | 'admin'): boolean {
+    if (role === 'admin') {
+      return false; // Root administrator cannot be deleted
+    }
+    if (role === 'trainer') {
+      const trainers = this.getTrainers();
+      const next = trainers.filter(t => t.id !== id);
+      this.saveTrainers(next);
+      return true;
+    }
+    if (role === 'student') {
+      const students = this.getStudents();
+      const next = students.filter(s => s.id !== id);
+      this.saveStudents(next);
+      return true;
+    }
+    return false;
   }
 }

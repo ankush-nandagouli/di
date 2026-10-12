@@ -8,6 +8,7 @@ import TrainerGuide from './TrainerGuide';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
 import OfficialCertificate from './OfficialCertificate';
 import AdminWorkshopFeedbackManager from './AdminWorkshopFeedbackManager';
+import SupportTicketManager from './SupportTicketManager';
 
 interface TrainerDashboardProps {
   trainer: TrainerUser;
@@ -32,7 +33,7 @@ export default function TrainerDashboard({
 }: TrainerDashboardProps) {
   const isLight = theme === 'light';
   // Navigation states inside dashboard
-  const [activeTab, setActiveTab] = useState<'groups' | 'assessment' | 'certificates' | 'guide' | 'feedback' | 'profile'>('groups');
+  const [activeTab, setActiveTab] = useState<'groups' | 'assessment' | 'certificates' | 'guide' | 'feedback' | 'tickets' | 'profile'>('groups');
 
   // Trainer Profile States
   const [phone, setPhone] = useState(trainer.profile?.phone || '');
@@ -263,7 +264,7 @@ export default function TrainerDashboard({
       <div className={`flex flex-wrap gap-1.5 border-b pb-0.5 font-mono text-2xs uppercase ${
         isLight ? 'border-slate-200' : 'border-cyan-500/10'
       }`}>
-        {(['groups', 'assessment', 'certificates', 'guide', 'feedback', 'profile'] as const).map(tab => (
+        {(['groups', 'assessment', 'certificates', 'guide', 'feedback', 'tickets', 'profile'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -273,7 +274,7 @@ export default function TrainerDashboard({
                 : (isLight ? 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50' : 'border-transparent text-slate-450 hover:text-white hover:bg-slate-500/5')
             }`}
           >
-            {tab === 'groups' ? 'Group Builder' : tab === 'assessment' ? 'Assessment Matrix' : tab === 'certificates' ? 'Publish Certificates' : tab === 'guide' ? '📖 Curriculum Guides' : tab === 'feedback' ? '📋 Workshop Feedbacks' : '👤 Profile Details'}
+            {tab === 'groups' ? 'Group Builder' : tab === 'assessment' ? 'Assessment Matrix' : tab === 'certificates' ? 'Publish Certificates' : tab === 'guide' ? '📖 Curriculum Guides' : tab === 'feedback' ? '📋 Workshop Feedbacks' : tab === 'tickets' ? '🎫 Support Tickets' : '👤 Profile Details'}
           </button>
         ))}
       </div>
@@ -1114,6 +1115,22 @@ export default function TrainerDashboard({
         {activeTab === 'feedback' && (
           <div className="w-full">
             <AdminWorkshopFeedbackManager theme={theme} currentUserRole="trainer" />
+          </div>
+        )}
+
+        {/* TAB 7: SUPPORT TICKETS & BUG REPORTS */}
+        {activeTab === 'tickets' && (
+          <div className="w-full">
+            <SupportTicketManager
+              currentUser={{
+                id: trainer.id,
+                name: trainer.name,
+                email: trainer.email,
+                role: 'trainer'
+              }}
+              theme={theme}
+              isAdminView={false}
+            />
           </div>
         )}
           </motion.div>

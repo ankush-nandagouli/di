@@ -7,6 +7,7 @@ import SyllabusExplorer from './SyllabusExplorer';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
 import OfficialCertificate from './OfficialCertificate';
 import WorkshopDirectoryModal from './WorkshopDirectoryModal';
+import SupportTicketManager from './SupportTicketManager';
 
 interface StudentDashboardProps {
   user: StudentUser;
@@ -36,7 +37,7 @@ export default function StudentDashboard({
   const myCertificates = certificates.filter(cert => cert.studentEmail.toLowerCase() === user.email.toLowerCase());
 
   // Navigation tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'syllabus'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'syllabus' | 'tickets'>('overview');
   const [viewCert, setViewCert] = useState<Certificate | null>(null);
   const [isDirModalOpen, setIsDirModalOpen] = useState(false);
 
@@ -165,7 +166,7 @@ export default function StudentDashboard({
       <div className={`flex gap-1.5 border-b pb-0.5 font-mono text-2xs uppercase ${
         isLight ? 'border-blue-900/15' : 'border-blue-900/30'
       }`}>
-        {(['overview', 'syllabus'] as const).map(tab => (
+        {(['overview', 'syllabus', 'tickets'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -175,7 +176,7 @@ export default function StudentDashboard({
                 : (isLight ? 'border-transparent text-slate-500 hover:text-slate-800' : 'border-transparent text-slate-400 hover:text-white')
             }`}
           >
-            {tab === 'overview' ? '📋 Workspace Overview' : '📖 My Course Syllabus'}
+            {tab === 'overview' ? '📋 Workspace Overview' : tab === 'syllabus' ? '📖 My Course Syllabus' : '🎫 Support & Bug Tickets'}
           </button>
         ))}
       </div>
@@ -496,8 +497,21 @@ export default function StudentDashboard({
           </div>
 
         </div>
-      ) : (
+      ) : activeTab === 'syllabus' ? (
         <SyllabusExplorer courses={courses} applications={applications} theme={theme} />
+      ) : (
+        <div className="w-full">
+          <SupportTicketManager
+            currentUser={{
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: 'student'
+            }}
+            theme={theme}
+            isAdminView={false}
+          />
+        </div>
       )}
         </motion.div>
       </AnimatePresence>

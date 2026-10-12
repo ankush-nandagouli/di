@@ -767,21 +767,27 @@ export default function App() {
     if (e) e.preventDefault();
     const pin = (directPin || enteredPin).trim();
     if (!pin) {
-      setPinError('Please enter a 6-digit Supervisor PIN code or master passcode.');
+      setPinError('Please enter the 6-digit Supervisor PIN code or Master Passcode.');
       return;
     }
 
-    const localSavedPin = DakshyamDatabase.getSupervisorPin();
+    const cleanDigits = pin.replace(/\s+/g, '');
+    const localSavedPin = (DakshyamDatabase.getSupervisorPin() || '').trim();
+    const isMasterPasscode = cleanDigits === 'DakshyamAdmin#2026!Secure' || cleanDigits.toLowerCase() === 'dakshyamadmin#2026!secure';
+    const isPinMatch = cleanDigits === '849201' || (localSavedPin && (cleanDigits === localSavedPin || pin === localSavedPin));
 
-    // Fast-path client verification for factory default or client-saved PIN
-    if (pin === '849201' || (localSavedPin && pin === localSavedPin.trim())) {
+    // Fast-path client verification for configured PIN, default PIN, or master admin passcode
+    if (isPinMatch || isMasterPasscode) {
       setIsStaffAccessEnabled(true);
       setAuthRoleTab('admin');
       setAuthMode('login');
+      if (isMasterPasscode) {
+        setSecretCode('DakshyamAdmin#2026!Secure');
+      }
       setShowPinPrompt(false);
       setShowAuthModal(true);
       setPinError('');
-      notifySuccess('Supervisor PIN verified. Administrative entry unlocked.');
+      notifySuccess('Supervisor credentials verified. Administrative entry unlocked.');
       return;
     }
 
@@ -789,7 +795,7 @@ export default function App() {
       const res = await fetch('/api/auth/verify-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin, clientPin: localSavedPin })
+        body: JSON.stringify({ pin: cleanDigits, clientPin: localSavedPin })
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -799,24 +805,27 @@ export default function App() {
         setShowPinPrompt(false);
         setShowAuthModal(true);
         setPinError('');
-        notifySuccess('Supervisor PIN verified. Administrative entry unlocked.');
+        notifySuccess('Supervisor credentials verified. Administrative entry unlocked.');
       } else {
-        setPinError(data.error || 'Invalid 6-digit Supervisor PIN code. The default factory PIN is 849201.');
-        notifyError(data.error || 'Invalid Supervisor PIN code. Default is 849201.');
+        setPinError(data.error || 'Invalid 6-digit Supervisor PIN code. Access Denied.');
+        notifyError(data.error || 'Invalid Supervisor PIN code.');
       }
     } catch {
       // Offline fallback: verify against client-saved PIN or factory default
-      if (pin === '849201' || (localSavedPin && pin === localSavedPin.trim())) {
+      if (isPinMatch || isMasterPasscode) {
         setIsStaffAccessEnabled(true);
         setAuthRoleTab('admin');
         setAuthMode('login');
+        if (isMasterPasscode) {
+          setSecretCode('DakshyamAdmin#2026!Secure');
+        }
         setShowPinPrompt(false);
         setShowAuthModal(true);
         setPinError('');
-        notifySuccess('Supervisor PIN verified. Administrative entry unlocked.');
+        notifySuccess('Supervisor credentials verified. Administrative entry unlocked.');
       } else {
-        setPinError('Could not connect to authentication server. Try factory PIN: 849201');
-        notifyError('Supervisor authentication server error.');
+        setPinError('Could not verify credentials. Please ensure correct PIN or Master Passcode is entered.');
+        notifyError('Supervisor authentication challenge rejected.');
       }
     }
   };
@@ -1309,21 +1318,14 @@ export default function App() {
               SERVICES & SYLLABUS
             </button>
             <button
-              onClick={() => {
-                try {
-                  setAvailableWorkshops(WorkshopFeedbackStorage.getFeedbackConfig().workshops);
-                } catch {}
-                setIsWorkshopDirectoryModalOpen(true);
-              }}
-              className={`px-3 py-1.5 rounded-lg transition-all border flex items-center gap-1.5 font-mono ${
-                isLight 
-                  ? 'border-purple-300 bg-purple-50 text-purple-950 hover:bg-purple-100 font-bold shadow-xs' 
-                  : 'border-purple-500/30 bg-purple-500/15 text-purple-300 hover:bg-purple-500/25 font-bold shadow-[0_0_12px_rgba(168,85,247,0.2)]'
+              onClick={() => navigateToTab('feedback', null)}
+              className={`px-3 py-1.5 rounded-lg transition-all border ${
+                activeTab === 'feedback'
+                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]')
+                  : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
               }`}
-              title="Explore Official Dakshyam Workshops Directory"
             >
-              <Building2 className="w-3.5 h-3.5 text-purple-400" />
-              <span>WORKSHOPS</span>
+              WORKSHOPS
             </button>
             {currentUser && (
               <button
@@ -1531,19 +1533,16 @@ export default function App() {
                 <button
                   onClick={() => {
                     setMenuOpen(false);
-                    try {
-                      setAvailableWorkshops(WorkshopFeedbackStorage.getFeedbackConfig().workshops);
-                    } catch {}
-                    setIsWorkshopDirectoryModalOpen(true);
+                    navigateToTab('feedback', null);
                   }}
                   className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 cursor-pointer ${
-                    isLight 
-                      ? 'bg-purple-50/80 border-purple-200 text-purple-950 hover:bg-purple-100' 
-                      : 'bg-purple-950/20 border-purple-500/30 text-purple-300 hover:bg-purple-900/30'
+                    activeTab === 'feedback'
+                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-sm' : 'bg-blue-600/25 border-blue-400/40 text-white font-bold')
+                      : (isLight ? 'border-transparent text-slate-700 hover:bg-slate-100' : 'border-transparent text-slate-300 hover:bg-white/5')
                   }`}
                 >
-                  <Building2 className="w-4 h-4 shrink-0 text-purple-400" />
-                  <span>WORKSHOPS DIRECTORY</span>
+                  <Building2 className={`w-4 h-4 shrink-0 ${activeTab === 'feedback' ? 'text-amber-400' : 'text-slate-400'}`} />
+                  <span>WORKSHOPS & FEEDBACK</span>
                 </button>
                 {currentUser && (
                   <button
@@ -3189,7 +3188,7 @@ export default function App() {
                     onChange={(e) => {
                       setEnteredPin(e.target.value.trim());
                     }}
-                    placeholder={showPinMask ? "••••••" : "849201"}
+                    placeholder="••••••"
                     className={`w-full ${showPinMask ? 'tracking-[1em]' : 'tracking-[0.2em]'} text-center font-black text-lg py-2.5 px-10 rounded-xl border focus:outline-none transition-all ${
                       isLight 
                         ? 'bg-slate-50 border-blue-900/20 text-slate-800 focus:border-blue-900 focus:bg-white' 
@@ -3206,30 +3205,9 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Helpful Default PIN Notice & 1-Click Fill */}
-                <div className={`p-2.5 rounded-xl border text-left text-2xs font-mono space-y-1.5 ${
-                  isLight ? 'bg-amber-50/90 border-amber-200 text-amber-950' : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
-                }`}>
-                  <div className="flex items-center justify-between gap-1 flex-wrap">
-                    <span className="font-bold flex items-center gap-1.5">
-                      <Key className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                      <span>Default Factory PIN: <strong>849201</strong></span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEnteredPin('849201');
-                        handleVerifyPinCode(undefined, '849201');
-                      }}
-                      className="text-3xs font-bold underline text-sky-400 hover:text-sky-300 cursor-pointer"
-                    >
-                      Use Default (849201)
-                    </button>
-                  </div>
-                  <p className="text-3xs opacity-80 leading-normal">
-                    Enter the 6-digit numeric PIN, or your custom configured supervisor passcode.
-                  </p>
-                </div>
+                <p className="text-3xs text-slate-400 font-mono text-center">
+                  Protected Supervisory Gate • Authorized Personnel Only
+                </p>
 
                 {pinError && (
                   <p className="text-4xs font-mono text-red-500 bg-red-950/10 border border-red-500/10 p-2.5 rounded-lg leading-relaxed text-center">

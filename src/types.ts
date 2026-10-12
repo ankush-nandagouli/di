@@ -315,5 +315,27 @@ export interface AppNotification {
   actionData?: Record<string, any>;
 }
 
+// Support Tickets & Error Reporting System
+export type TicketCategory = 'BUG' | 'RECOMMENDATION' | 'ACCOUNT' | 'COURSE' | 'CERTIFICATE' | 'OTHER';
+export type TicketPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+export type TicketStatus = 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED' | 'CLOSED';
+
+export interface SupportTicket {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  userRole: 'student' | 'trainer' | 'admin';
+  category: TicketCategory;
+  priority: TicketPriority;
+  subject: string;
+  description: string;
+  status: TicketStatus;
+  createdAt: string;
+  updatedAt: string;
+  adminResponse?: string;
+  resolvedAt?: string;
+}
+
 
 
