@@ -112,10 +112,13 @@ class SecurityGuardService {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       if (this.isBypassed) return;
 
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const platformStr = (typeof navigator !== 'undefined' && navigator && (navigator.platform || navigator.userAgent))
+        ? String(navigator.platform || navigator.userAgent)
+        : '';
+      const isMac = platformStr ? platformStr.toUpperCase().indexOf('MAC') >= 0 : false;
       const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
-      const key = e.key.toUpperCase();
-      const code = e.code;
+      const key = (e.key || '').toUpperCase();
+      const code = e.code || '';
 
       // 1. F12 key (Inspect / DevTools)
       if (key === 'F12' || code === 'F12') {

@@ -452,12 +452,12 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
 
       {/* Videos List */}
       <div className="grid grid-cols-1 gap-6">
-        {videos.map(video => {
+        {videos.map((video, vIdx) => {
           const isLiked = loggedInUser && video.likedByUserIds?.includes(loggedInUser.id);
           
           return (
             <div 
-              key={video.id}
+              key={video.id ? `${video.id}-${vIdx}` : `vid-${vIdx}`}
               className={`border rounded-2xl overflow-hidden backdrop-blur-md relative group transition-all duration-300 ${
                 isLight 
                   ? 'bg-white border-slate-200 hover:shadow-md hover:border-amber-500/25' 
@@ -606,8 +606,8 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
                 {/* Actual saved thread items */}
                 <div className="space-y-2.5 max-h-36 overflow-y-auto pr-1">
                   {video.comments && video.comments.length > 0 ? (
-                    video.comments.map(c => (
-                      <div key={c.id} className={`text-2xs font-sans p-2 rounded-xl text-left space-y-0.5 border ${
+                    video.comments.map((c, cIdx) => (
+                      <div key={c.id ? `${c.id}-${cIdx}` : `cmt-${cIdx}`} className={`text-2xs font-sans p-2 rounded-xl text-left space-y-0.5 border ${
                         isLight ? 'bg-white border-slate-100' : 'bg-[#111111]/30 border-slate-500/5'
                       }`}>
                         <div className="flex items-center justify-between font-mono">

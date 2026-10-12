@@ -5,8 +5,9 @@ import { DakshyamDatabase } from './db';
 import ExcelJS from 'exceljs';
 import { jsPDF } from 'jspdf';
 
-// Canonical deployed Vercel domain for public student feedback links
-export const VERCEL_DOMAIN = 'https://dakshyaminnovations.vercel.app';
+// Canonical domain for public student feedback links
+export const PRODUCTION_DOMAIN = 'https://dakshyaminnovations.in';
+export const VERCEL_DOMAIN = 'https://dakshyaminnovations.in';
 
 export const getActiveBaseDomain = (): string => {
   if (typeof window !== 'undefined' && window.location.origin) {
@@ -23,7 +24,7 @@ export const getActiveBaseDomain = (): string => {
       return custom.replace(/\/+$/, '');
     }
   }
-  return VERCEL_DOMAIN;
+  return PRODUCTION_DOMAIN;
 };
 
 export const toWorkshopSlug = (nameOrId: string): string => {
@@ -38,11 +39,11 @@ export const toWorkshopSlug = (nameOrId: string): string => {
 export const getWorkshopShareUrl = (ws?: WorkshopItem | string | null, useVercel = false): string => {
   let base = getActiveBaseDomain();
   if (useVercel) {
-    // If current origin is already on Vercel or production domain, prefer active origin; otherwise fallback to VERCEL_DOMAIN
-    if (typeof window !== 'undefined' && window.location.origin && window.location.hostname.includes('vercel.app')) {
+    // If current origin is already on production domain, prefer active origin; otherwise fallback to PRODUCTION_DOMAIN
+    if (typeof window !== 'undefined' && window.location.origin && window.location.hostname.includes('dakshyaminnovations.in')) {
       base = window.location.origin;
     } else {
-      base = VERCEL_DOMAIN;
+      base = PRODUCTION_DOMAIN;
     }
   } else if (typeof window !== 'undefined' && window.location.origin) {
     base = window.location.origin;
@@ -538,7 +539,25 @@ export class WorkshopFeedbackStorage {
       const stored = localStorage.getItem(LOCAL_STORAGE_FEEDBACK_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const seen = new Set<string>();
+          const deduped: WorkshopFeedbackSubmission[] = [];
+          let hadDuplicates = false;
+          for (const item of parsed) {
+            if (!item) continue;
+            const id = item.id || `fb-${Math.random().toString(36).substring(2, 9)}`;
+            if (seen.has(id)) {
+              hadDuplicates = true;
+              continue;
+            }
+            seen.add(id);
+            deduped.push({ ...item, id });
+          }
+          if (hadDuplicates) {
+            this.saveLocalSubmissions(deduped);
+          }
+          return deduped;
+        }
       }
     } catch (e) {
       console.warn('Submissions local read warning:', e);
@@ -548,7 +567,17 @@ export class WorkshopFeedbackStorage {
 
   static saveLocalSubmissions(items: WorkshopFeedbackSubmission[]): void {
     try {
-      localStorage.setItem(LOCAL_STORAGE_FEEDBACK_KEY, JSON.stringify(items));
+      if (!Array.isArray(items)) return;
+      const seen = new Set<string>();
+      const deduped: WorkshopFeedbackSubmission[] = [];
+      for (const item of items) {
+        if (!item) continue;
+        const id = item.id || `fb-${Math.random().toString(36).substring(2, 9)}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        deduped.push({ ...item, id });
+      }
+      localStorage.setItem(LOCAL_STORAGE_FEEDBACK_KEY, JSON.stringify(deduped));
     } catch (e) {
       console.error('Local save error:', e);
     }

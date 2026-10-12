@@ -4,6 +4,7 @@ import { Search, CheckCircle2, AlertTriangle, Printer, Award, ShieldCheck, Heart
 import { Certificate } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import OfficialCertificate from './OfficialCertificate';
+import { notifySuccess, notifyError } from '../utils/toast';
 
 interface CertificateVerifyProps {
   theme?: 'light' | 'dark';
@@ -25,6 +26,7 @@ export default function CertificateVerify({ theme = 'dark' }: CertificateVerifyP
     const formattedCode = code.trim().toUpperCase();
     if (!formattedCode) {
       setErrorText('Please enter a verification code.');
+      notifyError('Please enter a valid certificate verification code.');
       return;
     }
 
@@ -36,11 +38,14 @@ export default function CertificateVerify({ theme = 'dark' }: CertificateVerifyP
       setSearched(true);
       if (match) {
         setFoundCertificate(match);
+        notifySuccess(`Verified authentic certificate for ${match.studentName}!`);
       } else {
         setFoundCertificate(null);
+        notifyError(`Code "${formattedCode}" could not be verified in system records.`);
       }
     } catch {
       setErrorText('Error matching credentials against records.');
+      notifyError('Error validating credentials with database.');
     }
   };
 
@@ -116,10 +121,14 @@ export default function CertificateVerify({ theme = 'dark' }: CertificateVerifyP
                 />
               </div>
             ) : (
-              <div className="bg-red-950/20 border border-red-500/20 rounded-2xl p-6 text-center space-y-3">
-                <AlertTriangle className="w-10 h-10 text-red-400 mx-auto animate-bounce" />
-                <h3 className="text-white font-bold text-base">Invalid Verification Code Passed</h3>
-                <p className="text-slate-400 text-xs max-w-sm mx-auto">
+              <div className={`rounded-2xl p-6 text-center space-y-3 border transition-colors ${
+                isLight 
+                  ? 'bg-red-50/80 border-red-200 text-red-900' 
+                  : 'bg-red-950/20 border-red-500/20 text-white'
+              }`}>
+                <AlertTriangle className={`w-10 h-10 mx-auto animate-bounce ${isLight ? 'text-red-600' : 'text-red-400'}`} />
+                <h3 className={`font-bold text-base ${isLight ? 'text-red-900' : 'text-white'}`}>Invalid Verification Code Passed</h3>
+                <p className={`text-xs max-w-sm mx-auto ${isLight ? 'text-red-700' : 'text-slate-400'}`}>
                   Code "{queriedCode}" could not be matched with any secure records. Ensure there are no spacing or characters errors.
                 </p>
               </div>

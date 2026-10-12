@@ -24,6 +24,7 @@ import {
   toWorkshopSlug 
 } from '../utils/feedbackStorage';
 import WorkshopFeedbackForm from './WorkshopFeedbackForm';
+import WorkshopDirectoryModal from './WorkshopDirectoryModal';
 
 interface AdminWorkshopFeedbackManagerProps {
   theme?: 'light' | 'dark';
@@ -70,6 +71,7 @@ export default function AdminWorkshopFeedbackManager({
     queryUrl: string; 
   } | null>(null);
   const [qrModalWorkshop, setQrModalWorkshop] = useState<WorkshopItem | null>(null);
+  const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
 
   // Audit Stream search & filters
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
@@ -706,6 +708,19 @@ export default function AdminWorkshopFeedbackManager({
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Workshop Audit Stream</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setIsDirectoryModalOpen(true)}
+            className={`px-3 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap border ${
+              isLight 
+                ? 'bg-purple-50 hover:bg-purple-100 text-purple-950 border-purple-200' 
+                : 'bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border-purple-500/30'
+            }`}
+            title="Open Directory Modal View"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Directory Modal</span>
+          </button>
         </div>
 
         {/* Primary Action Button: Create Workshop */}
@@ -942,7 +957,7 @@ export default function AdminWorkshopFeedbackManager({
           </div>
         ) : (
           <div className="divide-y divide-slate-500/10">
-            {filteredSubmissions.map((sub) => {
+            {filteredSubmissions.map((sub, idx) => {
               const dateStr = sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('en-IN', {
                 day: '2-digit', month: 'short', year: 'numeric'
               }) : 'N/A';
@@ -955,7 +970,7 @@ export default function AdminWorkshopFeedbackManager({
 
               return (
                 <div 
-                  key={sub.id} 
+                  key={sub.id ? `${sub.id}-${idx}` : `sub-${idx}`} 
                   className={`p-5 transition-colors flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${
                     isLight ? 'hover:bg-slate-50/70' : 'hover:bg-slate-800/30'
                   }`}
@@ -1082,6 +1097,19 @@ export default function AdminWorkshopFeedbackManager({
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDirectoryModalOpen(true)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                  isLight 
+                    ? 'bg-purple-50 hover:bg-purple-100 text-purple-950 border-purple-200' 
+                    : 'bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border-purple-500/30'
+                }`}
+                title="Preview Directory Modal as Attendees See It"
+              >
+                <Building2 className="w-3.5 h-3.5 text-purple-400" />
+                <span>Directory Modal</span>
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -1332,7 +1360,10 @@ export default function AdminWorkshopFeedbackManager({
       {/* 3. WORKSHOP AUDIT STREAM VIEW */}
       {managerView === 'audit' && (() => {
         const rawLogs = DakshyamDatabase.getAppLogs();
-        const allWorkshopLogs = rawLogs.filter(l => 
+        const uniqueLogsMap = new Map<string, typeof rawLogs[0]>();
+        rawLogs.forEach(l => { if (l && l.id && !uniqueLogsMap.has(l.id)) uniqueLogsMap.set(l.id, l); });
+        const uniqueRawLogs = Array.from(uniqueLogsMap.values());
+        const allWorkshopLogs = uniqueRawLogs.filter(l => 
           l.category === 'WORKSHOP' || 
           l.action.toLowerCase().includes('workshop') ||
           l.details.toLowerCase().includes('workshop') ||
@@ -1602,14 +1633,14 @@ export default function AdminWorkshopFeedbackManager({
                   </button>
                 </div>
               ) : (
-                filteredLogs.map(log => {
+                filteredLogs.map((log, idx) => {
                   const isExpanded = expandedLogId === log.id;
                   const isCreation = log.action.toLowerCase().includes('created') || log.action.toLowerCase().includes('published');
                   const isSubmission = log.action.toLowerCase().includes('submission') || log.action.toLowerCase().includes('feedback');
 
                   return (
                     <div
-                      key={log.id}
+                      key={log.id ? `${log.id}-${idx}` : `log-${idx}`}
                       className={`p-3.5 rounded-2xl border transition-all ${
                         isLight 
                           ? 'bg-white border-slate-200 hover:border-slate-300 shadow-sm' 
@@ -1724,12 +1755,12 @@ export default function AdminWorkshopFeedbackManager({
       {/* DETAIL VIEW MODAL */}
       <AnimatePresence>
         {selectedSubmission && (
-          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden overscroll-contain">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className={`max-w-2xl w-full rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto ${
+              className={`max-w-2xl w-full rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto overscroll-contain custom-scrollbar ${
                 isLight ? 'bg-white border-blue-900/20 text-slate-900' : 'bg-[#0d1f38] border-sky-500/30 text-white'
               }`}
             >
@@ -1901,12 +1932,12 @@ export default function AdminWorkshopFeedbackManager({
       {/* ADMIN PRIVILEGES MODAL ("MODIFY WORKSHOP FORM") */}
       <AnimatePresence>
         {isConfigModalOpen && isAdmin && (
-          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden overscroll-contain">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className={`max-w-3xl w-full rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-6 max-h-[92vh] overflow-y-auto ${
+              className={`max-w-3xl w-full rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-6 max-h-[92vh] overflow-y-auto overscroll-contain custom-scrollbar ${
                 isLight ? 'bg-white border-blue-900/20 text-slate-900' : 'bg-[#0d1f38] border-sky-500/30 text-white'
               }`}
             >
@@ -2428,12 +2459,12 @@ export default function AdminWorkshopFeedbackManager({
       {/* CREATE WORKSHOP MODAL */}
       <AnimatePresence>
         {isCreateWorkshopModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-hidden overscroll-contain">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className={`max-w-xl w-full rounded-3xl border shadow-2xl p-6 sm:p-7 space-y-5 my-6 ${
+              className={`max-w-xl w-full rounded-3xl border shadow-2xl p-6 sm:p-7 space-y-5 my-auto max-h-[90vh] overflow-y-auto overscroll-contain custom-scrollbar ${
                 isLight ? 'bg-white border-blue-900/20 text-slate-900' : 'bg-[#0d1f38] border-purple-500/30 text-white'
               }`}
             >
@@ -2609,12 +2640,12 @@ export default function AdminWorkshopFeedbackManager({
       {/* WORKSHOP CREATED SUCCESS MODAL */}
       <AnimatePresence>
         {createdWorkshopSuccess && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-hidden overscroll-contain">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className={`max-w-xl w-full rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-5 my-6 text-center ${
+              className={`max-w-xl w-full rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-5 my-auto max-h-[90vh] overflow-y-auto overscroll-contain custom-scrollbar text-center ${
                 isLight ? 'bg-white border-emerald-500/40 text-slate-900' : 'bg-[#0a192f] border-emerald-500/40 text-white'
               }`}
             >
@@ -2805,12 +2836,12 @@ export default function AdminWorkshopFeedbackManager({
       {/* QR CODE DISPLAY MODAL */}
       <AnimatePresence>
         {qrModalWorkshop && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-hidden overscroll-contain">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className={`max-w-md w-full rounded-3xl border shadow-2xl p-6 sm:p-7 space-y-4 my-6 text-center ${
+              className={`max-w-md w-full rounded-3xl border shadow-2xl p-6 sm:p-7 space-y-4 my-auto max-h-[90vh] overflow-y-auto overscroll-contain custom-scrollbar text-center ${
                 isLight ? 'bg-white border-blue-900/20 text-slate-900' : 'bg-[#0d1f38] border-sky-500/30 text-white'
               }`}
             >
@@ -2987,6 +3018,28 @@ export default function AdminWorkshopFeedbackManager({
           </div>
         )}
       </AnimatePresence>
+
+      {/* WORKSHOP DIRECTORY MODAL PREVIEW */}
+      <WorkshopDirectoryModal
+        isOpen={isDirectoryModalOpen}
+        onClose={() => setIsDirectoryModalOpen(false)}
+        workshops={config.workshops}
+        theme={theme}
+        currentUserRole={currentUserRole}
+        onOpenForm={(wsId) => {
+          if (onOpenPublicForm) {
+            onOpenPublicForm(wsId);
+          } else {
+            setPreviewWorkshopId(wsId);
+            setShowPreviewModal(true);
+          }
+          setIsDirectoryModalOpen(false);
+        }}
+        onViewQr={(ws) => {
+          setQrModalWorkshop(ws);
+          setIsDirectoryModalOpen(false);
+        }}
+      />
 
     </div>
   );

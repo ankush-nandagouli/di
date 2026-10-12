@@ -241,7 +241,7 @@ export default function NotificationBell({
 
               <span className="text-[9px] flex items-center gap-1 font-semibold text-emerald-400">
                 <Shield className="w-3 h-3" />
-                <span>{currentUser ? `${currentUser.role.toUpperCase()} Hub` : 'Guest Hub'}</span>
+                <span>{currentUser?.role ? `${currentUser.role.toUpperCase()} Hub` : 'Guest Hub'}</span>
               </span>
             </div>
 
@@ -257,9 +257,9 @@ export default function NotificationBell({
                   </p>
                 </div>
               ) : (
-                filteredNotifs.map((notif) => (
+                filteredNotifs.map((notif, nIdx) => (
                   <div
-                    key={notif.id}
+                    key={notif.id ? `${notif.id}-${nIdx}` : `notif-${nIdx}`}
                     onClick={() => handleNotificationClick(notif)}
                     className={`p-3 sm:p-3.5 transition-all cursor-pointer flex items-start gap-3 hover:bg-blue-500/5 ${
                       !notif.isRead 

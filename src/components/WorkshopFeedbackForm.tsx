@@ -13,6 +13,7 @@ import {
 import { WorkshopFeedbackStorage, toWorkshopSlug, getWorkshopShareUrl, VERCEL_DOMAIN } from '../utils/feedbackStorage';
 import { NotificationService } from '../utils/notificationService';
 import DakshyamLogo from './DakshyamLogo';
+import WorkshopDirectoryModal from './WorkshopDirectoryModal';
 
 interface WorkshopFeedbackFormProps {
   theme?: 'light' | 'dark';
@@ -85,6 +86,7 @@ export default function WorkshopFeedbackForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedResult, setSubmittedResult] = useState<{ id: string } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
 
   // Hydrate config and preselected workshop
   useEffect(() => {
@@ -777,11 +779,26 @@ export default function WorkshopFeedbackForm({
             
             {/* Workshop Picker */}
             <div className="space-y-2">
-              <label className={`text-xs font-mono font-bold uppercase tracking-wider block ${
-                isLight ? 'text-slate-800' : 'text-slate-200'
-              }`}>
-                Select Workshop Program <span className="text-rose-400">*</span>
-              </label>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <label className={`text-xs font-mono font-bold uppercase tracking-wider block ${
+                  isLight ? 'text-slate-800' : 'text-slate-200'
+                }`}>
+                  Select Workshop Program <span className="text-rose-400">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsDirectoryModalOpen(true)}
+                  className={`text-2xs font-mono font-bold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                    isLight 
+                      ? 'border-purple-300 bg-purple-50 text-purple-950 hover:bg-purple-100' 
+                      : 'border-purple-500/30 bg-purple-500/15 text-purple-300 hover:bg-purple-500/25'
+                  }`}
+                  title="Open interactive workshop catalog"
+                >
+                  <Building2 className="w-3 h-3 text-purple-400" />
+                  <span>Browse Workshops Directory</span>
+                </button>
+              </div>
               <select
                 value={selectedWorkshopId}
                 onChange={(e) => setSelectedWorkshopId(e.target.value)}
@@ -1408,6 +1425,19 @@ export default function WorkshopFeedbackForm({
         </div>
 
       </form>
+
+      {/* WORKSHOP DIRECTORY SELECTION MODAL */}
+      <WorkshopDirectoryModal
+        isOpen={isDirectoryModalOpen}
+        onClose={() => setIsDirectoryModalOpen(false)}
+        workshops={config.workshops}
+        theme={theme}
+        selectedWorkshopId={selectedWorkshopId}
+        onSelectWorkshop={(ws) => {
+          setSelectedWorkshopId(ws.id);
+        }}
+        currentUserRole={currentUser?.role}
+      />
 
     </div>
   );

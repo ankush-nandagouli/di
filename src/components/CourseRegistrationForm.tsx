@@ -5,6 +5,7 @@ import { Course, CourseApplication } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
 import { NotificationService } from '../utils/notificationService';
+import { notifySuccess, notifyError } from '../utils/toast';
 
 interface CourseRegistrationFormProps {
   courses: Course[];

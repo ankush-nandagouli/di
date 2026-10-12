@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowRight, BookOpen, Smartphone, ShieldCheck, 
-  Star, ChevronLeft, ChevronRight, School, Sparkles, LayoutGrid, Image as ImageIcon 
+  Star, ChevronLeft, ChevronRight, School, Sparkles, LayoutGrid, Image as ImageIcon,
+  Building2
 } from 'lucide-react';
 import DakshyamLogo from './DakshyamLogo';
 import Home3DArtViewer from './Home3DArtViewer';
@@ -19,6 +20,7 @@ interface LandingPageProps {
   theme?: 'light' | 'dark';
   currentUser?: any;
   onNavigateToAdmin?: () => void;
+  onOpenWorkshopDirectory?: () => void;
 }
 
 export default function LandingPage({ 
@@ -29,7 +31,8 @@ export default function LandingPage({
   onSelectCourse,
   theme = 'dark',
   currentUser,
-  onNavigateToAdmin
+  onNavigateToAdmin,
+  onOpenWorkshopDirectory
 }: LandingPageProps) {
   // Check if current authenticated user has administrator privileges
   const loggedInUser = currentUser || DakshyamDatabase.getLoggedInUser();
@@ -283,17 +286,34 @@ export default function LandingPage({
             To make practical technology education accessible to every student, empowering both rural and urban learners to understand, create, and innovate with technology.
           </p>
 
-          <div className="pt-1">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               onClick={onEnterPortal}
-              className={`font-black text-xs sm:text-sm px-8 py-3.5 rounded-xl inline-flex items-center gap-2 group cursor-pointer active:scale-95 transition-all uppercase font-mono tracking-wider ${
+              className={`w-full sm:w-auto font-black text-xs sm:text-sm px-8 py-3.5 rounded-xl inline-flex items-center justify-center gap-2 group cursor-pointer active:scale-95 transition-all uppercase font-mono tracking-wider shadow-lg ${
                 isLight 
-                  ? 'bg-blue-950 hover:bg-blue-900 text-white hover:shadow-[0_4px_20px_rgba(15,23,42,0.2)]' 
-                  : 'bg-white hover:bg-slate-100 text-[#0a192f] hover:shadow-[0_0_25px_rgba(255,255,255,0.2)]'
+                  ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-blue-950/20' 
+                  : 'bg-white hover:bg-slate-100 text-[#0a192f] shadow-[0_0_25px_rgba(255,255,255,0.2)]'
               }`}
             >
-              Enter Innovation Portal <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <span>Enter Innovation Portal</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
+
+            {onOpenWorkshopDirectory && (
+              <button
+                type="button"
+                onClick={onOpenWorkshopDirectory}
+                className={`w-full sm:w-auto font-bold text-xs sm:text-sm px-6 py-3.5 rounded-xl inline-flex items-center justify-center gap-2 border transition-all uppercase font-mono tracking-wider cursor-pointer active:scale-95 shadow-sm ${
+                  isLight
+                    ? 'bg-purple-50/90 border-purple-300 text-purple-950 hover:bg-purple-100 hover:border-purple-400'
+                    : 'bg-purple-950/30 border-purple-500/40 text-purple-300 hover:bg-purple-900/40 hover:border-purple-400/60 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+                }`}
+                title="Open interactive workshop catalog"
+              >
+                <Building2 className="w-4 h-4 text-purple-400" />
+                <span>Workshops Directory</span>
+              </button>
+            )}
           </div>
         </motion.div>
       </div>
@@ -480,12 +500,28 @@ export default function LandingPage({
 
       {/* --- SECTION CD: SYLLABUS DIRECTORY --- */}
       <div className="max-w-4xl mx-auto px-4 space-y-8">
-        <div className={`text-left space-y-2 border-l-2 pl-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
-          <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${textGold}`}>Curriculum Catalog</span>
-          <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Official Course Syllabus Directory</h2>
-          <p className={`text-xs max-w-xl ${textMuted}`}>
-            Explore active syllabus schedules. Complete physical training is supported by digital access logs and authorized, downloadable certificates.
-          </p>
+        <div className={`text-left border-l-2 pl-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
+          <div className="space-y-1">
+            <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${textGold}`}>Curriculum Catalog</span>
+            <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Official Course Syllabus Directory</h2>
+            <p className={`text-xs max-w-xl ${textMuted}`}>
+              Explore active syllabus schedules. Complete physical training is supported by digital access logs and authorized, downloadable certificates.
+            </p>
+          </div>
+          {onOpenWorkshopDirectory && (
+            <button
+              type="button"
+              onClick={onOpenWorkshopDirectory}
+              className={`self-start sm:self-auto shrink-0 text-xs font-mono font-bold px-3.5 py-2 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                isLight 
+                  ? 'bg-purple-50 hover:bg-purple-100 text-purple-950 border-purple-200' 
+                  : 'bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border-purple-500/30'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5 text-purple-400" />
+              <span>Workshops Directory</span>
+            </button>
+          )}
         </div>
 
         {/* Course Cards */}

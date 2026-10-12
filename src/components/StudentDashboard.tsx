@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Award, Users, FileText, CheckCircle2, Clock, MapPin, Phone, Briefcase, BookOpen, Camera, Eye, ClipboardList } from 'lucide-react';
+import { User, Award, Users, FileText, CheckCircle2, Clock, MapPin, Phone, Briefcase, BookOpen, Camera, Eye, ClipboardList, Building2 } from 'lucide-react';
 import { StudentUser, StudentGroup, Course, CourseApplication, Certificate } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import SyllabusExplorer from './SyllabusExplorer';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
 import OfficialCertificate from './OfficialCertificate';
+import WorkshopDirectoryModal from './WorkshopDirectoryModal';
 
 interface StudentDashboardProps {
   user: StudentUser;
@@ -37,6 +38,7 @@ export default function StudentDashboard({
   // Navigation tab
   const [activeTab, setActiveTab] = useState<'overview' | 'syllabus'>('overview');
   const [viewCert, setViewCert] = useState<Certificate | null>(null);
+  const [isDirModalOpen, setIsDirModalOpen] = useState(false);
 
   // Editing profile details states
   const [name, setName] = useState(user.name);
@@ -337,17 +339,31 @@ export default function StudentDashboard({
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigateTab('feedback')}
-                  className={`w-full py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs ${
-                    isLight
-                      ? 'bg-amber-900 hover:bg-amber-800 text-white'
-                      : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold'
-                  }`}
-                >
-                  Open Feedback Form →
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('feedback')}
+                    className={`w-full py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                      isLight
+                        ? 'bg-amber-900 hover:bg-amber-800 text-white'
+                        : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold'
+                    }`}
+                  >
+                    Open Feedback Form →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsDirModalOpen(true)}
+                    className={`w-full py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                      isLight
+                        ? 'bg-purple-50 hover:bg-purple-100 text-purple-950 border-purple-200'
+                        : 'bg-purple-950/30 hover:bg-purple-900/40 text-purple-300 border-purple-500/30'
+                    }`}
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Browse Workshops Directory</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -367,12 +383,12 @@ export default function StudentDashboard({
 
               {myApplications.length > 0 ? (
                 <div className="space-y-3">
-                  {myApplications.map(app => {
+                  {myApplications.map((app, idx) => {
                     const matchCourse = courses.find(c => c.id === app.courseId);
                     
                     return (
                       <div 
-                        key={app.id}
+                        key={app.id ? `${app.id}-${idx}` : `app-${idx}`}
                         className={`flex items-center justify-between p-3.5 rounded-xl border relative transition-all ${
                           isLight 
                             ? 'bg-slate-50/50 border-slate-100 hover:border-blue-900/20' 
@@ -432,9 +448,9 @@ export default function StudentDashboard({
 
               {myCertificates.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {myCertificates.map(cert => (
+                  {myCertificates.map((cert, idx) => (
                     <div 
-                      key={cert.id}
+                      key={cert.id ? `${cert.id}-${idx}` : `cert-${idx}`}
                       className={`p-4 rounded-xl border flex flex-col justify-between space-y-3 ${
                         isLight 
                           ? 'bg-gradient-to-br from-blue-50/50 to-white border-blue-900/15' 
@@ -504,6 +520,24 @@ export default function StudentDashboard({
           </div>
         </div>
       )}
+
+      {/* WORKSHOP DIRECTORY MODAL */}
+      <WorkshopDirectoryModal
+        isOpen={isDirModalOpen}
+        onClose={() => setIsDirModalOpen(false)}
+        theme={theme}
+        currentUserRole="student"
+        onSelectWorkshop={(ws) => {
+          if (onNavigateTab) {
+            onNavigateTab('feedback');
+          }
+        }}
+        onOpenForm={(wsId) => {
+          if (onNavigateTab) {
+            onNavigateTab('feedback');
+          }
+        }}
+      />
 
     </div>
   );

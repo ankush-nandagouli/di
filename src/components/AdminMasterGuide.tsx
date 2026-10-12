@@ -232,7 +232,7 @@ export default function AdminMasterGuide({
         'Edge & Brave Resilience: Cookies and local storage are synchronized every session to guarantee uninterrupted logins.'
       ],
       tips: [
-        'Share URLs formatted as https://dakshyaminnovations.vercel.app/feedback-form/:slug for maximum click-through rates.'
+        'Share URLs formatted as https://dakshyaminnovations.in/feedback-form/:slug for maximum click-through rates.'
       ],
       targetAdminTab: 'about_editor'
     }

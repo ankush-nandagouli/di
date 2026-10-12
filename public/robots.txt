@@ -1,6 +1,5 @@
 # ==============================================================================
-# Robots.txt for Dakshyam Innovations (https://dakshyaminnovations.vercel.app)
-# Generated: 2026-09-11
+# Robots.txt for Dakshyam Innovations (https://dakshyaminnovations.in)
 # ==============================================================================
 
 User-agent: *
@@ -26,7 +25,8 @@ Allow: /*.ico$
 Allow: /*.obj$
 Allow: /*.glb$
 Allow: /logo.svg
-Allow: /logo.png
+Allow: /favicon.svg
+Allow: /favicon.ico
 Allow: /og-image.png
 
 # Disallow private internal panels, trainer consoles, and admin dashboard routes
@@ -53,5 +53,5 @@ User-agent: Bingbot
 Allow: /
 
 # Canonical Host & XML Sitemaps
-Host: https://dakshyaminnovations.vercel.app
-Sitemap: https://dakshyaminnovations.vercel.app/sitemap.xml
+Host: https://dakshyaminnovations.in
+Sitemap: https://dakshyaminnovations.in/sitemap.xml

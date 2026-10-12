@@ -522,15 +522,23 @@ export class DakshyamDatabase {
   }
 
   static getSupervisorPin(): string {
-    return this.get<string>('supervisor_pin', '');
+    return this.get<string>('supervisor_pin', '849201') || '849201';
   }
 
   static saveSupervisorPin(pin: string): void {
-    this.set('supervisor_pin', pin);
+    const clean = String(pin).trim();
+    this.set('supervisor_pin', clean);
+    if (typeof fetch !== 'undefined') {
+      fetch('/api/auth/update-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: clean })
+      }).catch(() => {});
+    }
   }
 
   static getAppLogs(): AppLog[] {
-    return this.get<AppLog[]>('app_logs', [
+    const raw = this.get<AppLog[]>('app_logs', [
       {
         id: 'log-initial',
         timestamp: new Date().toISOString(),
@@ -541,10 +549,43 @@ export class DakshyamDatabase {
         status: 'INFO'
       }
     ]);
+
+    if (!Array.isArray(raw)) return [];
+
+    const seen = new Set<string>();
+    const uniqueLogs: AppLog[] = [];
+    let hadDuplicates = false;
+
+    for (const item of raw) {
+      if (!item) continue;
+      const id = item.id || `log-${Math.random().toString(36).substring(2, 9)}`;
+      if (seen.has(id)) {
+        hadDuplicates = true;
+        continue;
+      }
+      seen.add(id);
+      uniqueLogs.push({ ...item, id });
+    }
+
+    if (hadDuplicates) {
+      this.saveAppLogs(uniqueLogs);
+    }
+
+    return uniqueLogs;
   }
 
   static saveAppLogs(logs: AppLog[]): void {
-    this.set('app_logs', logs);
+    if (!Array.isArray(logs)) return;
+    const seen = new Set<string>();
+    const deduplicated: AppLog[] = [];
+    for (const item of logs) {
+      if (!item) continue;
+      const id = item.id || `log-${Math.random().toString(36).substring(2, 9)}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      deduplicated.push({ ...item, id });
+    }
+    this.set('app_logs', deduplicated);
   }
 
   static logEvent(
@@ -608,12 +649,18 @@ export class DakshyamDatabase {
         const data = await res.json();
         if (data && Array.isArray(data.logs) && data.logs.length > 0) {
           const local = this.getAppLogs();
-          const existingIds = new Set(local.map(l => l.id));
-          const combined = [...local];
+          const existingIds = new Set<string>();
+          const combined: AppLog[] = [];
+          for (const item of local) {
+            if (item && item.id && !existingIds.has(item.id)) {
+              existingIds.add(item.id);
+              combined.push(item);
+            }
+          }
           for (const rl of data.logs) {
-            if (!existingIds.has(rl.id)) {
-              combined.push(rl);
+            if (rl && rl.id && !existingIds.has(rl.id)) {
               existingIds.add(rl.id);
+              combined.push(rl);
             }
           }
           combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

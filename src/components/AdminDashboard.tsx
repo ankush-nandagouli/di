@@ -1443,12 +1443,12 @@ export default function AdminDashboard({
 
             <div className="space-y-3">
               {applications.length > 0 ? (
-                applications.map(app => {
+                applications.map((app, aIdx) => {
                   const matchCourse = courses.find(c => c.id === app.courseId);
                   
                   return (
                     <div 
-                      key={app.id}
+                      key={app.id ? `${app.id}-${aIdx}` : `app-${aIdx}`}
                       className={`p-4 rounded-xl border transition-all text-left flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fadeIn ${
                         isLight 
                           ? 'bg-slate-50 border-slate-200 hover:border-amber-500/15 shadow-3xs' 
@@ -1533,9 +1533,9 @@ export default function AdminDashboard({
             </div>
 
             <div className="space-y-3">
-              {trainersList.map(trn => (
+              {trainersList.map((trn, idx) => (
                 <div 
-                  key={trn.id}
+                  key={trn.id ? `${trn.id}-${idx}` : `trn-${idx}`}
                   className={`p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-left animate-fadeIn ${
                     isLight 
                       ? 'bg-slate-50 border-slate-200 hover:border-amber-500/15 shadow-3xs' 
@@ -1702,9 +1702,9 @@ export default function AdminDashboard({
               </h3>
 
               <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                {bannersList.map(b => (
+                {bannersList.map((b, idx) => (
                   <div 
-                    key={b.id}
+                    key={b.id ? `${b.id}-${idx}` : `banner-${idx}`}
                     className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-left animate-fadeIn ${
                       isLight 
                         ? 'bg-slate-50 border-slate-200 hover:border-amber-500/15 shadow-3xs' 
@@ -1895,9 +1895,9 @@ export default function AdminDashboard({
               </h3>
 
               <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                {galleryList.map(g => (
+                {galleryList.map((g, idx) => (
                   <div 
-                    key={g.id}
+                    key={g.id ? `${g.id}-${idx}` : `gal-${idx}`}
                     className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-left animate-fadeIn ${
                       isLight 
                         ? 'bg-slate-50 border-slate-200 hover:border-amber-500/15 shadow-3xs' 
@@ -2051,13 +2051,13 @@ export default function AdminDashboard({
 
                 {specialProgramsAll.length > 0 ? (
                   <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
-                    {specialProgramsAll.map(prog => {
+                    {specialProgramsAll.map((prog, idx) => {
                       const registries = specialEnrollments.filter(e => e.programId === prog.id);
                       const isExpired = new Date(prog.startingDateTime) < new Date();
                       
                       return (
                         <div 
-                          key={prog.id}
+                          key={prog.id ? `${prog.id}-${idx}` : `prog-${idx}`}
                           onClick={() => {
                             setSelectedProgramId(prog.id);
                             setManualEnrollOpen(false);
@@ -2361,13 +2361,13 @@ export default function AdminDashboard({
                           </tr>
                         </thead>
                         <tbody className={`divide-y select-text ${isLight ? 'divide-slate-200' : 'divide-cyan-500/5'}`}>
-                          {programEnrolls.map(enroll => {
+                          {programEnrolls.map((enroll, idx) => {
                             const matchedCert = issuedCertificates.find(
                               c => c.studentEmail.toLowerCase() === enroll.email.toLowerCase() && c.courseTitle === currentProgram.trainingName
                             );
 
                             return (
-                              <tr key={enroll.id} className={`transition-all ${
+                              <tr key={enroll.id ? `${enroll.id}-${idx}` : `enroll-${idx}`} className={`transition-all ${
                                 isLight ? 'hover:bg-slate-100/80 text-slate-700' : 'hover:bg-cyan-500/5 text-slate-305'
                               }`}>
                                 <td className={`p-3 font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{enroll.rollNumber}</td>
@@ -2753,13 +2753,13 @@ export default function AdminDashboard({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-cyan-500/5 col">
-                            {registeredStudents.map(student => {
+                            {registeredStudents.map((student, idx) => {
                               const matchedCert = issuedCertificates.find(
                                 c => c.studentEmail.toLowerCase() === student.email.toLowerCase() && c.courseTitle.trim().toLowerCase() === selectedOption.title.trim().toLowerCase()
                               );
 
                               return (
-                                <tr key={student.id} className="hover:bg-cyan-500/5 transition-all text-slate-350">
+                                <tr key={student.id ? `${student.id}-${idx}` : `std-${idx}`} className="hover:bg-cyan-500/5 transition-all text-slate-350">
                                   <td className="p-2.5">
                                     <span className="font-extrabold text-white uppercase block">{student.name}</span>
                                   </td>
@@ -2854,8 +2854,8 @@ export default function AdminDashboard({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-cyan-500/5">
-                        {filteredCerts.map(cert => (
-                          <tr key={cert.id} className="hover:bg-cyan-500/5 transition-all text-slate-350">
+                        {filteredCerts.map((cert, cIdx) => (
+                          <tr key={cert.id ? `${cert.id}-${cIdx}` : `cert-${cIdx}`} className="hover:bg-cyan-500/5 transition-all text-slate-350">
                             <td className="p-3 font-bold text-[#22d3ee] tracking-wide select-all">{cert.id}</td>
                             <td className="p-3 font-extrabold text-white text-[10px] uppercase">{cert.studentName}</td>
                             <td className="p-3 lowercase">{cert.studentEmail}</td>
@@ -2950,7 +2950,10 @@ export default function AdminDashboard({
         {/* TAB 11: ADMINISTRATIVE LOG CONTROL */}
         {adminTab === 'logs' && (() => {
           const rawLogs = DakshyamDatabase.getAppLogs();
-          const filteredLogs = rawLogs.filter(log => {
+          const uniqueLogsMap = new Map<string, typeof rawLogs[0]>();
+          rawLogs.forEach(l => { if (l && l.id && !uniqueLogsMap.has(l.id)) uniqueLogsMap.set(l.id, l); });
+          const uniqueRawLogs = Array.from(uniqueLogsMap.values());
+          const filteredLogs = uniqueRawLogs.filter(log => {
             const matchesSearch = log.action.toLowerCase().includes(searchLog.toLowerCase()) || 
                                   log.details.toLowerCase().includes(searchLog.toLowerCase()) ||
                                   log.userEmail.toLowerCase().includes(searchLog.toLowerCase());
@@ -2959,9 +2962,9 @@ export default function AdminDashboard({
             return matchesSearch && matchesStatus && matchesCategory;
           });
 
-          const workshopLogsCount = rawLogs.filter(l => l.category === 'WORKSHOP' || l.action.toLowerCase().includes('workshop')).length;
-          const securityLogsCount = rawLogs.filter(l => l.category === 'SECURITY' || l.category === 'AUTH' || l.action.toLowerCase().includes('login') || l.action.toLowerCase().includes('lockout')).length;
-          const errorLogsCount = rawLogs.filter(l => l.status === 'ERROR').length;
+          const workshopLogsCount = uniqueRawLogs.filter(l => l.category === 'WORKSHOP' || l.action.toLowerCase().includes('workshop')).length;
+          const securityLogsCount = uniqueRawLogs.filter(l => l.category === 'SECURITY' || l.category === 'AUTH' || l.action.toLowerCase().includes('login') || l.action.toLowerCase().includes('lockout')).length;
+          const errorLogsCount = uniqueRawLogs.filter(l => l.status === 'ERROR').length;
 
           const handleSyncRemoteLogs = async () => {
             setIsFetchingLogs(true);
@@ -3244,7 +3247,7 @@ export default function AdminDashboard({
                     <p className="text-3xs font-mono">No telemetry events found matching the active criteria.</p>
                   </div>
                 ) : (
-                  filteredLogs.map(log => {
+                  filteredLogs.map((log, idx) => {
                     let statusBg = '';
                     if (log.status === 'SUCCESS') {
                       statusBg = isLight ? 'bg-emerald-50 text-emerald-800 border-emerald-500/20' : 'bg-emerald-950/20 text-emerald-400 border-emerald-500/20';
@@ -3273,7 +3276,7 @@ export default function AdminDashboard({
 
                     return (
                       <div
-                        key={log.id}
+                        key={log.id ? `${log.id}-${idx}` : `log-${idx}`}
                         className={`p-3.5 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-3xs font-mono transition-all ${
                           isLight ? 'bg-slate-50/50 border-slate-150 hover:bg-slate-50' : 'bg-[#111]/60 border-cyan-500/5 hover:border-cyan-500/10'
                         }`}

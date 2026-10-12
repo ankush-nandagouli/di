@@ -11,7 +11,7 @@ interface DakshyamLogoProps {
   className?: string;
 }
 
-export default function DakshyamLogo({
+export function DakshyamLogo({
   size = 'md',
   showText = true,
   interactive = true,
@@ -350,3 +350,5 @@ export default function DakshyamLogo({
     </div>
   );
 }
+
+export default DakshyamLogo;

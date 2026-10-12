@@ -6,20 +6,20 @@
                             http://www.google.com/schemas/sitemap-image/1.1 http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd">
   <!-- 1. Primary Landing Gateway -->
   <url>
-    <loc>https://dakshyaminnovations.vercel.app/</loc>
+    <loc>https://dakshyaminnovations.in/</loc>
     <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.00</priority>
     <image:image>
-      <image:loc>https://dakshyaminnovations.vercel.app/logo.png</image:loc>
-      <image:title>Dakshyam Innovations - Sovereign Skill Systems and Robotics Integration</image:title>
+      <image:loc>https://dakshyaminnovations.in/logo.svg</image:loc>
+      <image:title>Dakshyam Innovations - Learn • Build • Innovate</image:title>
       <image:caption>Official logo and emblem of Dakshyam Innovations</image:caption>
     </image:image>
   </url>
 
   <!-- 2. Home Tab -->
   <url>
-    <loc>https://dakshyaminnovations.vercel.app/?tab=home</loc>
+    <loc>https://dakshyaminnovations.in/?tab=home</loc>
     <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.00</priority>
@@ -27,7 +27,7 @@
 
   <!-- 3. Professional Technical Services & Training Programs -->
   <url>
-    <loc>https://dakshyaminnovations.vercel.app/?tab=services</loc>
+    <loc>https://dakshyaminnovations.in/?tab=services</loc>
     <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
@@ -35,15 +35,15 @@
 
   <!-- 4. Digital Credential & Certificate Verification Engine -->
   <url>
-    <loc>https://dakshyaminnovations.vercel.app/?tab=verification</loc>
+    <loc>https://dakshyaminnovations.in/?tab=verification</loc>
     <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
   </url>
 
-  <!-- 5. Corporate Identity, Founders & Mission -->
+  <!-- 5. Corporate Identity & Mission -->
   <url>
-    <loc>https://dakshyaminnovations.vercel.app/?tab=about</loc>
+    <loc>https://dakshyaminnovations.in/?tab=about</loc>
     <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
@@ -51,7 +51,7 @@
 
   <!-- 6. Student Assessment Leaderboard & Competency Rankings -->
   <url>
-    <loc>https://dakshyaminnovations.vercel.app/?tab=leaderboard</loc>
+    <loc>https://dakshyaminnovations.in/?tab=leaderboard</loc>
     <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.80</priority>
@@ -59,7 +59,7 @@
 
   <!-- 7. Innovation Feeds, Community Exhibits & Video Showcases -->
   <url>
-    <loc>https://dakshyaminnovations.vercel.app/?tab=social</loc>
+    <loc>https://dakshyaminnovations.in/?tab=social</loc>
     <lastmod>2026-09-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.80</priority>
@@ -67,7 +67,7 @@
 
   <!-- 8. Contact Desk & Lab Consultation Booking -->
   <url>
-    <loc>https://dakshyaminnovations.vercel.app/?tab=contact</loc>
+    <loc>https://dakshyaminnovations.in/?tab=contact</loc>
     <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.75</priority>
@@ -75,7 +75,7 @@
 
   <!-- 9. Student & Enterprise Access Portal -->
   <url>
-    <loc>https://dakshyaminnovations.vercel.app/?tab=portal</loc>
+    <loc>https://dakshyaminnovations.in/?tab=portal</loc>
     <lastmod>2026-09-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.70</priority>

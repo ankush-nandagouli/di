@@ -6,24 +6,74 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
-/* Custom Scrollbar for Navy Blue & White UI */
+/* Root Theme Switching & Smooth Scrolling Consistency */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5.5rem;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+html.light {
+  color-scheme: light;
+  background-color: #ffffff;
+  scrollbar-color: #94a3b8 #f1f5f9;
+  scrollbar-width: thin;
+}
+
+html.dark {
+  color-scheme: dark;
+  background-color: #0a192f;
+  scrollbar-color: #1e3a8a #071224;
+  scrollbar-width: thin;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Custom Scrollbar for Navy Blue & White UI (Light & Dark Mode) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
+/* Dark mode scrollbars */
+html.dark ::-webkit-scrollbar-track,
 ::-webkit-scrollbar-track {
   background: #071224;
 }
 
+html.dark ::-webkit-scrollbar-thumb,
 ::-webkit-scrollbar-thumb {
   background: #1e3a8a;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+html.dark ::-webkit-scrollbar-thumb:hover,
 ::-webkit-scrollbar-thumb:hover {
   background: #3b82f6;
+}
+
+/* Light mode scrollbars */
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #1e3a8a;
 }
 
 /* Fluid keyframe pulses to animate background glowing spots */
@@ -59,21 +109,13 @@
   }
 }
 
-html {
-  scroll-behavior: smooth;
-  scroll-padding-top: 5rem;
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  -webkit-tap-highlight-color: transparent;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
-}
-
-/* Momentum scrolling for touch devices & anti-jitter hardware acceleration */
-* {
+/* Momentum scrolling for touch scroll containers */
+html,
+body,
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto,
+.scroll-touch {
   -webkit-overflow-scrolling: touch;
 }
 
@@ -83,4 +125,44 @@ body {
   backface-visibility: hidden;
   perspective: 1000px;
   will-change: transform, opacity;
+}
+
+/* Mobile viewport overflow guard */
+.mobile-scroll-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* Subtle modal scrollbar utility */
+.custom-scrollbar {
+  scrollbar-width: thin;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.65);
+}
+
+/* Hide scrollbars cleanly while preserving touch/wheel scroll ability */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Isolated scroll chaining prevention */
+.overscroll-contain {
+  overscroll-behavior: contain;
 }

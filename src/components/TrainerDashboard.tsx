@@ -357,10 +357,10 @@ export default function TrainerDashboard({
                 <div className={`border rounded-xl p-3 max-h-36 overflow-y-auto space-y-2 ${
                   isLight ? 'bg-slate-50 border-slate-200' : 'bg-[#111]/65 border-cyan-500/10'
                 }`}>
-                  {students.map(std => {
+                  {students.map((std, idx) => {
                     const isChecked = selectedMemberIds.includes(std.id);
                     return (
-                      <label key={std.id} className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                      <label key={std.id ? `${std.id}-${idx}` : `std-${idx}`} className="flex items-center gap-2 text-xs cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -407,7 +407,7 @@ export default function TrainerDashboard({
               </h3>
 
               <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                {myCreatedGroups.map(gp => {
+                {myCreatedGroups.map((gp, idx) => {
                   const memberNames = students
                     .filter(s => gp.memberIds.includes(s.id))
                     .map(s => s.name)
@@ -415,7 +415,7 @@ export default function TrainerDashboard({
 
                   return (
                     <div 
-                      key={gp.id}
+                      key={gp.id ? `${gp.id}-${idx}` : `gp-${idx}`}
                       className={`p-4 rounded-xl border transition-all text-left space-y-1.5 ${
                         isLight 
                           ? 'bg-slate-50/50 border-slate-200/60 hover:border-amber-500/20 shadow-xs' 
@@ -482,8 +482,8 @@ export default function TrainerDashboard({
                   }`}
                 >
                   <option value="">-- Select Team --</option>
-                  {myCreatedGroups.map(gp => (
-                    <option key={gp.id} value={gp.id}>{gp.name} (Current: {gp.points} pts)</option>
+                  {myCreatedGroups.map((gp, idx) => (
+                    <option key={gp.id ? `${gp.id}-${idx}` : `gp-opt-${idx}`} value={gp.id}>{gp.name} (Current: {gp.points} pts)</option>
                   ))}
                 </select>
               </div>
@@ -551,10 +551,10 @@ export default function TrainerDashboard({
                   }`}
                 >
                   <option value="">-- Choose Applicant --</option>
-                  {eligibleApplicants.map(app => {
+                  {eligibleApplicants.map((app, idx) => {
                     const courseName = courses.find(c => c.id === app.courseId)?.title || 'Training Sector';
                     return (
-                      <option key={app.id} value={app.id}>
+                      <option key={app.id ? `${app.id}-${idx}` : `app-opt-${idx}`} value={app.id}>
                         {app.fullName} ({courseName})
                       </option>
                     );
@@ -751,9 +751,9 @@ export default function TrainerDashboard({
               </h3>
 
               <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
-                {certificates.map(cert => (
+                {certificates.map((cert, idx) => (
                   <div 
-                    key={cert.id}
+                    key={cert.id ? `${cert.id}-${idx}` : `cert-${idx}`}
                     className={`p-3 rounded-xl border text-left text-2xs space-y-1.5 ${
                       isLight 
                         ? 'bg-slate-50/50 border-slate-200/60' 

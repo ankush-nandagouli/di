@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Phone, MapPin, Send, HelpCircle, CheckCircle2, MessageSquare, ArrowRight } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, HelpCircle, CheckCircle2, MessageSquare, ArrowRight, AlertTriangle } from 'lucide-react';
+import { notifySuccess, notifyError } from '../utils/toast';
 
 interface ContactUsProps {
   theme: 'dark' | 'light';
@@ -15,18 +16,35 @@ export default function ContactUs({ theme }: ContactUsProps) {
     subject: 'Robotics Workshop Requisition',
     message: ''
   });
+  const [formError, setFormError] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
+    setFormError('');
+
+    if (!formData.name.trim()) {
+      setFormError('Please enter your full name.');
+      notifyError('Please enter your full name.');
       return;
     }
+    if (!formData.email.trim() || !formData.email.includes('@')) {
+      setFormError('Please enter a valid email address.');
+      notifyError('Please enter a valid email address.');
+      return;
+    }
+    if (!formData.message.trim() || formData.message.trim().length < 5) {
+      setFormError('Please write a message with at least 5 characters.');
+      notifyError('Please write a message with at least 5 characters.');
+      return;
+    }
+
     setIsSending(true);
     setTimeout(() => {
       setIsSending(false);
       setSubmitted(true);
+      notifySuccess('Inquiry received! A technical coordinator will reach out shortly.');
       setFormData({
         name: '',
         email: '',
@@ -34,7 +52,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
         subject: 'Robotics Workshop Requisition',
         message: ''
       });
-    }, 1200);
+    }, 800);
   };
 
   return (
@@ -81,8 +99,8 @@ export default function ContactUs({ theme }: ContactUsProps) {
               </div>
               <div className="space-y-1">
                 <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Electronic Mail</h3>
-                <a href="mailto:support@dakshyam.com" className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-sky-300'}`}>
-                  support@dakshyam.com
+                <a href="mailto:support@dakshyaminnovations.in" className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-sky-300'}`}>
+                  support@dakshyaminnovations.in
                 </a>
                 <span className="text-4xs font-mono text-slate-500 block uppercase">24-hour Dispatch SLA</span>
               </div>
@@ -145,6 +163,13 @@ export default function ContactUs({ theme }: ContactUsProps) {
                 </motion.div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4 font-sans text-xs">
+                  {formError && (
+                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-mono flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{formError}</span>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>

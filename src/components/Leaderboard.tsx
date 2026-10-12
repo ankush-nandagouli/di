@@ -37,7 +37,7 @@ export default function Leaderboard({ groups, students, theme = 'dark' }: Leader
               <Trophy className={`w-5 h-5 ${isLight ? 'text-blue-950' : 'text-sky-400'}`} /> Platform Leaderboard
             </h2>
             <p className={`text-xs font-sans max-w-lg ${
-              isLight ? 'text-slate-650' : 'text-slate-400'
+              isLight ? 'text-slate-600' : 'text-slate-400'
             }`}>
               Live standings of all active student project teams representing schools and colleges in Balaghat. Rated based on hardware assembly, design complexity, and code execution.
             </p>
@@ -73,7 +73,7 @@ export default function Leaderboard({ groups, students, theme = 'dark' }: Leader
 
           return (
             <div 
-              key={gp.id}
+              key={gp.id ? `${gp.id}-${index}` : `gp-${index}`}
               className={`p-4 sm:p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
                 isLight 
                   ? 'bg-white border-slate-200 hover:shadow-md' 
@@ -122,7 +122,7 @@ export default function Leaderboard({ groups, students, theme = 'dark' }: Leader
                     {gp.points} PTS
                   </span>
                   <span className="text-5xs text-slate-500 tracking-widest uppercase block mt-0.5">
-                    Rating 2026 Season
+                    Rating {new Date().getFullYear()} Season
                   </span>
                 </div>
               </div>
