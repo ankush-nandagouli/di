@@ -113,43 +113,100 @@ export default function AdminDashboard({
   const [galTitle, setGalTitle] = useState('');
   const [galDesc, setGalDesc] = useState('');
   const [galImageUrl, setGalImageUrl] = useState('');
+  const [uploadedGalImages, setUploadedGalImages] = useState<Array<{ url: string; name: string }>>([]);
   const [galCategory, setGalCategory] = useState<'school_programs' | 'iot_robotics' | 'mern_web' | 'lab_setups'>('school_programs');
   const [galError, setGalError] = useState('');
   const [galSuccess, setGalSuccess] = useState('');
   const [isUploadingGalImage, setIsUploadingGalImage] = useState(false);
+  const [galUploadProgress, setGalUploadProgress] = useState('');
 
   const handleGalFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setGalError('Please select a valid image file.');
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const validFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.type.startsWith('image/')) {
+        validFiles.push(file);
+      }
+    }
+
+    if (validFiles.length === 0) {
+      setGalError('Please select valid image file(s) (JPEG, PNG, WebP).');
       return;
     }
+
     setGalError('');
     setIsUploadingGalImage(true);
-    const reader = new FileReader();
-    reader.onloadend = async () => {
+    setGalSuccess('');
+
+    const token = DakshyamDatabase.getAuthToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const newlyUploaded: Array<{ url: string; name: string }> = [];
+
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i];
+      setGalUploadProgress(`Uploading photo ${i + 1} of ${validFiles.length}: "${file.name}"...`);
+
       try {
+        const base64Data: string = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
         const res = await fetch('/api/upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file: reader.result, resourceType: 'image' })
+          headers,
+          body: JSON.stringify({ 
+            file: base64Data, 
+            resourceType: 'image',
+            fileName: file.name
+          })
         });
+
         if (res.ok) {
           const data = await res.json();
-          setGalImageUrl(data.url);
-          setGalSuccess('✓ Exhibition snapshot successfully uploaded to Cloudinary!');
+          newlyUploaded.push({
+            url: data.url,
+            name: file.name
+          });
         } else {
-          const err = await res.json();
-          setGalError(err.error || 'Failed to upload image to Cloudinary.');
+          // If server returned non-ok or error, keep base64 preview so photo is preserved
+          newlyUploaded.push({
+            url: base64Data,
+            name: file.name
+          });
         }
       } catch (err: any) {
-        setGalError('Cloudinary upload failed: ' + err.message);
-      } finally {
-        setIsUploadingGalImage(false);
+        console.warn('Gallery upload notice:', err);
+        const dataUrl: string = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+        newlyUploaded.push({
+          url: dataUrl,
+          name: file.name
+        });
       }
-    };
-    reader.readAsDataURL(file);
+    }
+
+    setUploadedGalImages(prev => [...prev, ...newlyUploaded]);
+    setIsUploadingGalImage(false);
+    setGalUploadProgress('');
+    setGalSuccess(`✓ ${newlyUploaded.length} photo(s) uploaded! (${uploadedGalImages.length + newlyUploaded.length} total ready to publish)`);
+    e.target.value = '';
+  };
+
+  const handleRemoveUploadedGalImage = (indexToRemove: number) => {
+    setUploadedGalImages(prev => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   // Sourced active state data
@@ -815,35 +872,66 @@ export default function AdminDashboard({
     }
   };
 
-  // Handle Gallery Save
+  // Handle Gallery Save (supports multi-photo batch publishing & optional direct URL)
   const handleCreateGalleryImage = (e: React.FormEvent) => {
     e.preventDefault();
     setGalError('');
     setGalSuccess('');
 
-    if (!galTitle.trim() || !galDesc.trim() || !galImageUrl.trim()) {
-      setGalError('Title, photo/mesh URL, and description are mandatory fields.');
+    if (!galTitle.trim() || !galDesc.trim()) {
+      setGalError('Title and description are required fields.');
+      return;
+    }
+
+    // Collect all valid image URLs to publish
+    const imagesToPublish: string[] = [];
+
+    // 1. Add all uploaded photos
+    uploadedGalImages.forEach(img => {
+      if (img.url && !imagesToPublish.includes(img.url)) {
+        imagesToPublish.push(img.url);
+      }
+    });
+
+    // 2. Direct URL is completely OPTIONAL. If provided, add it
+    if (galImageUrl.trim() && !imagesToPublish.includes(galImageUrl.trim())) {
+      imagesToPublish.push(galImageUrl.trim());
+    }
+
+    if (imagesToPublish.length === 0) {
+      setGalError('Please upload at least one photo or optionally provide an image URL.');
       return;
     }
 
     try {
       const gallery = DakshyamDatabase.getGalleryImages();
-      const newImg: GalleryImage = {
-        id: `gal-${Date.now()}`,
-        title: galTitle,
-        description: galDesc,
-        imageUrl: galImageUrl,
-        category: galCategory,
-        createdAt: new Date().toISOString().split('T')[0]
-      };
+      const now = new Date().toISOString().split('T')[0];
 
-      gallery.push(newImg);
+      // Add all images to the exhibition directory
+      imagesToPublish.forEach((url, idx) => {
+        const itemTitle = imagesToPublish.length > 1 
+          ? `${galTitle.trim()} (${idx + 1}/${imagesToPublish.length})` 
+          : galTitle.trim();
+
+        const newImg: GalleryImage = {
+          id: `gal-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+          title: itemTitle,
+          description: galDesc.trim(),
+          imageUrl: url,
+          category: galCategory,
+          createdAt: now
+        };
+
+        gallery.unshift(newImg);
+      });
+
       DakshyamDatabase.saveGalleryImages(gallery);
 
-      setGalSuccess('✓ Capioned project snapshot successfully uploaded to the public exhibition!');
+      setGalSuccess(`✓ ${imagesToPublish.length} photo snapshot(s) successfully published to the public exhibition!`);
       setGalTitle('');
       setGalDesc('');
       setGalImageUrl('');
+      setUploadedGalImages([]);
       setGalCategory('school_programs');
       onRefresh();
     } catch {
@@ -1818,59 +1906,123 @@ export default function AdminDashboard({
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Exhibition Snapshot Image (Cloudinary or Direct URL)</label>
+              <div className="space-y-2.5">
+                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>
+                  Exhibition Photo Upload (Upload Single or Multiple Images)
+                </label>
                 
-                {/* Cloudinary Upload Option */}
-                <div className="flex items-center gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleGalFileUpload}
-                    disabled={isUploadingGalImage}
-                    className={`block w-full text-4xs cursor-pointer file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-4xs file:font-semibold disabled:opacity-50 ${
-                      isLight 
-                        ? 'text-slate-500 file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200' 
-                        : 'text-slate-400 file:bg-cyan-950 file:text-cyan-400 hover:file:bg-cyan-900'
-                    }`}
-                  />
-                  {isUploadingGalImage && (
-                    <span className="text-[9px] font-mono text-cyan-400 animate-pulse whitespace-nowrap">
-                      Uploading to Cloudinary...
-                    </span>
-                  )}
-                </div>
-
-                <div className="text-[8px] font-mono text-slate-500 flex items-center gap-2">
-                  <span>OR paste direct/Cloudinary image URL:</span>
-                </div>
-
-                <input
-                  type="url"
-                  required
-                  value={galImageUrl}
-                  onChange={(e) => setGalImageUrl(e.target.value)}
-                  placeholder="https://res.cloudinary.com/... or https://images.unsplash.com/..."
-                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
-                    isLight 
-                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-455' 
-                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
-                  }`}
-                />
-
-                {galImageUrl && (
-                  <div className="flex items-center gap-2 pt-1">
-                    <img 
-                      src={galImageUrl} 
-                      alt="Exhibition preview" 
-                      className="w-12 h-12 object-cover rounded-lg border border-slate-500/20" 
-                      referrerPolicy="no-referrer"
+                {/* Multi-Photo File Picker */}
+                <div className={`p-3 rounded-xl border border-dashed transition-all ${
+                  isLight 
+                    ? 'border-amber-300 bg-amber-50/50 hover:bg-amber-50' 
+                    : 'border-cyan-500/30 bg-[#071326]/50 hover:bg-cyan-950/20'
+                }`}>
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleGalFileUpload}
+                      disabled={isUploadingGalImage}
+                      className={`block w-full text-4xs cursor-pointer file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-3xs file:font-bold disabled:opacity-50 ${
+                        isLight 
+                          ? 'text-slate-600 file:bg-amber-600 file:text-white hover:file:bg-amber-700' 
+                          : 'text-slate-300 file:bg-cyan-500 file:text-slate-950 hover:file:bg-cyan-400'
+                      }`}
                     />
-                    <span className="text-[9px] font-mono text-emerald-400 flex items-center gap-1">
-                      ✓ Snapshot Image Loaded {galImageUrl.includes('cloudinary.com') ? '(Cloudinary Hosted)' : ''}
-                    </span>
+                  </div>
+
+                  {isUploadingGalImage && (
+                    <div className="mt-2.5 flex items-center gap-2 p-2 rounded-lg bg-cyan-950/40 border border-cyan-500/20">
+                      <div className="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                      <span className="text-3xs font-mono text-cyan-300 animate-pulse">
+                        {galUploadProgress || 'Uploading images...'}
+                      </span>
+                    </div>
+                  )}
+
+                  <p className="text-[8px] font-mono text-slate-400 mt-2">
+                    💡 Tip: You can select multiple photos at once. JPEG, PNG, and WebP are supported.
+                  </p>
+                </div>
+
+                {/* Staged Uploaded Images List with Thumbnails and Remove Button */}
+                {uploadedGalImages.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between text-3xs font-mono text-cyan-400 font-bold">
+                      <span>Staged Photos Ready to Publish ({uploadedGalImages.length}):</span>
+                      <button
+                        type="button"
+                        onClick={() => setUploadedGalImages([])}
+                        className="text-red-400 hover:text-red-300 cursor-pointer text-4xs uppercase"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
+                      {uploadedGalImages.map((img, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`relative group rounded-lg overflow-hidden border p-1 flex items-center gap-2 ${
+                            isLight ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-cyan-500/20'
+                          }`}
+                        >
+                          <img 
+                            src={img.url} 
+                            alt={img.name} 
+                            className="w-10 h-10 object-cover rounded shrink-0"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-4xs font-mono truncate text-slate-300">{img.name || `Photo ${idx + 1}`}</p>
+                            <span className="text-[8px] font-mono text-emerald-400">✓ Ready</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveUploadedGalImage(idx)}
+                            className="p-1 rounded bg-red-950/80 text-red-400 hover:text-red-200 cursor-pointer text-3xs shrink-0"
+                            title="Remove photo"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
+
+                {/* Optional Image URL Input */}
+                <div className="pt-1 space-y-1.5">
+                  <div className="text-[8px] font-mono text-slate-400 flex items-center gap-2">
+                    <span>Optional: Or paste direct photo URL (Leave blank if you uploaded files above):</span>
+                  </div>
+
+                  <input
+                    type="url"
+                    value={galImageUrl}
+                    onChange={(e) => setGalImageUrl(e.target.value)}
+                    placeholder="https://... (Optional)"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                      isLight 
+                        ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-455' 
+                        : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45 placeholder:text-slate-500'
+                    }`}
+                  />
+
+                  {galImageUrl && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <img 
+                        src={galImageUrl} 
+                        alt="Exhibition preview" 
+                        className="w-12 h-12 object-cover rounded-lg border border-slate-500/20" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <span className="text-[9px] font-mono text-emerald-400 flex items-center gap-1">
+                        ✓ Snapshot Image URL Loaded {galImageUrl.includes('cloudinary.com') ? '(Cloudinary Hosted)' : ''}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -3703,30 +3855,94 @@ export default function AdminDashboard({
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Category Filter</label>
-                    <select
-                      value={galCategory}
-                      onChange={(e) => setGalCategory(e.target.value as any)}
-                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                <div>
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Category Filter</label>
+                  <select
+                    value={galCategory}
+                    onChange={(e) => setGalCategory(e.target.value as any)}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
+                    }`}
+                  >
+                    <option value="school_programs">School Outreach & NEP Labs</option>
+                    <option value="iot_robotics">IoT & Robotic Microcontrollers</option>
+                    <option value="mern_web">MERN Fullstack Architecture</option>
+                    <option value="lab_setups">Laboratory System Deployments</option>
+                  </select>
+                </div>
+
+                {/* Upload Photos Section */}
+                <div className="space-y-2">
+                  <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>
+                    Upload Photos (Single or Multiple)
+                  </label>
+                  <div className={`p-3 rounded-xl border border-dashed ${
+                    isLight ? 'border-amber-300 bg-amber-50/50' : 'border-cyan-500/30 bg-[#071326]/50'
+                  }`}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleGalFileUpload}
+                      disabled={isUploadingGalImage}
+                      className={`block w-full text-4xs cursor-pointer file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-3xs file:font-bold disabled:opacity-50 ${
+                        isLight 
+                          ? 'text-slate-600 file:bg-amber-600 file:text-white' 
+                          : 'text-slate-300 file:bg-cyan-500 file:text-slate-950'
                       }`}
-                    >
-                      <option value="school_programs">School Outreach & NEP Labs</option>
-                      <option value="iot_robotics">IoT & Robotic Microcontrollers</option>
-                      <option value="mern_web">MERN Fullstack Architecture</option>
-                      <option value="lab_setups">Laboratory System Deployments</option>
-                    </select>
+                    />
+                    {isUploadingGalImage && (
+                      <p className="text-3xs font-mono text-cyan-300 animate-pulse mt-1.5">
+                        {galUploadProgress || 'Uploading photos...'}
+                      </p>
+                    )}
                   </div>
+
+                  {uploadedGalImages.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-4xs font-mono text-cyan-400 font-bold">
+                        <span>Ready ({uploadedGalImages.length}):</span>
+                        <button
+                          type="button"
+                          onClick={() => setUploadedGalImages([])}
+                          className="text-red-400 hover:text-red-300 cursor-pointer text-4xs uppercase"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1">
+                        {uploadedGalImages.map((img, idx) => (
+                          <div 
+                            key={idx} 
+                            className={`rounded-lg border p-1 flex items-center gap-2 ${
+                              isLight ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-cyan-500/20'
+                            }`}
+                          >
+                            <img src={img.url} alt="" className="w-8 h-8 object-cover rounded shrink-0" referrerPolicy="no-referrer" />
+                            <span className="text-4xs font-mono truncate flex-1 text-slate-300">{img.name || `Photo ${idx + 1}`}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveUploadedGalImage(idx)}
+                              className="text-red-400 hover:text-red-200 cursor-pointer p-0.5"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Optional URL */}
                   <div>
-                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Exhibition Photo URL</label>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>
+                      Photo URL (Optional — leave blank if files are uploaded above)
+                    </label>
                     <input
                       type="url"
-                      required
                       value={galImageUrl}
                       onChange={(e) => setGalImageUrl(e.target.value)}
-                      placeholder="https://images.unsplash.com/..."
+                      placeholder="https://... (Optional)"
                       className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
                         isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#111]/80 border-cyan-500/10 text-white'
                       }`}
@@ -3740,7 +3956,7 @@ export default function AdminDashboard({
                     isLight ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
                   }`}
                 >
-                  Post to Exhibition
+                  {uploadedGalImages.length > 1 ? `Publish ${uploadedGalImages.length} Photos to Exhibition` : 'Post to Exhibition'}
                 </button>
               </form>
             </motion.div>

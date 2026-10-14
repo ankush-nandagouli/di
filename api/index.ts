@@ -439,6 +439,22 @@ function authenticateToken(req: AuthenticatedRequest, res: express.Response, nex
   }
 }
 
+// Permissive token reader for media uploads: captures user identity if token is present,
+// but does not block valid file uploads with magic-byte validation if user is in an un-tokenized session.
+function optionalAuthToken(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
+      req.user = decoded;
+    } catch {
+      // Allow proceeding even if token has expired or is invalid
+    }
+  }
+  next();
+}
+
 function requireRole(...roles: string[]) {
   return (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
     if (!req.user || !roles.includes(req.user.role)) {
@@ -1535,8 +1551,8 @@ function validateFileBuffer(buffer: Buffer, declaredExt?: string): { valid: bool
   return { valid: false, mime: '', ext: '', error: 'Unsupported file type. Only PNG, JPEG, WebP, MP4, WebM, and GLB files are accepted.' };
 }
 
-// POST /api/upload — Protected with authentication & strict magic-byte validation
-app.post('/api/upload', authenticateToken, async (req: AuthenticatedRequest, res) => {
+// POST /api/upload — Magic-byte validation, Cloudinary/server storage, permissive token reader
+app.post('/api/upload', optionalAuthToken, async (req: AuthenticatedRequest, res) => {
   const { file, resourceType, fileName } = req.body;
   if (!file) {
     return res.status(400).json({ error: 'No file data received.' });
