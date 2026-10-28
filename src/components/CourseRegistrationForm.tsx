@@ -98,8 +98,15 @@ export default function CourseRegistrationForm({
             status: 'pending'
           };
 
-          apps.push(newApp);
-          DakshyamDatabase.saveApplications(apps);
+          const existingApp = apps.find(a => 
+            (a.studentId === activeUser.id || (a.email && a.email.toLowerCase() === email.toLowerCase())) && 
+            a.courseId === selectedCourseId
+          );
+
+          if (!existingApp) {
+            apps.push(newApp);
+            DakshyamDatabase.saveApplications(apps);
+          }
 
           // Dispatch real-time notifications
           try {
@@ -411,7 +418,7 @@ export default function CourseRegistrationForm({
                     required
                     readOnly
                     value={email}
-                    placeholder="student@example.com"
+                    placeholder="student@dakshyam.in"
                     className={`w-full rounded-xl py-3 pl-10 pr-4 text-xs md:text-sm focus:outline-none border opacity-90 cursor-not-allowed transition-all ${
                       isLight 
                         ? 'bg-slate-100 border-slate-300 text-slate-800' 

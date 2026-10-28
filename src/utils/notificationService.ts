@@ -26,16 +26,6 @@ const INITIAL_NOTIFICATIONS: AppNotification[] = [
     linkTab: 'home'
   },
   {
-    id: 'notif-workshop-feedback-open',
-    title: 'Workshop Feedback Forms Active',
-    message: 'Participant feedback submission portals and automated QR share links are now live for all active bootcamps.',
-    timestamp: new Date().toISOString(),
-    targetRole: 'all',
-    category: 'workshop',
-    priority: 'normal',
-    linkTab: 'feedback'
-  },
-  {
     id: 'notif-admin-security-active',
     title: 'Security Suite Active & Guarding Portal',
     message: 'Developer tools blocking, right-click restrictions, and resilient cross-browser cookie policies are fully enforced.',
@@ -243,7 +233,7 @@ export class NotificationService {
     targetUserId?: string;
     category: NotificationCategory;
     priority?: NotificationPriority;
-    linkTab?: 'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact' | 'feedback';
+    linkTab?: 'home' | 'services' | 'social' | 'portal' | 'about' | 'contact' | 'notfound';
     actionData?: Record<string, any>;
   }): Promise<AppNotification> {
     const newId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;

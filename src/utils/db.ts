@@ -366,10 +366,97 @@ export class DakshyamDatabase {
         localStorage.setItem('dakshyam_logged_in_user', JSON.stringify(safeUser));
       } else {
         localStorage.removeItem('dakshyam_logged_in_user');
+        localStorage.removeItem('dakshyam_session_id');
       }
     } catch (e) {
       console.error(e);
     }
+  }
+
+  // Dynamic Session ID tracking
+  static getSessionId(): string {
+    try {
+      let id = localStorage.getItem('dakshyam_session_id');
+      if (!id) {
+        id = `sess_local_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
+        localStorage.setItem('dakshyam_session_id', id);
+      }
+      return id;
+    } catch {
+      return 'sess_fallback';
+    }
+  }
+
+  static setSessionId(sessionId: string | null): void {
+    try {
+      if (sessionId) {
+        localStorage.setItem('dakshyam_session_id', sessionId);
+      } else {
+        localStorage.removeItem('dakshyam_session_id');
+      }
+    } catch {}
+  }
+
+  // Dynamic Visitor Counter Tracker
+  static getVisitorCount(): number {
+    return this.get<number>('dakshyam_visitor_count', 1482);
+  }
+
+  static recordVisitorHit(): number {
+    try {
+      const current = this.getVisitorCount();
+      const hasCountedSession = sessionStorage.getItem('dakshyam_visitor_session_counted');
+      if (!hasCountedSession) {
+        sessionStorage.setItem('dakshyam_visitor_session_counted', 'true');
+        const next = current + 1;
+        this.set('dakshyam_visitor_count', next);
+
+        fetch('/api/visitor/hit', { method: 'POST' })
+          .then(res => res.json())
+          .then(data => {
+            if (data?.count) {
+              this.set('dakshyam_visitor_count', data.count);
+            }
+          })
+          .catch(() => {});
+
+        return next;
+      }
+      return current;
+    } catch {
+      return 1482;
+    }
+  }
+
+  // First-Time Visitor Intro Video Management (Persistent across LocalStorage & SameSite Cookies)
+  static hasSeenIntroVideo(): boolean {
+    try {
+      const local = localStorage.getItem('dakshyam_intro_video_seen') === 'true';
+      const cookie = typeof document !== 'undefined' && document.cookie.includes('dakshyam_intro_video_seen=true');
+      return local || cookie;
+    } catch {
+      return false;
+    }
+  }
+
+  static markIntroVideoSeen(): void {
+    try {
+      localStorage.setItem('dakshyam_intro_video_seen', 'true');
+      if (typeof document !== 'undefined') {
+        const expiry = new Date();
+        expiry.setFullYear(expiry.getFullYear() + 1);
+        document.cookie = `dakshyam_intro_video_seen=true; expires=${expiry.toUTCString()}; path=/; SameSite=Lax`;
+      }
+    } catch {}
+  }
+
+  static resetIntroVideoSeen(): void {
+    try {
+      localStorage.removeItem('dakshyam_intro_video_seen');
+      if (typeof document !== 'undefined') {
+        document.cookie = `dakshyam_intro_video_seen=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
+      }
+    } catch {}
   }
 
   /**
@@ -470,6 +557,12 @@ export class DakshyamDatabase {
       socialLinkedin: 'https://linkedin.com/company/dakshyam-innovations',
       socialTwitter: 'https://twitter.com/dakshyam_in',
       socialYoutube: 'https://youtube.com/@dakshyaminnovations',
+      socialInstagram: 'https://instagram.com/dakshyam_innovations',
+      hideGithub: false,
+      hideLinkedin: false,
+      hideTwitter: false,
+      hideYoutube: false,
+      hideInstagram: false,
       founders: [],
       services: DEFAULT_SERVICES
     };

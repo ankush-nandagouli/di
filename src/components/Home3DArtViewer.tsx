@@ -8,12 +8,13 @@ import {
   RotateCw, Pause, Play, RefreshCw, Eye, Sparkles, 
   Settings2, ShieldAlert, Box, Layers
 } from 'lucide-react';
-import DakshyamLogo from './DakshyamLogo';
+
 import Admin3DModelEditorModal from './Admin3DModelEditorModal';
 import { 
   loadObjModel, fetchAndCacheCloud3DModel, subscribeToCloud3DModel,
   StoredModelMetadata, ModelDisplaySettings, DEFAULT_MODEL_SETTINGS 
 } from '../utils/modelStorage';
+import { SAMPLE_3D_MODELS } from '../utils/sampleModels';
 
 interface Home3DArtViewerProps {
   theme?: 'light' | 'dark';
@@ -23,6 +24,24 @@ interface Home3DArtViewerProps {
 
 const STORAGE_KEY = 'home_custom_3d_obj';
 
+// Default 3D Geometric Art Model (Quantum Geodesic Core)
+const getDefaultModel = (): { objText: string; meta: StoredModelMetadata } => {
+  const objText = SAMPLE_3D_MODELS[0].generateObj();
+  return {
+    objText,
+    meta: {
+      id: 'default-quantum-core',
+      name: 'Quantum Geodesic Core (Default 3D Art)',
+      size: objText.length,
+      format: 'obj',
+      vertexCount: 12,
+      faceCount: 20,
+      updatedAt: new Date().toISOString(),
+      settings: DEFAULT_MODEL_SETTINGS
+    }
+  };
+};
+
 export default function Home3DArtViewer({ 
   theme = 'dark', 
   isAdmin = false,
@@ -31,7 +50,7 @@ export default function Home3DArtViewer({
   const isLight = theme === 'light';
 
   // Model & State
-  const [hasCustomModel, setHasCustomModel] = useState<boolean>(false);
+  const [hasCustomModel, setHasCustomModel] = useState<boolean>(true);
   const [modelData, setModelData] = useState<string | ArrayBuffer | null>(null);
   const [metadata, setMetadata] = useState<StoredModelMetadata | null>(null);
   const [settings, setSettings] = useState<ModelDisplaySettings>(DEFAULT_MODEL_SETTINGS);
@@ -72,9 +91,14 @@ export default function Home3DArtViewer({
       setIsRotatingLocally(loadedSettings.autoRotate);
       setIsWireframeLocally(loadedSettings.wireframe);
     } else {
-      setHasCustomModel(false);
-      setModelData(null);
-      setMetadata(null);
+      // Always fallback to default 3D art so home page always presents a real interactive 3D model
+      const def = getDefaultModel();
+      setModelData(def.objText);
+      setMetadata(def.meta);
+      setHasCustomModel(true);
+      setSettings(DEFAULT_MODEL_SETTINGS);
+      setIsRotatingLocally(DEFAULT_MODEL_SETTINGS.autoRotate);
+      setIsWireframeLocally(DEFAULT_MODEL_SETTINGS.wireframe);
     }
   }, []);
 
@@ -93,11 +117,12 @@ export default function Home3DArtViewer({
       if (cloudModel) {
         applyModelData(cloudModel);
       } else if (!local) {
-        setHasCustomModel(false);
+        // Fallback to high-tech default 3D art
+        applyModelData(getDefaultModel());
       }
     } catch (err) {
-      console.warn('Could not load custom 3D model:', err);
-      setHasCustomModel(false);
+      console.warn('Could not load custom 3D model, applying default 3D art:', err);
+      applyModelData(getDefaultModel());
     } finally {
       setIsLoading(false);
     }
@@ -111,7 +136,11 @@ export default function Home3DArtViewer({
   // Real-time listener for any admin updates or deletions
   useEffect(() => {
     const unsubscribe = subscribeToCloud3DModel((updated) => {
-      applyModelData(updated);
+      if (updated) {
+        applyModelData(updated);
+      } else {
+        applyModelData(getDefaultModel());
+      }
     }, STORAGE_KEY);
     return () => unsubscribe();
   }, [applyModelData]);
@@ -396,38 +425,39 @@ export default function Home3DArtViewer({
     setIsWireframeLocally(prev => !prev);
   };
 
-  // --- FALLBACK: DEFAULT DAKSHYAM 3D VECTOR EMBLEM ---
-  if (!hasCustomModel || parseError) {
+  // --- PARSE ERROR RECOVERY VIEW ---
+  if (parseError) {
     return (
-      <div className="flex flex-col items-center justify-center relative w-full">
-        <div className="scale-90 md:scale-100 transition-all">
-          <DakshyamLogo size="lg" pulseGlow={true} interactive={true} showText={true} theme={theme} />
+      <div className="flex flex-col items-center justify-center relative w-full py-6 space-y-4 max-w-md mx-auto text-center px-4">
+        <div className="p-4 rounded-3xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono space-y-2">
+          <div className="flex items-center justify-center gap-2 text-rose-400 font-bold">
+            <ShieldAlert className="w-4 h-4" />
+            <span>3D Model Render Notice</span>
+          </div>
+          <p>{parseError}</p>
         </div>
 
-        {/* Error notification if parsing failed */}
-        {parseError && (
-          <div className="mt-3 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono max-w-md text-center">
-            {parseError}
-          </div>
-        )}
+        <button
+          onClick={() => {
+            setParseError(null);
+            applyModelData(getDefaultModel());
+          }}
+          className="px-5 py-2.5 rounded-xl text-xs font-mono font-bold bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition-all cursor-pointer flex items-center gap-2 shadow-md"
+        >
+          <RefreshCw className="w-4 h-4" />
+          <span>Restore Default 3D Art Model</span>
+        </button>
 
-        {/* ONLY ADMIN CAN ADD OR CHANGE THE MODEL */}
         {isAdmin && (
-          <div className="mt-4 flex flex-col items-center space-y-2">
-            <button
-              onClick={() => setShowAdminModal(true)}
-              className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 transition-all cursor-pointer flex items-center gap-2 shadow-sm group"
-            >
-              <Settings2 className="w-4 h-4 text-cyan-400 group-hover:rotate-45 transition-transform" />
-              <span>Admin 3D Studio: Upload Custom 3D Model</span>
-            </button>
-            <p className="text-[10px] font-mono text-slate-400">
-              Only visible to administrators. Visitors see the official logo.
-            </p>
-          </div>
+          <button
+            onClick={() => setShowAdminModal(true)}
+            className="px-4 py-2 rounded-xl text-xs font-mono font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all cursor-pointer flex items-center gap-2"
+          >
+            <Settings2 className="w-4 h-4 text-cyan-400" />
+            <span>Open 3D Upload & Studio</span>
+          </button>
         )}
 
-        {/* Admin 3D Customizer Modal */}
         {isAdmin && (
           <Admin3DModelEditorModal
             isOpen={showAdminModal}
@@ -440,6 +470,18 @@ export default function Home3DArtViewer({
             storageKey={STORAGE_KEY}
           />
         )}
+      </div>
+    );
+  }
+
+  // --- INITIAL LOADING STATE ---
+  if (isLoading && !modelData) {
+    return (
+      <div className="w-full h-[380px] sm:h-[460px] md:h-[500px] flex flex-col items-center justify-center space-y-3">
+        <div className="w-12 h-12 rounded-2xl border-2 border-cyan-400/40 border-t-cyan-400 animate-spin" />
+        <p className="text-xs font-mono text-cyan-400 animate-pulse uppercase tracking-wider">
+          Initializing 3D Geometry Stage...
+        </p>
       </div>
     );
   }

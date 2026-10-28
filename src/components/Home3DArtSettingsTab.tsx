@@ -45,7 +45,7 @@ export default function Home3DArtSettingsTab({ theme = 'dark' }: Home3DArtSettin
   }, [refreshKey]);
 
   const handleRemove = async () => {
-    if (confirm('Revert home page 3D art back to the default Dakshyam Innovations logo?')) {
+    if (confirm('Revert home page 3D art back to the default 3D Geometric Core model?')) {
       await deleteObjModel(STORAGE_KEY);
       setRefreshKey(prev => prev + 1);
     }
@@ -106,7 +106,7 @@ export default function Home3DArtSettingsTab({ theme = 'dark' }: Home3DArtSettin
                 className="px-3 py-2 rounded-xl border text-xs font-mono font-semibold transition-all cursor-pointer flex items-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                Revert to Default Logo
+                Revert to Default 3D Art
               </button>
             )}
           </div>
@@ -191,22 +191,22 @@ export default function Home3DArtSettingsTab({ theme = 'dark' }: Home3DArtSettin
             )}
           </div>
         ) : (
-          <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-mono flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="p-5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-mono flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Sparkles className="w-5 h-5 shrink-0 text-amber-400" />
+              <Sparkles className="w-5 h-5 shrink-0 text-cyan-400" />
               <div>
-                <p className="font-bold">Official Dakshyam Innovations 3D Art Active</p>
-                <p className="text-[11px] text-amber-300/80">
-                  No custom .obj file is currently active. The home page is presenting the official high-tech vector emblem.
+                <p className="font-bold text-white">Default 3D Art Active (Quantum Geodesic Core)</p>
+                <p className="text-[11px] text-cyan-300/80">
+                  The home page is displaying the interactive 3D model. Use the tools below to upload an .obj or .glb file and customize transforms, shaders, and lighting.
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setShowEditorModal(true)}
-              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold font-mono text-xs cursor-pointer uppercase tracking-wider shrink-0"
+              className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold font-mono text-xs cursor-pointer uppercase tracking-wider shrink-0 shadow-md"
             >
-              Upload First .OBJ Model
+              Upload / Customize 3D Model
             </button>
           </div>
         )}

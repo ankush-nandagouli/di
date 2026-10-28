@@ -5,23 +5,20 @@ import {
   LogOut, LogIn, ChevronRight, HelpCircle, Activity, Sparkles, School,
   Sun, Moon, Menu, X, Eye, EyeOff, Lock, Settings, Key, Info, Cpu, Compass,
   UserPlus, ShieldAlert, CheckCircle2, Check, ClipboardList, Home, Phone, Video, Award,
-  Building2, ArrowUp
+  Building2, ArrowUp, Instagram, Linkedin, Youtube, Twitter, Smartphone, Users, Github
 } from 'lucide-react';
 
 import ThreeBackground from './components/ThreeBackground';
 import LandingPage from './components/LandingPage';
-import LeaderboardComp from './components/Leaderboard';
 import CourseRegistrationForm from './components/CourseRegistrationForm';
-import CertificateVerify from './components/CertificateVerify';
 import SocialVideoWall from './components/SocialVideoWall';
 import StudentDashboard from './components/StudentDashboard';
 import TrainerDashboard from './components/TrainerDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AboutCompany from './components/AboutCompany';
 import ContactUs from './components/ContactUs';
-import PageLoader from './components/PageLoader';
-import WorkshopFeedbackForm from './components/WorkshopFeedbackForm';
-import AdminWorkshopFeedbackManager from './components/AdminWorkshopFeedbackManager';
+import { PrivacyPolicy } from './components/PrivacyPolicy';
+import { TermsAndConditions } from './components/TermsAndConditions';
 import WorkshopDirectoryModal from './components/WorkshopDirectoryModal';
 import { WorkshopFeedbackStorage } from './utils/feedbackStorage';
 import NotificationBell from './components/NotificationBell';
@@ -34,9 +31,8 @@ import { SecurityGuard } from './utils/security';
 import { syncStorageWithCookies } from './utils/secureCookie';
 
 import { DakshyamDatabase } from './utils/db';
-import { Course, CourseApplication, StudentGroup, StudentUser, Certificate, VideoPost, PromoBanner, GalleryImage, PageLoaderConfig } from './types';
+import { Course, CourseApplication, StudentGroup, StudentUser, Certificate, VideoPost, PromoBanner, GalleryImage } from './types';
 import { BeautifulErrorDisplay } from './utils/errorShield';
-import { getVideoBlob, cacheVideoFromUrl } from './utils/videoStorage';
 
 // Firebase Auth & Firestore SDK imports
 import { 
@@ -46,7 +42,7 @@ import {
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth as firebaseAuth, db } from './utils/firebase';
 
-export type NavigationTab = 'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact' | 'feedback' | 'notfound';
+export type NavigationTab = 'home' | 'services' | 'social' | 'portal' | 'about' | 'contact' | 'notfound' | 'privacy' | 'terms';
 
 export default function App() {
   // Theme & Mobile Menu states
@@ -72,71 +68,44 @@ export default function App() {
   const [pinError, setPinError] = useState('');
   const [showPinMask, setShowPinMask] = useState(true);
 
-  // Helper to parse routes (supports feedback, courses, hashes, 404 routes, etc.)
-  const parseInitialRoute = () => {
+  // Helper to parse routes (supports courses, hashes, 404 routes, etc.)
+  const parseInitialRoute = (): { tab: NavigationTab } => {
     try {
-      if (typeof window === 'undefined') return { isFeedback: false, slug: null, tab: 'home' as NavigationTab };
+      if (typeof window === 'undefined') return { tab: 'home' };
       const pathname = window.location.pathname;
       const searchParams = new URLSearchParams(window.location.search);
-      const hash = window.location.hash || '';
 
-      const feedbackPrefixes = ['/feedback-form', '/feedback', '/workshop-form', '/workshop', '/workshops'];
-      for (const prefix of feedbackPrefixes) {
+      // Check for legacy feedback or certificate paths - gracefully route home
+      const legacyPrefixes = ['/feedback-form', '/feedback', '/workshop-form', '/workshop', '/workshops', '/leaderboard', '/verification'];
+      for (const prefix of legacyPrefixes) {
         if (pathname.startsWith(prefix)) {
-          const parts = pathname.slice(prefix.length).split('/').filter(Boolean);
-          const slug = parts.length > 0 ? decodeURIComponent(parts[0]) : null;
-          return { isFeedback: true, slug, tab: 'feedback' as NavigationTab };
+          return { tab: 'home' };
         }
-      }
-
-      // Check hash route (e.g. #/feedback-form/slug or #feedback...)
-      if (hash.includes('feedback') || hash.includes('workshop')) {
-        const cleanHash = hash.replace(/^#\/?/, '');
-        for (const prefix of feedbackPrefixes) {
-          const cleanPrefix = prefix.replace(/^\//, '');
-          if (cleanHash.startsWith(cleanPrefix)) {
-            const parts = cleanHash.slice(cleanPrefix.length).split('/').filter(Boolean);
-            const slug = parts.length > 0 ? decodeURIComponent(parts[0]) : null;
-            return { isFeedback: true, slug, tab: 'feedback' as NavigationTab };
-          }
-        }
-      }
-
-      if (searchParams.get('tab') === 'feedback' || searchParams.get('feedback') !== null || searchParams.get('workshop') !== null) {
-        const slug = searchParams.get('workshop') || searchParams.get('w') || searchParams.get('ws') || searchParams.get('slug');
-        return { isFeedback: true, slug, tab: 'feedback' as NavigationTab };
       }
 
       // Check for 404 path
       if (pathname !== '/' && pathname !== '' && pathname !== '/index.html') {
-        return { isFeedback: false, slug: null, tab: 'notfound' as NavigationTab };
+        return { tab: 'notfound' };
       }
 
       const tabParam = searchParams.get('tab');
       if (tabParam) {
-        if (['home', 'services', 'leaderboard', 'social', 'portal', 'verification', 'about', 'contact', 'feedback'].includes(tabParam)) {
-          return { isFeedback: false, slug: null, tab: tabParam as NavigationTab };
+        if (['home', 'services', 'social', 'portal', 'about', 'contact', 'privacy', 'terms'].includes(tabParam)) {
+          return { tab: tabParam as NavigationTab };
         }
-        return { isFeedback: false, slug: null, tab: 'notfound' as NavigationTab };
+        return { tab: 'notfound' };
       }
     } catch (e) {
       console.error('URL parse fail', e);
     }
-    return { isFeedback: false, slug: null, tab: 'home' as NavigationTab };
+    return { tab: 'home' };
   };
 
   const initialRoute = parseInitialRoute();
 
   // Navigation states
   const [activeTab, setActiveTab] = useState<NavigationTab>(() => initialRoute.tab);
-  const [feedbackViewMode, setFeedbackViewMode] = useState<'audit' | 'form'>(() => {
-    // If arriving via shared feedback link, default directly to public participant form
-    if (initialRoute.isFeedback) {
-      return 'form';
-    }
-    return 'audit';
-  });
-  const [preselectedWorkshopSlug, setPreselectedWorkshopSlug] = useState<string | null>(initialRoute.slug);
+  const [preselectedWorkshopSlug, setPreselectedWorkshopSlug] = useState<string | null>(null);
   const [preselectedCourseId, setPreselectedCourseId] = useState<string | null>(null);
   const [isWorkshopDirectoryModalOpen, setIsWorkshopDirectoryModalOpen] = useState<boolean>(false);
   const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
@@ -157,94 +126,41 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // --- ANIMATED VIDEO LAZY LOADER STATES ---
-  const [pageLoaderConfig, setPageLoaderConfig] = useState<PageLoaderConfig>(() => {
-    return DakshyamDatabase.getPageLoaderConfig();
-  });
-  const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
-  const [loadingTargetTab, setLoadingTargetTab] = useState<string>('home');
-  const [localVideoUrl, setLocalVideoUrl] = useState<string>('');
-
-  // Hydrate local video from IndexedDB if uploaded locally
+  // Enterprise Security Initialization & Visitor Tracking
   useEffect(() => {
-    let activeObjUrl: string | null = null;
-    async function loadCachedVideoBlob() {
-      try {
-        const blob = await getVideoBlob('page_loader_video');
-        if (blob) {
-          activeObjUrl = URL.createObjectURL(blob);
-          setLocalVideoUrl(activeObjUrl);
-        }
-      } catch (err) {
-        console.warn('Could not read cached video blob from IndexedDB:', err);
-      }
-    }
-    loadCachedVideoBlob();
-
-    return () => {
-      if (activeObjUrl) {
-        URL.revokeObjectURL(activeObjUrl);
-      }
-    };
-  }, [pageLoaderConfig.updatedAt]);
-
-  // Global Real-time Subscription to Page Loader Config from Firestore
-  useEffect(() => {
-    try {
-      const configDocRef = doc(db, 'settings', 'page_loader_config');
-      const unsubscribe = onSnapshot(configDocRef, (snap) => {
-        if (snap.exists()) {
-          const cloudData = snap.data();
-          const cloudConfig = (cloudData.value || cloudData) as PageLoaderConfig;
-          if (cloudConfig && typeof cloudConfig === 'object' && cloudConfig.videoUrl !== undefined) {
-            setPageLoaderConfig((prev) => ({ ...prev, ...cloudConfig }));
-            DakshyamDatabase.savePageLoaderConfig({ ...pageLoaderConfig, ...cloudConfig });
-            if (cloudConfig.videoUrl) {
-              cacheVideoFromUrl(cloudConfig.videoUrl, 'page_loader_video').then((cached) => {
-                if (cached) setLocalVideoUrl(cached);
-              }).catch(() => {});
-            }
-          }
-        }
-      }, (err) => {
-        console.warn('Firestore page loader config sync notice:', err);
-      });
-      return () => unsubscribe();
-    } catch (err) {
-      console.warn('Firestore page loader config snapshot error:', err);
-    }
-  }, []);
-
-  // Initial page load lazy animation & Enterprise Security Initialization
-  useEffect(() => {
-    // Initialize Enterprise Security Guard (restricts unauthorized right click & devtools inspection)
+    // Initialize Enterprise Security Guard
     SecurityGuard.init();
-    // Synchronize resilient cookie and local storage across Edge, Brave, and modern browsers
+    // Synchronize resilient cookie and local storage across browsers
     syncStorageWithCookies();
 
-    if (pageLoaderConfig.enabled) {
-      const timer = setTimeout(() => {
-        setIsPageLoading(false);
-      }, Math.max(pageLoaderConfig.minDurationMs || 850, 700));
-      return () => clearTimeout(timer);
-    } else {
-      setIsPageLoading(false);
-    }
+    // Dynamic Visitor Tracking Hit
+    const liveHitCount = DakshyamDatabase.recordVisitorHit();
+    setVisitorCount(liveHitCount);
+
+    fetch('/api/visitor/count')
+      .then(res => res.json())
+      .then(data => {
+        if (typeof data?.count === 'number') {
+          setVisitorCount(data.count);
+          DakshyamDatabase.set('dakshyam_visitor_count', data.count);
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  // Listen to browser navigation popstate (e.g. back/forward or direct feedback links)
+  // Dynamic Visitor Count state
+  const [visitorCount, setVisitorCount] = useState<number>(() => {
+    return DakshyamDatabase.getVisitorCount();
+  });
+
+  // Dynamic active devices count for admin
+  const [adminDeviceCount, setAdminDeviceCount] = useState<number>(1);
+
+  // Listen to browser navigation popstate (back/forward)
   useEffect(() => {
     const handlePopState = () => {
       const route = parseInitialRoute();
-      if (route.isFeedback) {
-        setActiveTab('feedback');
-        setFeedbackViewMode('form');
-        if (route.slug) {
-          setPreselectedWorkshopSlug(route.slug);
-        }
-      } else {
-        setActiveTab(route.tab);
-      }
+      setActiveTab(route.tab);
     };
     window.addEventListener('popstate', handlePopState);
     window.addEventListener('hashchange', handlePopState);
@@ -254,13 +170,7 @@ export default function App() {
     };
   }, []);
 
-  // Compute active loader configuration with local video preference
-  const activeLoaderConfig: PageLoaderConfig = {
-    ...pageLoaderConfig,
-    videoUrl: localVideoUrl || pageLoaderConfig.videoUrl || ''
-  };
-
-  // Safe navigation function triggering the animated lazy loader on every page change
+  // Fast, user-friendly navigation function
   const navigateToTab = (
     newTab: NavigationTab,
     preselectCourse: string | null = null,
@@ -276,12 +186,7 @@ export default function App() {
 
     try {
       const url = new URL(window.location.href);
-      if (newTab === 'feedback') {
-        url.searchParams.set('tab', 'feedback');
-        if (preselectWorkshop) {
-          url.searchParams.set('workshop', preselectWorkshop);
-        }
-      } else if (newTab === 'home') {
+      if (newTab === 'home') {
         url.pathname = '/';
         url.searchParams.delete('tab');
         url.searchParams.delete('workshop');
@@ -299,33 +204,12 @@ export default function App() {
       window.history.pushState(null, '', url.toString());
     } catch {}
 
-    window.scrollTo(0, 0);
-
     if (newTab === activeTab) {
       return;
     }
 
-    if (pageLoaderConfig.enabled && pageLoaderConfig.showOnTabChange) {
-      setLoadingTargetTab(newTab);
-      setIsPageLoading(true);
-
-      const switchTimer = setTimeout(() => {
-        setActiveTab(newTab);
-        window.scrollTo({ top: 0, behavior: 'instant' });
-      }, 120);
-
-      const finishTimer = setTimeout(() => {
-        setIsPageLoading(false);
-      }, Math.max(pageLoaderConfig.minDurationMs || 850, 600));
-
-      return () => {
-        clearTimeout(switchTimer);
-        clearTimeout(finishTimer);
-      };
-    } else {
-      setActiveTab(newTab);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    setActiveTab(newTab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const [pendingApplyCourseId, setPendingApplyCourseId] = useState<string | null>(() => {
@@ -540,11 +424,48 @@ export default function App() {
       setGalleryImages(DakshyamDatabase.getGalleryImages());
       setCurrentUser(DakshyamDatabase.getLoggedInUser());
       setAboutState(DakshyamDatabase.getCompanyAbout());
-      setPageLoaderConfig(DakshyamDatabase.getPageLoaderConfig());
     } catch (e) {
       console.error('Error synchronizing dataset:', e);
     }
   };
+
+  // Dynamic session heartbeat ping & devices count
+  useEffect(() => {
+    if (!currentUser) return;
+    const sessionId = DakshyamDatabase.getSessionId();
+
+    const doPingAndRefreshDevices = () => {
+      fetch('/api/auth/sessions/ping', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-id': sessionId
+        },
+        body: JSON.stringify({ sessionId })
+      }).catch(() => {});
+
+      if (currentUser?.role === 'admin') {
+        const token = DakshyamDatabase.getAuthToken();
+        fetch(`/api/auth/sessions?sessionId=${encodeURIComponent(sessionId)}`, {
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            'x-session-id': sessionId
+          }
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (typeof data?.totalDevices === 'number') {
+              setAdminDeviceCount(data.totalDevices);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    doPingAndRefreshDevices();
+    const interval = setInterval(doPingAndRefreshDevices, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   // Run initial loading sequences and sync theme side-effect to root HTML & meta
   useEffect(() => {
@@ -588,63 +509,109 @@ export default function App() {
       window.history.replaceState(null, '', url.toString());
 
       // Update document titles and meta tags dynamically matching brand & SEO standards
+      const portalTitle = currentUser 
+        ? `${currentUser.role === 'admin' ? 'Admin Control Console' : currentUser.role === 'trainer' ? 'Trainer Evaluation & Assessment Portal' : 'Student Workspace & Learning Portal'} | Dakshyam Innovations`
+        : 'Console & Workspace Access | Dakshyam Innovations';
+
+      const portalDesc = currentUser
+        ? `Dakshyam Innovations authenticated workspace for ${currentUser.name} (${currentUser.role.toUpperCase()}). Manage courses, robotics telemetry, and project modules.`
+        : 'Secure digital console for enrolled students, certified trainers, and system administrators at Dakshyam Innovations.';
+
       const titleMapping: Record<NavigationTab, string> = {
-        home: 'Dakshyam Innovations | Learn • Build • Innovate',
-        services: 'Vocational Programs & Labs | Dakshyam Innovations',
-        leaderboard: 'Student Matrix Leaderboard | Dakshyam Innovations',
+        home: 'Dakshyam Innovations | Robotics, IoT & Programming Hub Waraseoni',
+        services: 'Vocational Programs & Labs | Dakshyam Innovations Waraseoni',
         social: 'Exhibition Wall & Projects | Dakshyam Innovations',
-        portal: 'Console & Workspace Access | Dakshyam Innovations',
-        verification: 'Digital Credential Verification | Dakshyam Innovations',
+        portal: portalTitle,
         about: 'About Us & Tech Services | Dakshyam Innovations Waraseoni',
         contact: 'Contact & Campus Consultations | Dakshyam Innovations',
-        feedback: 'Workshop Feedback Audit | Dakshyam Innovations',
-        notfound: '404 - Page Not Found | Dakshyam Innovations'
+        notfound: '404 - Page Not Found | Dakshyam Innovations',
+        privacy: 'Privacy Policy | Dakshyam Innovations',
+        terms: 'Terms and Conditions | Dakshyam Innovations'
       };
 
       const descMapping: Record<NavigationTab, string> = {
-        home: 'Practical technology education in Programming, Web & App Development, AI, IoT and Robotics aligned with NEP 2020. Learn • Build • Innovate.',
-        services: 'Explore our hands-on engineering programs in C, C++, Python, JavaScript, Django, MERN, Flutter, and IoT robotics.',
-        leaderboard: 'Live competency standings of student engineering teams rated on circuit diagnostics, firmware design, and logic execution.',
-        social: 'Exhibition postings, hardware demonstrations, and technical achievements from Dakshyam Innovations laboratories.',
-        portal: 'Secure digital workspace for students, vocational trainers, and system administrators.',
-        verification: 'Verify authentic tamper-resistant certificates and digital credentials issued by Dakshyam Innovations.',
-        about: 'To make practical technology education accessible to every student, empowering rural and urban learners to innovate.',
-        contact: 'Connect with Dakshyam Innovations at Ward No. 4, Siddhivinayak Complex, Balaghat Road, Waraseoni for workshops and lab setups.',
-        feedback: 'Official student and participant evaluation portal for NEP-aligned technical bootcamps and workshops.',
-        notfound: 'The requested destination on dakshyaminnovations.in could not be located. Explore our available courses and training tracks.'
+        home: 'Dakshyam Innovations Waraseoni delivers premier hands-on training in Programming, Web Development, Mobile Apps, AI, Industrial IoT, and Robotics under NEP 2020 in Waraseoni, Balaghat, MP.',
+        services: 'Explore our hands-on engineering programs in C, C++, Python, JavaScript, Django, MERN, Flutter, and IoT robotics laboratory hardware in Waraseoni.',
+        social: 'Exhibition postings, student robotics demonstrations, and technical achievements from Dakshyam Innovations laboratories.',
+        portal: portalDesc,
+        about: 'Dakshyam Innovations is a premier engineering education technology developer and skill incubator in Waraseoni, Balaghat, MP. Learn • Build • Innovate.',
+        contact: 'Connect with Dakshyam Innovations at Ward No. 4, Siddhivinayak Complex, Balaghat Road, Waraseoni for workshops, training, and lab setups.',
+        notfound: 'The requested destination on dakshyaminnovations.in could not be located. Explore our available courses and training tracks.',
+        privacy: 'Read the Dakshyam Innovations Privacy Policy. Learn how we handle student data, laboratory security, and privacy compliance under DPDP & IT Act 2000.',
+        terms: 'Terms and Conditions for Dakshyam Innovations vocational training programs, robotics hardware laboratories, and student certification.'
       };
 
-      if (titleMapping[activeTab]) {
-        document.title = titleMapping[activeTab];
-      }
+      const currentTitle = titleMapping[activeTab] || titleMapping.home;
+      const currentDesc = descMapping[activeTab] || descMapping.home;
+      const currentUrl = activeTab === 'home' ? 'https://dakshyaminnovations.in/' : `https://dakshyaminnovations.in/?tab=${activeTab}`;
 
-      // Update meta description
-      const metaDesc = document.querySelector('meta[name="description"]');
-      if (metaDesc && descMapping[activeTab]) {
-        metaDesc.setAttribute('content', descMapping[activeTab]);
-      }
+      document.title = currentTitle;
 
-      // Update Open Graph tags for rich indexing previews
-      const ogTitle = document.querySelector('meta[property="og:title"]');
-      if (ogTitle && titleMapping[activeTab]) {
-        ogTitle.setAttribute('content', titleMapping[activeTab]);
-      }
-      const ogDesc = document.querySelector('meta[property="og:description"]');
-      if (ogDesc && descMapping[activeTab]) {
-        ogDesc.setAttribute('content', descMapping[activeTab]);
-      }
-      const ogUrl = document.querySelector('meta[property="og:url"]');
-      if (ogUrl) {
-        ogUrl.setAttribute('content', activeTab === 'home' ? 'https://dakshyaminnovations.in/' : `https://dakshyaminnovations.in/?tab=${activeTab}`);
-      }
-      const canonical = document.querySelector('link[rel="canonical"]');
-      if (canonical) {
-        canonical.setAttribute('href', activeTab === 'home' ? 'https://dakshyaminnovations.in/' : `https://dakshyaminnovations.in/?tab=${activeTab}`);
-      }
+      const setMeta = (selector: string, attr: string, val: string, createTag?: () => HTMLElement) => {
+        let el = document.querySelector(selector);
+        if (!el && createTag) {
+          el = createTag();
+          document.head.appendChild(el);
+        }
+        if (el) el.setAttribute(attr, val);
+      };
+
+      // Primary Meta Tags
+      setMeta('meta[name="title"]', 'content', currentTitle, () => {
+        const m = document.createElement('meta');
+        m.name = 'title';
+        return m;
+      });
+      setMeta('meta[name="description"]', 'content', currentDesc, () => {
+        const m = document.createElement('meta');
+        m.name = 'description';
+        return m;
+      });
+
+      // Open Graph Tags
+      setMeta('meta[property="og:title"]', 'content', currentTitle, () => {
+        const m = document.createElement('meta');
+        m.setAttribute('property', 'og:title');
+        return m;
+      });
+      setMeta('meta[property="og:description"]', 'content', currentDesc, () => {
+        const m = document.createElement('meta');
+        m.setAttribute('property', 'og:description');
+        return m;
+      });
+      setMeta('meta[property="og:url"]', 'content', currentUrl, () => {
+        const m = document.createElement('meta');
+        m.setAttribute('property', 'og:url');
+        return m;
+      });
+
+      // Twitter Card Tags
+      setMeta('meta[name="twitter:title"]', 'content', currentTitle, () => {
+        const m = document.createElement('meta');
+        m.name = 'twitter:title';
+        return m;
+      });
+      setMeta('meta[name="twitter:description"]', 'content', currentDesc, () => {
+        const m = document.createElement('meta');
+        m.name = 'twitter:description';
+        return m;
+      });
+      setMeta('meta[name="twitter:url"]', 'content', currentUrl, () => {
+        const m = document.createElement('meta');
+        m.name = 'twitter:url';
+        return m;
+      });
+
+      // Canonical link
+      setMeta('link[rel="canonical"]', 'href', currentUrl, () => {
+        const l = document.createElement('link');
+        l.rel = 'canonical';
+        return l;
+      });
     } catch (err) {
       console.error('SEO sync fail', err);
     }
-  }, [activeTab]);
+  }, [activeTab, currentUser]);
 
   useEffect(() => {
     // Sync public catalog and UI settings without exposing user accounts
@@ -708,20 +675,13 @@ export default function App() {
 
       // Validate tabMatch whitelist
       if (tabMatch) {
-        const allowedTabs = ['home', 'services', 'leaderboard', 'social', 'portal', 'verification', 'about', 'contact', 'feedback'];
+        const allowedTabs = ['home', 'services', 'social', 'portal', 'about', 'contact'];
         if (!allowedTabs.includes(tabMatch)) {
           console.warn('Security Warning: Corrupt tab parameter blocked.');
           setActiveTab('home');
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('tab');
           window.history.replaceState(null, '', cleanUrl.toString());
-        } else if (tabMatch === 'feedback') {
-          setActiveTab('feedback');
-          setFeedbackViewMode('form');
-          const workshopParam = searchParams.get('workshop') || searchParams.get('w') || searchParams.get('ws') || searchParams.get('slug');
-          if (workshopParam) {
-            setPreselectedWorkshopSlug(workshopParam);
-          }
         }
       }
       
@@ -924,8 +884,6 @@ export default function App() {
           navigateToTab('services');
           setPendingApplyCourseId(null);
           try { sessionStorage.removeItem('dakshyam_pending_course_apply'); } catch {}
-        } else if (activeTab === 'feedback') {
-          navigateToTab('feedback');
         } else {
           navigateToTab('portal'); // Take directly to workspace
         }
@@ -997,8 +955,6 @@ export default function App() {
           navigateToTab('services');
           setPendingApplyCourseId(null);
           try { sessionStorage.removeItem('dakshyam_pending_course_apply'); } catch {}
-        } else if (activeTab === 'feedback') {
-          navigateToTab('feedback');
         } else {
           navigateToTab('portal');
         }
@@ -1060,11 +1016,7 @@ export default function App() {
         setStudentEmail('');
         setPasswordInput('');
         refreshDb();
-        if (activeTab === 'feedback') {
-          navigateToTab('feedback');
-        } else {
-          navigateToTab('portal');
-        }
+        navigateToTab('portal');
       } else {
         setAuthError(data.error || 'Invalid trainer credentials or pending authorization.');
         notifyError(data.error || 'Trainer authentication failed.');
@@ -1172,6 +1124,7 @@ export default function App() {
       if (res.ok && data.success) {
         DakshyamDatabase.setAuthToken(data.token);
         DakshyamDatabase.setLoggedInUser(data.user);
+        if (data.sessionId) DakshyamDatabase.setSessionId(data.sessionId);
         DakshyamDatabase.logEvent('Admin Logged In', `Platform administrator authenticated successfully and opened system tools.`, data.user.email, 'admin', 'SUCCESS');
         notifySuccess('Administrator console access authorized.');
         setShowAuthModal(false);
@@ -1191,6 +1144,7 @@ export default function App() {
   const handleLogout = () => {
     DakshyamDatabase.setAuthToken(null);
     DakshyamDatabase.setLoggedInUser(null);
+    DakshyamDatabase.setSessionId(null);
     refreshDb();
     notifyInfo('Session logged out successfully.');
     navigateToTab('home');
@@ -1226,22 +1180,6 @@ export default function App() {
         : 'bg-[#0a192f] text-slate-100 selection:bg-blue-600/35 selection:text-white'
     }`}>
       
-      {/* FULL-SCREEN ANIMATED VIDEO LAZY LOADER */}
-      <PageLoader 
-        isLoading={isPageLoading}
-        targetTab={loadingTargetTab}
-        config={activeLoaderConfig}
-        onFinish={() => setIsPageLoading(false)}
-        onOpenUploadSettings={() => {
-          setIsPageLoading(false);
-          if (currentUser?.role === 'admin') {
-            navigateToTab('portal');
-          } else {
-            handleStaffAccessTrigger();
-          }
-        }}
-        theme={theme}
-      />
 
       {/* Dynamic scanlines & background ambient lights */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none -z-20">
@@ -1318,28 +1256,6 @@ export default function App() {
               SERVICES & SYLLABUS
             </button>
             <button
-              onClick={() => navigateToTab('feedback', null)}
-              className={`px-3 py-1.5 rounded-lg transition-all border ${
-                activeTab === 'feedback'
-                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]')
-                  : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
-              }`}
-            >
-              WORKSHOPS
-            </button>
-            {currentUser && (
-              <button
-                onClick={() => navigateToTab('leaderboard')}
-                className={`px-3 py-1.5 rounded-lg transition-all border ${
-                  activeTab === 'leaderboard' 
-                    ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]') 
-                    : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
-                }`}
-              >
-                LEADERBOARD
-              </button>
-            )}
-            <button
               onClick={() => navigateToTab('social')}
               className={`px-3 py-1.5 rounded-lg transition-all border ${
                 activeTab === 'social' 
@@ -1348,16 +1264,6 @@ export default function App() {
               }`}
             >
               INNOVATION EXHIBITION
-            </button>
-            <button
-              onClick={() => navigateToTab('verification')}
-              className={`px-3 py-1.5 rounded-lg transition-all border ${
-                activeTab === 'verification' 
-                  ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-blue-600/20 border-blue-400/30 text-white font-bold shadow-[0_0_12px_rgba(59,130,246,0.2)]') 
-                  : (isLight ? 'border-transparent text-slate-700 hover:text-blue-950 hover:bg-blue-50/50' : 'border-transparent text-slate-300 hover:text-white hover:bg-white/5')
-              }`}
-            >
-              VERIFY CREDENTIALS
             </button>
             <button
               onClick={() => navigateToTab('about')}
@@ -1379,29 +1285,6 @@ export default function App() {
             >
               CONTACT US
             </button>
-
-            {/* WORKSHOP FEEDBACK: Only visible to authenticated logged-in users */}
-            {currentUser && (
-              <button
-                onClick={() => {
-                  setFeedbackViewMode((currentUser.role === 'admin' || currentUser.role === 'trainer') ? 'audit' : 'form');
-                  navigateToTab('feedback');
-                }}
-                className={`px-3 py-1.5 rounded-lg transition-all border flex items-center gap-1.5 font-mono ${
-                  activeTab === 'feedback' 
-                    ? (isLight ? 'bg-blue-900 text-white font-bold shadow-xs border-blue-900' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold shadow-[0_0_12px_rgba(56,189,248,0.25)]') 
-                    : (isLight ? 'border-amber-500/25 bg-amber-50/70 text-amber-950 hover:bg-amber-100/70 font-semibold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20')
-                }`}
-                title={(currentUser.role === 'admin' || currentUser.role === 'trainer') ? "Workshop Participant Feedback Management Console" : "Submit Workshop Evaluation & Participant Feedback"}
-              >
-                <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
-                <span>
-                  {(currentUser.role === 'admin' || currentUser.role === 'trainer')
-                    ? 'FEEDBACK AUDIT'
-                    : 'FEEDBACK FORM'}
-                </span>
-              </button>
-            )}
           </nav>
 
           {/* Right Theme, Notifications & Auth Action button segment */}
@@ -1430,6 +1313,25 @@ export default function App() {
             <div className="hidden lg:flex items-center gap-2">
               {currentUser ? (
                 <div className="flex items-center gap-2">
+                  {(currentUser.role === 'admin' || currentUser.role === 'trainer') && (
+                    <button
+                      onClick={() => {
+                        try {
+                          setAvailableWorkshops(WorkshopFeedbackStorage.getFeedbackConfig().workshops);
+                        } catch {}
+                        setIsWorkshopDirectoryModalOpen(true);
+                      }}
+                      className={`border text-2xs font-mono font-bold px-2.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                        isLight 
+                          ? 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100 shadow-2xs' 
+                          : 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/25 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
+                      }`}
+                      title="Workshop Directory: Edit Fields & Full CRUD Console"
+                    >
+                      <Building2 className="w-3.5 h-3.5" />
+                      <span>WORKSHOPS</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => navigateToTab('portal')}
                     className={`border text-2xs font-mono font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -1531,33 +1433,6 @@ export default function App() {
                   <span>SERVICES & SYLLABUS</span>
                 </button>
                 <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    navigateToTab('feedback', null);
-                  }}
-                  className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 cursor-pointer ${
-                    activeTab === 'feedback'
-                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-sm' : 'bg-blue-600/25 border-blue-400/40 text-white font-bold')
-                      : (isLight ? 'border-transparent text-slate-700 hover:bg-slate-100' : 'border-transparent text-slate-300 hover:bg-white/5')
-                  }`}
-                >
-                  <Building2 className={`w-4 h-4 shrink-0 ${activeTab === 'feedback' ? 'text-amber-400' : 'text-slate-400'}`} />
-                  <span>WORKSHOPS & FEEDBACK</span>
-                </button>
-                {currentUser && (
-                  <button
-                    onClick={() => navigateToTab('leaderboard')}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 cursor-pointer ${
-                      activeTab === 'leaderboard' 
-                        ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-sm' : 'bg-blue-600/25 border-blue-400/40 text-white font-bold') 
-                        : (isLight ? 'border-transparent text-slate-700 hover:bg-slate-100' : 'border-transparent text-slate-300 hover:bg-white/5')
-                    }`}
-                  >
-                    <Trophy className={`w-4 h-4 shrink-0 ${activeTab === 'leaderboard' ? 'text-amber-400' : 'text-slate-400'}`} />
-                    <span>LEADERBOARD TRACKER</span>
-                  </button>
-                )}
-                <button
                   onClick={() => navigateToTab('social')}
                   className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 cursor-pointer ${
                     activeTab === 'social' 
@@ -1567,17 +1442,6 @@ export default function App() {
                 >
                   <Video className={`w-4 h-4 shrink-0 ${activeTab === 'social' ? 'text-amber-400' : 'text-slate-400'}`} />
                   <span>EXHIBITION POSTINGS</span>
-                </button>
-                <button
-                  onClick={() => navigateToTab('verification')}
-                  className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all flex items-center gap-3 cursor-pointer ${
-                    activeTab === 'verification' 
-                      ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-sm' : 'bg-blue-600/25 border-blue-400/40 text-white font-bold') 
-                      : (isLight ? 'border-transparent text-slate-700 hover:bg-slate-100' : 'border-transparent text-slate-300 hover:bg-white/5')
-                  }`}
-                >
-                  <Award className={`w-4 h-4 shrink-0 ${activeTab === 'verification' ? 'text-amber-400' : 'text-slate-400'}`} />
-                  <span>VERIFY CREDENTIALS</span>
                 </button>
                 <button
                   onClick={() => navigateToTab('about')}
@@ -1602,29 +1466,6 @@ export default function App() {
                   <span>CONTACT US</span>
                 </button>
 
-                {/* WORKSHOP FEEDBACK: Only visible to authenticated logged-in users */}
-                {currentUser && (
-                  <button
-                    onClick={() => {
-                      setFeedbackViewMode((currentUser.role === 'admin' || currentUser.role === 'trainer') ? 'audit' : 'form');
-                      navigateToTab('feedback');
-                      setMenuOpen(false);
-                    }}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-xl border transition-all flex items-center gap-2 font-mono ${
-                      activeTab === 'feedback' 
-                        ? (isLight ? 'bg-blue-900 text-white font-extrabold shadow-xs' : 'bg-sky-500/20 border-sky-400/40 text-sky-300 font-bold') 
-                        : (isLight ? 'border-amber-500/25 bg-amber-50 text-amber-950 font-bold' : 'border-amber-500/25 bg-amber-500/10 text-amber-300')
-                    }`}
-                  >
-                    <ClipboardList className="w-4 h-4 text-amber-400" />
-                    <span>
-                      {(currentUser.role === 'admin' || currentUser.role === 'trainer') 
-                        ? 'WORKSHOP FEEDBACK AUDIT' 
-                        : 'WORKSHOP FEEDBACK FORM'}
-                    </span>
-                  </button>
-                )}
-
                 {/* Mobile Theme Shift Button */}
                 <button
                   onClick={() => setTheme(isLight ? 'dark' : 'light')}
@@ -1644,6 +1485,25 @@ export default function App() {
                 <div className="pt-2 border-t border-slate-500/10">
                   {currentUser ? (
                     <div className="space-y-1.5 pt-1">
+                      {(currentUser.role === 'admin' || currentUser.role === 'trainer') && (
+                        <button
+                          onClick={() => {
+                            try {
+                              setAvailableWorkshops(WorkshopFeedbackStorage.getFeedbackConfig().workshops);
+                            } catch {}
+                            setIsWorkshopDirectoryModalOpen(true);
+                            setMenuOpen(false);
+                          }}
+                          className={`w-full py-2.5 rounded-xl text-center border font-mono font-bold tracking-wider cursor-pointer flex items-center justify-center gap-2 ${
+                            isLight 
+                              ? 'bg-amber-50 border-amber-300 text-amber-900 shadow-2xs' 
+                              : 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
+                          }`}
+                        >
+                          <Building2 className="w-4 h-4" />
+                          <span>WORKSHOPS DIRECTORY (EDIT & CRUD)</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => navigateToTab('portal')}
                         className={`w-full py-2.5 rounded-xl text-center border font-mono font-bold tracking-widest cursor-pointer ${
@@ -1701,6 +1561,7 @@ export default function App() {
                 banners={banners}
                 galleryImages={galleryImages}
                 currentUser={currentUser}
+                currentUserRole={currentUser?.role}
                 onNavigateToAdmin={() => {
                   if (currentUser?.role === 'admin') {
                     navigateToTab('portal');
@@ -1724,6 +1585,7 @@ export default function App() {
                   } catch {}
                   setIsWorkshopDirectoryModalOpen(true);
                 }}
+                onNavigateToTab={navigateToTab}
               />
             )}
 
@@ -1922,226 +1784,19 @@ export default function App() {
               </div>
             )}
 
-            {/* VIEW 3: GLOBAL LEADERBOARD */}
-            {activeTab === 'leaderboard' && (
-              currentUser ? (
-                <LeaderboardComp groups={groups} students={students} />
-              ) : (
-                <div className="max-w-xl mx-auto px-4 py-12 text-center">
-                  <div className={`p-8 rounded-3xl border shadow-xl space-y-5 ${
-                    isLight ? 'bg-white border-blue-900/15' : 'bg-[#0d1f38]/90 border-blue-700/40'
-                  }`}>
-                    <div className={`w-14 h-14 mx-auto rounded-2xl flex items-center justify-center border ${
-                      isLight ? 'bg-blue-50 border-blue-900/20 text-blue-950' : 'bg-blue-950/80 border-blue-500/40 text-sky-400'
-                    }`}>
-                      <Lock className="w-7 h-7" />
-                    </div>
-                    <div className="space-y-2">
-                      <span className={`text-[10px] font-mono tracking-widest uppercase font-black ${isLight ? 'text-blue-900' : 'text-sky-400'}`}>
-                        Authorized Members Only
-                      </span>
-                      <h2 className={`text-xl font-black uppercase tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                        Student Leaderboard Access
-                      </h2>
-                      <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                        The laboratory performance leaderboard and group matrix are visible only to registered and logged-in users. Please log in to view rankings, project scores, and achievement points.
-                      </p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                      <button
-                        onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
-                        className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-mono text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md ${
-                          isLight ? 'bg-blue-950 hover:bg-blue-900 text-white' : 'bg-white hover:bg-slate-100 text-[#0a192f]'
-                        }`}
-                      >
-                        Sign In to Your Account
-                      </button>
-                      <button
-                        onClick={() => { setAuthMode('register'); setShowAuthModal(true); }}
-                        className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
-                          isLight ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800' : 'bg-blue-950/40 hover:bg-blue-900/60 border-blue-700/40 text-sky-300'
-                        }`}
-                      >
-                        Register New Student
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )
-            )}
-
-            {/* VIEW 4: SOCIAL VIDEO EXHIBITION */}
+            {/* VIEW 2: SOCIAL VIDEO EXHIBITION */}
             {activeTab === 'social' && (
               <SocialVideoWall videos={videos} onVideoUpdated={refreshDb} />
             )}
 
-            {/* VIEW 5: VERIFY CERTIFICATES */}
-            {activeTab === 'verification' && (
-              <CertificateVerify theme={theme} />
-            )}
-
-            {/* VIEW 6: ABOUT US COMPANY VIEW */}
+            {/* VIEW 3: ABOUT US COMPANY VIEW */}
             {activeTab === 'about' && aboutState && (
               <AboutCompany aboutState={aboutState} theme={theme} />
             )}
 
-            {/* VIEW 7: CONTACT US PAGE VIEW */}
+            {/* VIEW 4: CONTACT US PAGE VIEW */}
             {activeTab === 'contact' && (
               <ContactUs theme={theme} />
-            )}
-
-            {/* VIEW 8: WORKSHOP EVALUATION & FEEDBACK (Student Direct Form & Admin/Trainer Management Audit) */}
-            {activeTab === 'feedback' && (
-              <div className="w-full">
-                {!currentUser ? (
-                  <div className="max-w-xl mx-auto px-4 py-16 text-center">
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: 16 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      className={`border p-8 sm:p-10 rounded-3xl space-y-6 shadow-2xl transition-all ${
-                        isLight 
-                          ? 'bg-white border-blue-900/15 text-slate-800' 
-                          : 'bg-[#0a192f]/95 border-blue-800/40 text-white backdrop-blur-xl'
-                      }`}
-                    >
-                      <div className={`mx-auto w-16 h-16 rounded-2xl flex items-center justify-center border shadow-inner ${
-                        isLight ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                      }`}>
-                        <Lock className="w-8 h-8" />
-                      </div>
-
-                      <div className="space-y-2">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider border ${
-                          isLight ? 'bg-amber-50 text-amber-900 border-amber-200' : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-                        }`}>
-                          <ShieldAlert className="w-3.5 h-3.5" /> Authentication Required
-                        </span>
-                        <h2 className={`text-xl sm:text-2xl font-black uppercase tracking-tight font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                          Workshop Feedback Form
-                        </h2>
-                        <p className={`text-xs sm:text-sm max-w-md mx-auto leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-                          The workshop feedback portal is strictly protected and not open for public submissions. Please log in with your credentials to access the evaluation form.
-                        </p>
-                      </div>
-
-                      {preselectedWorkshopSlug && (
-                        <div className={`p-3 rounded-xl border text-xs font-mono inline-block max-w-md ${
-                          isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-white/5 border-white/10 text-slate-300'
-                        }`}>
-                          <span className="text-slate-400">Workshop Session: </span>
-                          <strong className={isLight ? 'text-blue-950' : 'text-sky-300'}>{preselectedWorkshopSlug}</strong>
-                        </div>
-                      )}
-
-                      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                        <button
-                          onClick={() => {
-                            setAuthMode('login');
-                            setShowAuthModal(true);
-                          }}
-                          className={`w-full sm:w-auto px-6 py-3 rounded-xl font-bold font-mono text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
-                            isLight
-                              ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-blue-950/20'
-                              : 'bg-cyan-500 hover:bg-cyan-400 text-black shadow-cyan-500/20 font-black'
-                          }`}
-                        >
-                          <LogIn className="w-4 h-4" /> Sign In To Continue
-                        </button>
-                        <button
-                          onClick={() => {
-                            setAuthMode('register');
-                            setShowAuthModal(true);
-                          }}
-                          className={`w-full sm:w-auto px-5 py-3 rounded-xl font-bold font-mono text-xs uppercase tracking-wider flex items-center justify-center gap-2 border transition-all cursor-pointer ${
-                            isLight
-                              ? 'bg-white border-slate-300 text-slate-800 hover:bg-slate-50'
-                              : 'bg-white/5 border-white/15 text-white hover:bg-white/10'
-                          }`}
-                        >
-                          <UserPlus className="w-4 h-4" /> Register New Account
-                        </button>
-                      </div>
-
-                      <div className="pt-4 border-t border-slate-500/10 flex items-center justify-between text-2xs font-mono text-slate-400">
-                        <button
-                          onClick={() => navigateToTab('home')}
-                          className="hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          ← Return to Home
-                        </button>
-                        <span>Dakshyam Innovations Portal</span>
-                      </div>
-                    </motion.div>
-                  </div>
-                ) : (currentUser.role === 'admin' || currentUser.role === 'trainer') ? (
-                  <div className="space-y-4">
-                    {/* View Switcher: Audit Console vs Participant Form Preview */}
-                    <div className="flex flex-wrap items-center justify-between max-w-7xl mx-auto px-4 gap-2">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setFeedbackViewMode('audit')}
-                          className={`text-2xs font-mono font-bold px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                            feedbackViewMode === 'audit'
-                              ? (isLight ? 'bg-blue-950 text-white border-blue-950 shadow-xs' : 'bg-sky-500/20 border-sky-400 text-sky-300 shadow-[0_0_10px_rgba(56,189,248,0.2)]')
-                              : (isLight ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700')
-                          }`}
-                        >
-                          📊 Feedback Audit & Export Console
-                        </button>
-                        <button
-                          onClick={() => setFeedbackViewMode('form')}
-                          className={`text-2xs font-mono font-bold px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                            feedbackViewMode === 'form'
-                              ? (isLight ? 'bg-blue-950 text-white border-blue-950 shadow-xs' : 'bg-sky-500/20 border-sky-400 text-sky-300 shadow-[0_0_10px_rgba(56,189,248,0.2)]')
-                              : (isLight ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700')
-                          }`}
-                        >
-                          📝 Participant Public Form Preview
-                        </button>
-                      </div>
-
-                      <div className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Logged in as <strong>{currentUser.name}</strong> ({currentUser.role.toUpperCase()})</span>
-                      </div>
-                    </div>
-
-                    {feedbackViewMode === 'audit' ? (
-                      <AdminWorkshopFeedbackManager
-                        theme={theme}
-                        currentUserRole={currentUser.role}
-                        onOpenPublicForm={(wsId) => {
-                          if (wsId) setPreselectedWorkshopSlug(wsId);
-                          setFeedbackViewMode('form');
-                        }}
-                      />
-                    ) : (
-                      <WorkshopFeedbackForm
-                        theme={theme}
-                        currentUser={currentUser}
-                        onNavigateHome={() => setFeedbackViewMode('audit')}
-                        preselectedWorkshopId={preselectedWorkshopSlug}
-                        isPreviewMode={true}
-                        onRequestLogin={() => {
-                          setAuthMode('login');
-                          setShowAuthModal(true);
-                        }}
-                      />
-                    )}
-                  </div>
-                ) : (
-                  <WorkshopFeedbackForm
-                    theme={theme}
-                    currentUser={currentUser}
-                    onNavigateHome={() => navigateToTab('home')}
-                    preselectedWorkshopId={preselectedWorkshopSlug}
-                    onRequestLogin={() => {
-                      setAuthMode('login');
-                      setShowAuthModal(true);
-                    }}
-                  />
-                )}
-              </div>
             )}
 
             {/* VIEW 6: MEMBERS / ROLES AREA DASHBOARDS */}
@@ -2183,18 +1838,6 @@ export default function App() {
                         onRefresh={refreshDb}
                         theme={theme}
                         isDbConnected={isDbConnected}
-                        onTestLoader={() => {
-                          setLoadingTargetTab('portal');
-                          setIsPageLoading(true);
-                          setTimeout(() => {
-                            setIsPageLoading(false);
-                          }, Math.max(pageLoaderConfig.minDurationMs || 900, 800));
-                        }}
-                        onOpenPublicFeedbackForm={(slug) => {
-                          if (slug) setPreselectedWorkshopSlug(slug);
-                          setFeedbackViewMode('form');
-                          navigateToTab('feedback');
-                        }}
                       />
                     )}
                   </>
@@ -2218,7 +1861,23 @@ export default function App() {
                 )}
               </div>
             )}
-            {/* VIEW 10: CUSTOM 404 NOT FOUND PAGE */}
+            {/* VIEW 9: PRIVACY POLICY PAGE */}
+            {activeTab === 'privacy' && (
+              <PrivacyPolicy 
+                theme={theme}
+                onNavigateTab={(tab) => navigateToTab(tab)}
+              />
+            )}
+
+            {/* VIEW 10: TERMS AND CONDITIONS PAGE */}
+            {activeTab === 'terms' && (
+              <TermsAndConditions 
+                theme={theme}
+                onNavigateTab={(tab) => navigateToTab(tab)}
+              />
+            )}
+
+            {/* VIEW 11: CUSTOM 404 NOT FOUND PAGE */}
             {activeTab === 'notfound' && (
               <NotFoundPage 
                 theme={theme}
@@ -2231,51 +1890,243 @@ export default function App() {
       </main>
 
       {/* FOOTER COOPERATING SIGNATURE */}
-      <footer className={`relative z-20 w-full py-6 text-center text-3xs font-mono tracking-wider border-t no-print flex flex-col items-center justify-center gap-1.5 transition-colors duration-300 ${
-        isLight ? 'text-slate-600 border-blue-900/10 bg-white/70' : 'text-slate-400 border-blue-900/20 bg-[#071326]/60 backdrop-blur-md'
+      <footer className={`relative z-20 w-full pt-10 pb-8 text-center text-3xs font-mono tracking-wider border-t no-print transition-colors duration-300 ${
+        isLight 
+          ? 'text-slate-600 border-blue-900/10 bg-gradient-to-b from-white/80 via-slate-50/90 to-blue-50/40 shadow-inner' 
+          : 'text-slate-400 border-blue-900/30 bg-gradient-to-b from-[#071326]/80 via-[#0a192f]/95 to-[#050d1a] backdrop-blur-xl'
       }`}>
-        <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.25em]">
-          <span className={isLight ? 'text-blue-950' : 'text-white'}>DAKSHYAM INNOVATIONS</span>
-          <span className="text-slate-500">•</span>
-          <span className={isLight ? 'text-amber-800' : 'text-amber-300'}>LEARN • BUILD • INNOVATE</span>
-        </div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
+          
+          {/* Top Row: Brand Identity & Social Icons */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-6 border-b border-slate-500/10">
+            <div className="text-center md:text-left space-y-1">
+              <div className="flex items-center justify-center md:justify-start gap-2 text-xs font-black uppercase tracking-[0.25em]">
+                <span className={`text-sm ${isLight ? 'text-blue-950 font-black' : 'text-white font-black'}`}>DAKSHYAM INNOVATIONS</span>
+                <span className="text-slate-500">•</span>
+                <span className={`text-2xs font-bold ${isLight ? 'text-amber-800' : 'text-amber-300'}`}>LEARN • BUILD • INNOVATE</span>
+              </div>
+              <p className="text-[10px] text-slate-500 max-w-md font-sans">
+                Equipping regional educational classrooms and engineering labs with hands-on robotics, IoT telemetry, and modern coding environments.
+              </p>
+            </div>
 
-        <div className="text-[9px] tracking-normal text-slate-500 font-sans max-w-xl px-4 text-center">
-          Ward No. 4, Siddhivinayak Complex, First Floor, Balaghat Road, Waraseoni - 481331 (M.P.), India
-        </div>
+            {/* Social Connectivity Links (Fully respectful of admin visibility toggles) */}
+            {(() => {
+              const igUrl = aboutState?.socialInstagram?.trim() || 'https://instagram.com/dakshyam_innovations';
+              const liUrl = aboutState?.socialLinkedin?.trim() || 'https://linkedin.com/company/dakshyam-innovations';
+              const ytUrl = aboutState?.socialYoutube?.trim() || 'https://youtube.com/@dakshyaminnovations';
+              const twUrl = aboutState?.socialTwitter?.trim() || 'https://twitter.com/dakshyam_in';
+              const ghUrl = aboutState?.socialGithub?.trim();
 
-        <div 
-          onClick={handleStaffAccessTrigger}
-          className="cursor-pointer hover:text-blue-900 dark:hover:text-sky-400 transition-colors py-0.5 text-[8.5px] uppercase tracking-widest font-mono text-slate-400"
-          title="Supervisory Node Overlap (Click to reveal panel)"
-        >
-          © {new Date().getFullYear()} Dakshyam Innovations • Learn • Build • Innovate • NEP 2020 Aligned
-        </div>
+              const showIg = !aboutState?.hideInstagram && Boolean(igUrl);
+              const showLi = !aboutState?.hideLinkedin && Boolean(liUrl);
+              const showYt = !aboutState?.hideYoutube && Boolean(ytUrl);
+              const showTw = !aboutState?.hideTwitter && Boolean(twUrl);
+              const showGh = !aboutState?.hideGithub && Boolean(ghUrl);
 
-        <div className="text-[8px] tracking-normal text-slate-400/60 uppercase flex items-center gap-2">
-          <span>Programming • Web & App Development • AI • IoT • Robotics</span>
-          <span className="text-slate-500">•</span>
-          <button
-            onClick={() => {
-              DakshyamDatabase.setCookie('dakshyam_cookie_consent', '');
-              setCookieConsent('');
-            }}
-            className="hover:text-[#22d3ee] underline transition-colors cursor-pointer text-[8px] font-mono lowercase tracking-normal"
-          >
-            [ manage cookies ]
-          </button>
-          <span className="text-slate-500">•</span>
-          <button
-            onClick={() => {
-              try {
-                setAvailableWorkshops(WorkshopFeedbackStorage.getFeedbackConfig().workshops);
-              } catch {}
-              setIsWorkshopDirectoryModalOpen(true);
-            }}
-            className="hover:text-purple-400 underline transition-colors cursor-pointer text-[8px] font-mono lowercase tracking-normal"
-          >
-            [ workshops directory ]
-          </button>
+              const hasAny = showIg || showLi || showYt || showTw || showGh;
+              if (!hasAny) return null;
+
+              return (
+                <div className="flex flex-wrap items-center justify-center md:justify-end gap-2.5">
+                  {showIg && (
+                    <a
+                      href={igUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`p-2.5 rounded-xl border flex items-center gap-2 text-[10px] font-mono font-bold transition-all shadow-xs group cursor-pointer ${
+                        isLight 
+                          ? 'border-pink-300/60 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-amber-500/10 text-pink-700 hover:border-pink-500/50 hover:shadow-pink-500/15' 
+                          : 'border-pink-500/30 bg-gradient-to-r from-pink-950/40 via-purple-950/30 to-amber-950/20 text-pink-300 hover:border-pink-400 hover:shadow-[0_0_15px_rgba(244,63,94,0.25)]'
+                      }`}
+                      title="Follow Dakshyam Innovations on Instagram"
+                    >
+                      <Instagram className="w-4 h-4 text-pink-500 group-hover:scale-110 transition-transform" />
+                      <span className="font-extrabold tracking-wider">Instagram</span>
+                    </a>
+                  )}
+
+                  {showLi && (
+                    <a
+                      href={liUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`p-2.5 rounded-xl border flex items-center gap-1.5 text-[10px] font-mono transition-all cursor-pointer ${
+                        isLight ? 'border-slate-200 bg-white hover:border-blue-500/40 text-blue-900' : 'border-blue-900/40 bg-black/40 hover:border-blue-400 text-sky-300'
+                      }`}
+                      title="LinkedIn"
+                    >
+                      <Linkedin className="w-4 h-4" />
+                      <span className="hidden sm:inline">LinkedIn</span>
+                    </a>
+                  )}
+
+                  {showYt && (
+                    <a
+                      href={ytUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`p-2.5 rounded-xl border flex items-center gap-1.5 text-[10px] font-mono transition-all cursor-pointer ${
+                        isLight ? 'border-slate-200 bg-white hover:border-red-500/40 text-red-600' : 'border-red-900/30 bg-black/40 hover:border-red-400 text-red-400'
+                      }`}
+                      title="YouTube"
+                    >
+                      <Youtube className="w-4 h-4" />
+                      <span className="hidden sm:inline">YouTube</span>
+                    </a>
+                  )}
+
+                  {showTw && (
+                    <a
+                      href={twUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`p-2.5 rounded-xl border flex items-center gap-1.5 text-[10px] font-mono transition-all cursor-pointer ${
+                        isLight ? 'border-slate-200 bg-white hover:border-slate-400 text-slate-800' : 'border-slate-800 bg-black/40 hover:border-slate-500 text-slate-300'
+                      }`}
+                      title="Twitter / X"
+                    >
+                      <Twitter className="w-4 h-4" />
+                      <span className="hidden sm:inline">Twitter</span>
+                    </a>
+                  )}
+
+                  {showGh && (
+                    <a
+                      href={ghUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`p-2.5 rounded-xl border flex items-center gap-1.5 text-[10px] font-mono transition-all cursor-pointer ${
+                        isLight ? 'border-slate-200 bg-white hover:border-slate-400 text-slate-800' : 'border-slate-800 bg-black/40 hover:border-slate-500 text-slate-300'
+                      }`}
+                      title="GitHub"
+                    >
+                      <Github className="w-4 h-4" />
+                      <span className="hidden sm:inline">GitHub</span>
+                    </a>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Quick Navigation Links */}
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[9px] font-mono uppercase font-bold">
+            <button onClick={() => navigateToTab('home')} className="hover:text-sky-400 transition-colors cursor-pointer">
+              Home
+            </button>
+            <button onClick={() => navigateToTab('services')} className="hover:text-sky-400 transition-colors cursor-pointer">
+              Courses
+            </button>
+            <button onClick={() => navigateToTab('social')} className="hover:text-sky-400 transition-colors cursor-pointer">
+              Exhibition Wall
+            </button>
+            <button onClick={() => navigateToTab('about')} className="hover:text-sky-400 transition-colors cursor-pointer">
+              About Us
+            </button>
+            <button onClick={() => navigateToTab('contact')} className="hover:text-sky-400 transition-colors cursor-pointer">
+              Contact
+            </button>
+            <button onClick={() => navigateToTab('privacy')} className="hover:text-sky-400 transition-colors cursor-pointer">
+              Privacy Policy
+            </button>
+            <button onClick={() => navigateToTab('terms')} className="hover:text-sky-400 transition-colors cursor-pointer">
+              Terms & Conditions
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  setAvailableWorkshops(WorkshopFeedbackStorage.getFeedbackConfig().workshops);
+                } catch {}
+                setIsWorkshopDirectoryModalOpen(true);
+              }}
+              className="text-purple-400 hover:text-purple-300 transition-colors cursor-pointer"
+            >
+              Workshops Directory
+            </button>
+            <button
+              onClick={() => {
+                DakshyamDatabase.setCookie('dakshyam_cookie_consent', '');
+                setCookieConsent('');
+              }}
+              className="hover:text-cyan-400 transition-colors cursor-pointer lowercase"
+            >
+              [ cookie preferences ]
+            </button>
+          </div>
+
+          {/* ADMIN-ONLY DYNAMIC TELEMETRY STRIP (Total Visitor Count & Device Tracking) */}
+          {currentUser?.role === 'admin' && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 text-left font-mono text-xs shadow-md ${
+                isLight 
+                  ? 'bg-amber-50/70 border-amber-300 text-slate-800' 
+                  : 'bg-[#0d1f38]/90 border-cyan-400/30 text-white shadow-[0_0_20px_rgba(34,211,238,0.12)]'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-xl ${isLight ? 'bg-amber-200 text-amber-900' : 'bg-cyan-500/20 text-cyan-300'}`}>
+                  <Eye className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      Admin Telemetry
+                    </span>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">Live Counters</span>
+                  </div>
+                  <div className="text-xs sm:text-sm font-black flex items-center gap-2 mt-0.5">
+                    <span className={isLight ? 'text-slate-900' : 'text-white'}>Total Site Visitors:</span>
+                    <span className="text-amber-500 dark:text-cyan-400 font-mono tracking-tight text-sm sm:text-base">
+                      {visitorCount.toLocaleString()} Hits
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Devices Logged In Pill (Clickable -> Opens Admin Dashboard Devices) */}
+              <button
+                type="button"
+                onClick={() => navigateToTab('portal')}
+                className={`px-3.5 py-2 rounded-xl border flex items-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+                  isLight 
+                    ? 'bg-white border-amber-300 text-slate-900 hover:bg-amber-100 shadow-xs' 
+                    : 'bg-black/50 border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40 hover:border-cyan-400 shadow-xs'
+                }`}
+                title="View logged-in devices in Admin Dashboard"
+              >
+                <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Active Devices: {adminDeviceCount || 1} Logged In</span>
+                <span className="text-[9px] uppercase font-mono text-slate-400 font-normal">→ Manage</span>
+              </button>
+            </motion.div>
+          )}
+
+          {/* Location & Copyright */}
+          <div className="space-y-1.5 pt-2">
+            <div className="text-[9px] tracking-normal text-slate-500 font-sans max-w-xl mx-auto">
+              📍 Ward No. 4, Siddhivinayak Complex, First Floor, Balaghat Road, Waraseoni - 481331 (M.P.), India
+            </div>
+
+            <div 
+              onClick={handleStaffAccessTrigger}
+              className="cursor-pointer hover:text-blue-900 dark:hover:text-sky-400 transition-colors text-[8.5px] uppercase tracking-widest text-slate-400/80"
+              title="Staff & Educator Access"
+            >
+              © {new Date().getFullYear()} Dakshyam Innovations • Learn • Build • Innovate • NEP 2020 Aligned
+            </div>
+
+            <div className="text-[8px] text-slate-500">
+              Programming • Web & App Development • AI & Machine Learning • IoT & Robotics Lab Infrastructure
+            </div>
+          </div>
+
         </div>
       </footer>
 
@@ -2366,7 +2217,7 @@ export default function App() {
               )}
 
               <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-650' : 'text-slate-350'}`}>
-                To submit an official course application, receive physical hardware kits, and track your accredited certification, please sign in to your student account or register as a new candidate.
+                To submit an official course application, receive physical hardware kits, and track your project modules, please sign in to your student account or register as a new candidate.
               </p>
 
               {/* Benefits Checklist */}
@@ -2383,7 +2234,7 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-2 text-[11px]">
                   <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>Verifiable QR-coded NEP 2020 Certificate issued upon completion</span>
+                  <span>Hands-on laboratory training and real project deployments</span>
                 </div>
               </div>
 
@@ -2582,7 +2433,7 @@ export default function App() {
                           required
                           value={studentEmail}
                           onChange={(e) => setStudentEmail(e.target.value)}
-                          placeholder="e.g. student@example.com"
+                          placeholder="e.g. student@dakshyam.in"
                           className={isLight 
                             ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900 focus:bg-white transition-all" 
                             : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-400 transition-all"
@@ -2684,7 +2535,7 @@ export default function App() {
                             setOtpInput('');
                             setOtpStatusMsg('');
                           }}
-                          placeholder="e.g. kunal@example.com"
+                          placeholder="e.g. trainer@dakshyam.in"
                           className={isLight 
                             ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-900 focus:bg-white" 
                             : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-400"
@@ -3093,7 +2944,7 @@ export default function App() {
                       required
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
-                      placeholder="e.g. user@example.com"
+                      placeholder="e.g. user@dakshyam.in"
                       className={isLight 
                         ? "w-full bg-slate-50 border border-blue-900/15 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-900" 
                         : "w-full bg-[#071326] border border-blue-900/30 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-400"
@@ -3321,12 +3172,7 @@ export default function App() {
         workshops={availableWorkshops}
         theme={theme}
         currentUserRole={currentUser?.role}
-        onSelectWorkshop={(ws) => {
-          navigateToTab('feedback', null, ws.id);
-        }}
-        onOpenForm={(wsId) => {
-          navigateToTab('feedback', null, wsId);
-        }}
+        onSelectWorkshop={() => {}}
       />
 
       {/* FLOATING SMOOTH SCROLL TO TOP BUTTON */}

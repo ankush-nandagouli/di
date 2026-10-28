@@ -293,11 +293,11 @@ export default function Admin3DModelEditorModal({
     }
   };
 
-  // Revert back to default logo
+  // Revert back to default 3D Geometric Core model
   const handleRevertToDefault = async () => {
-    if (confirm('Revert home page 3D art back to the default Dakshyam Innovations logo for all visitors?')) {
+    if (confirm('Revert home page 3D art back to the default 3D Geometric Core model for all visitors?')) {
       await delete3DModelFromCloud(storageKey);
-      setStatusMessage({ type: 'success', text: 'Reverted to default Dakshyam 3D Emblem across all devices' });
+      setStatusMessage({ type: 'success', text: 'Reverted to default 3D Geometric Core model across all devices' });
       onModelChanged();
       setTimeout(() => {
         onClose();
@@ -870,7 +870,7 @@ export default function Admin3DModelEditorModal({
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="url"
-                    placeholder="https://example.com/assets/model.obj or .glb"
+                    placeholder="https://assets.dakshyam.in/models/robotics_arm.obj or .glb"
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
                     className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-mono focus:border-cyan-400 focus:outline-none placeholder:text-slate-600"

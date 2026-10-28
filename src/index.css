@@ -119,12 +119,9 @@ body,
   -webkit-overflow-scrolling: touch;
 }
 
-/* Jitter-free hardware accelerated transitions */
+/* Jitter-free hardware accelerated transitions without fixed position trap */
 .smooth-gpu {
-  transform: translateZ(0);
   backface-visibility: hidden;
-  perspective: 1000px;
-  will-change: transform, opacity;
 }
 
 /* Mobile viewport overflow guard */

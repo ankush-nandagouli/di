@@ -5,7 +5,7 @@ import DakshyamLogo from './DakshyamLogo';
 
 interface NotFoundPageProps {
   theme: 'dark' | 'light';
-  onNavigateTab: (tab: 'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact' | 'feedback') => void;
+  onNavigateTab: (tab: 'home' | 'services' | 'social' | 'portal' | 'about' | 'contact' | 'notfound') => void;
 }
 
 export const NotFoundPage: React.FC<NotFoundPageProps> = ({ theme, onNavigateTab }) => {
@@ -73,7 +73,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({ theme, onNavigateTab
           </button>
 
           <button
-            onClick={() => onNavigateTab('verification')}
+            onClick={() => onNavigateTab('portal')}
             className={`flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl font-mono text-xs font-bold tracking-wider uppercase border transition-all duration-200 cursor-pointer active:scale-95 ${
               isLight
                 ? 'border-slate-300 bg-white hover:bg-slate-50 text-slate-800'
@@ -81,7 +81,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({ theme, onNavigateTab
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Verify Certificate</span>
+            <span>Innovation Portal</span>
           </button>
 
           <button

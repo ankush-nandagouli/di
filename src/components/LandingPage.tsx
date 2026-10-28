@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowRight, BookOpen, Smartphone, ShieldCheck, 
   Star, ChevronLeft, ChevronRight, School, Sparkles, LayoutGrid, Image as ImageIcon,
-  Building2
+  Building2, Camera, Maximize2, X, Download, Grid, Layers,
+  Calendar, MapPin, User, Video, Edit3
 } from 'lucide-react';
-import DakshyamLogo from './DakshyamLogo';
 import Home3DArtViewer from './Home3DArtViewer';
-import { Course, PromoBanner, GalleryImage } from '../types';
+import { Course, PromoBanner, GalleryImage, WorkshopItem } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
+import { WorkshopFeedbackStorage } from '../utils/feedbackStorage';
+import WorkshopDetailsModal from './WorkshopDetailsModal';
 
 interface LandingPageProps {
   courses: Course[];
@@ -19,8 +22,10 @@ interface LandingPageProps {
   onSelectCourse: (courseId: string) => void;
   theme?: 'light' | 'dark';
   currentUser?: any;
+  currentUserRole?: string;
   onNavigateToAdmin?: () => void;
   onOpenWorkshopDirectory?: () => void;
+  onNavigateToTab?: (tab: string) => void;
 }
 
 export default function LandingPage({ 
@@ -31,12 +36,15 @@ export default function LandingPage({
   onSelectCourse,
   theme = 'dark',
   currentUser,
+  currentUserRole,
   onNavigateToAdmin,
-  onOpenWorkshopDirectory
+  onOpenWorkshopDirectory,
+  onNavigateToTab
 }: LandingPageProps) {
   // Check if current authenticated user has administrator privileges
   const loggedInUser = currentUser || DakshyamDatabase.getLoggedInUser();
   const isAdmin = loggedInUser?.role === 'admin';
+  const effectiveUserRole = currentUserRole || loggedInUser?.role || 'student';
   
   // Theme state maps
   const isLight = theme === 'light';
@@ -71,9 +79,29 @@ export default function LandingPage({
     setCurrentSlide(prev => (prev - 1 + activeBanners.length) % activeBanners.length);
   };
 
-  // Image Gallery state
+  // Image Gallery & Event Snapshot States
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [lightboxImage, setLightboxImage] = useState<GalleryImage | null>(null);
+  const [selectedEventSnapshot, setSelectedEventSnapshot] = useState<{
+    id: string;
+    title: string;
+    category: string;
+    description: string;
+    createdAt: string;
+    images: GalleryImage[];
+  } | null>(null);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [eventViewMode, setEventViewMode] = useState<'slideshow' | 'grid'>('slideshow');
+
+  // Workshops Showcase & Details States
+  const [landingWorkshops, setLandingWorkshops] = useState<WorkshopItem[]>(() => {
+    try {
+      const cfg = WorkshopFeedbackStorage.getFeedbackConfig();
+      return (cfg && cfg.workshops) || [];
+    } catch {
+      return [];
+    }
+  });
+  const [selectedWorkshopForDetails, setSelectedWorkshopForDetails] = useState<WorkshopItem | null>(null);
 
   // Campus Special Programs Registration states
   const [selectedRegProg, setSelectedRegProg] = useState<any>(null);
@@ -151,9 +179,71 @@ export default function LandingPage({
     { key: 'lab_setups', label: 'LAB SETUP LOGISTICS' }
   ];
 
-  const filteredGallery = activeCategory === 'all' 
-    ? galleryImages 
-    : galleryImages.filter(img => img.category === activeCategory);
+  // Group gallery images by Event Snapshot Title
+  const eventSnapshots = React.useMemo(() => {
+    const map = new Map<string, {
+      id: string;
+      title: string;
+      category: string;
+      description: string;
+      createdAt: string;
+      images: GalleryImage[];
+    }>();
+    
+    galleryImages.forEach((img, idx) => {
+      const cleanTitle = (img.title || 'Dakshyam Innovations Event Snapshot').trim();
+      const key = cleanTitle.toLowerCase();
+      
+      if (!map.has(key)) {
+        map.set(key, {
+          id: img.id || `event-${idx}`,
+          title: cleanTitle,
+          category: img.category || 'school_programs',
+          description: img.description || '',
+          createdAt: img.createdAt || 'Recently',
+          images: [img]
+        });
+      } else {
+        const group = map.get(key)!;
+        if (!group.images.some(existing => existing.imageUrl === img.imageUrl)) {
+          group.images.push(img);
+        }
+        if (img.description && img.description.length > group.description.length) {
+          group.description = img.description;
+        }
+      }
+    });
+
+    return Array.from(map.values());
+  }, [galleryImages]);
+
+  const filteredEvents = React.useMemo(() => {
+    if (activeCategory === 'all') return eventSnapshots;
+    return eventSnapshots.filter(event => 
+      event.category === activeCategory || event.images.some(img => img.category === activeCategory)
+    );
+  }, [eventSnapshots, activeCategory]);
+
+  // Keyboard navigation & body scroll lock for open lightbox
+  useEffect(() => {
+    if (!selectedEventSnapshot) return;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedEventSnapshot(null);
+      } else if (e.key === 'ArrowRight') {
+        setActivePhotoIndex(prev => (prev + 1) % selectedEventSnapshot.images.length);
+      } else if (e.key === 'ArrowLeft') {
+        setActivePhotoIndex(prev => (prev - 1 + selectedEventSnapshot.images.length) % selectedEventSnapshot.images.length);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedEventSnapshot]);
 
   return (
     <div className="space-y-16 py-4 relative text-center">
@@ -201,12 +291,32 @@ export default function LandingPage({
 
                   {activeBanners[currentSlide].actionUrl && (
                     <div className="pt-1.5">
-                      <a
-                        href={activeBanners[currentSlide].actionUrl}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = activeBanners[currentSlide]?.actionUrl || '';
+                          if (url.startsWith('#')) {
+                            const target = url.replace('#', '');
+                            if (['services', 'courses', 'about', 'contact', 'portal'].includes(target)) {
+                              onNavigateToTab?.(target);
+                            } else {
+                              const el = document.getElementById(target);
+                              if (el) {
+                                el.scrollIntoView({ behavior: 'smooth' });
+                              } else if (target === 'services') {
+                                onNavigateToTab?.('services');
+                              }
+                            }
+                          } else if (url.startsWith('http://') || url.startsWith('https://')) {
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          } else {
+                            onNavigateToTab?.(url);
+                          }
+                        }}
                         className={`inline-flex items-center gap-1.5 text-[10px] font-black font-mono px-3.5 py-1.5 rounded-lg transition-all hover:scale-103 active:scale-97 cursor-pointer ${actionButtonBg}`}
                       >
                         LEARN DETAIL <ArrowRight className="w-3 h-3" />
-                      </a>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -258,9 +368,9 @@ export default function LandingPage({
         </div>
       )}
 
-      {/* --- HERO / 3D ART SECTION --- */}
-      <div className="flex flex-col items-center justify-center min-h-[48vh] px-4 space-y-6">
-        <div className="w-full transition-all">
+      {/* --- HERO 3D ART & BRAND IDENTITY SECTION --- */}
+      <div className="flex flex-col items-center justify-center min-h-[44vh] px-4 space-y-4">
+        <div className="w-full flex justify-center py-1 transition-all">
           <Home3DArtViewer 
             theme={theme} 
             isAdmin={isAdmin} 
@@ -498,34 +608,34 @@ export default function LandingPage({
         </div>
       </div>
 
-      {/* --- SECTION CD: SYLLABUS DIRECTORY --- */}
-      <div className="max-w-4xl mx-auto px-4 space-y-8">
-        <div className={`text-left border-l-2 pl-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
-          <div className="space-y-1">
-            <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${textGold}`}>Curriculum Catalog</span>
-            <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Official Course Syllabus Directory</h2>
-            <p className={`text-xs max-w-xl ${textMuted}`}>
-              Explore active syllabus schedules. Complete physical training is supported by digital access logs and authorized, downloadable certificates.
-            </p>
+      {/* --- SECTION CD: SYLLABUS DIRECTORY (Only rendered when curriculum catalog is uploaded/updated) --- */}
+      {courses && courses.length > 0 && (
+        <div className="max-w-4xl mx-auto px-4 space-y-8 animate-fadeIn">
+          <div className={`text-left border-l-2 pl-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isLight ? 'border-blue-900' : 'border-sky-400'}`}>
+            <div className="space-y-1">
+              <span className={`text-3xs font-mono tracking-widest uppercase font-bold ${textGold}`}>Curriculum Catalog</span>
+              <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>Official Course Syllabus Directory</h2>
+              <p className={`text-xs max-w-xl ${textMuted}`}>
+                Explore active syllabus schedules. Complete physical training is supported by digital access logs and hands-on laboratory equipment.
+              </p>
+            </div>
+            {onOpenWorkshopDirectory && (
+              <button
+                type="button"
+                onClick={onOpenWorkshopDirectory}
+                className={`self-start sm:self-auto shrink-0 text-xs font-mono font-bold px-3.5 py-2 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                  isLight 
+                    ? 'bg-purple-50 hover:bg-purple-100 text-purple-950 border-purple-200' 
+                    : 'bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border-purple-500/30'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5 text-purple-400" />
+                <span>Workshops Directory</span>
+              </button>
+            )}
           </div>
-          {onOpenWorkshopDirectory && (
-            <button
-              type="button"
-              onClick={onOpenWorkshopDirectory}
-              className={`self-start sm:self-auto shrink-0 text-xs font-mono font-bold px-3.5 py-2 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
-                isLight 
-                  ? 'bg-purple-50 hover:bg-purple-100 text-purple-950 border-purple-200' 
-                  : 'bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border-purple-500/30'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5 text-purple-400" />
-              <span>Workshops Directory</span>
-            </button>
-          )}
-        </div>
 
-        {/* Course Cards */}
-        {courses.length > 0 ? (
+          {/* Course Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
             {courses.map((course) => (
               <div 
@@ -581,14 +691,8 @@ export default function LandingPage({
               </div>
             ))}
           </div>
-        ) : (
-          <div className={`p-8 border rounded-2xl max-w-md mx-auto text-center space-y-2 font-mono ${cardCourseBg}`}>
-            <BookOpen className="w-8 h-8 text-slate-550 mx-auto" />
-            <h3 className={`text-xs font-bold uppercase ${textTitle}`}>Syllabus Catalog Empty</h3>
-            <p className={`text-3xs ${textMutedLight}`}>Wait for Admin supervisor to publish new classes.</p>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* --- SECTION CA: SPECIAL SCHOOL & COLLEGE CAMPUS REGISTRATIONS --- */}
       {activeSpecialPrograms.length > 0 && (
@@ -697,7 +801,7 @@ export default function LandingPage({
                       <form onSubmit={handleSelfRegister} className={`space-y-3 text-xs ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Student Full Name</label>
+                            <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-700 font-bold' : 'text-slate-400'}`}>Student Full Name</label>
                             <input
                               type="text"
                               required
@@ -705,13 +809,13 @@ export default function LandingPage({
                               onChange={(e) => setStudentName(e.target.value)}
                               placeholder="e.g. Ramesh Kumar"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950 placeholder:text-slate-400' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Branch / Stream</label>
+                            <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-700 font-bold' : 'text-slate-400'}`}>Branch / Stream</label>
                             <input
                               type="text"
                               required
@@ -719,13 +823,13 @@ export default function LandingPage({
                               onChange={(e) => setBranch(e.target.value)}
                               placeholder="e.g. Science / CSE / IT"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950 placeholder:text-slate-400' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Year of Study</label>
+                            <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-700 font-bold' : 'text-slate-400'}`}>Year of Study</label>
                             <input
                               type="text"
                               required
@@ -733,13 +837,13 @@ export default function LandingPage({
                               onChange={(e) => setYear(e.target.value)}
                               placeholder="e.g. Class 11 / 2nd Year"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950 placeholder:text-slate-400' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Father's Name</label>
+                            <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-700 font-bold' : 'text-slate-400'}`}>Father's Name</label>
                             <input
                               type="text"
                               required
@@ -747,27 +851,27 @@ export default function LandingPage({
                               onChange={(e) => setFatherName(e.target.value)}
                               placeholder="Father's Full Name"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950 placeholder:text-slate-400' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Email ID</label>
+                            <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-700 font-bold' : 'text-slate-400'}`}>Email ID</label>
                             <input
                               type="email"
                               required
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
-                              placeholder="student@example.com"
+                              placeholder="student@dakshyam.in"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950 placeholder:text-slate-400' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Roll / Enrolment Number</label>
+                            <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-700 font-bold' : 'text-slate-400'}`}>Roll / Enrolment Number</label>
                             <input
                               type="text"
                               required
@@ -775,14 +879,14 @@ export default function LandingPage({
                               onChange={(e) => setRoll(e.target.value)}
                               placeholder="e.g. ROLL12A"
                               className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
+                                isLight ? 'bg-slate-50 border-slate-300 text-slate-950 placeholder:text-slate-400' : 'bg-[#071326] border-blue-900/40 text-white'
                               }`}
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Mobile / WhatsApp contacts</label>
+                          <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-700 font-bold' : 'text-slate-400'}`}>Mobile / WhatsApp contacts</label>
                           <input
                             type="text"
                             required
@@ -790,7 +894,7 @@ export default function LandingPage({
                             onChange={(e) => setMobile(e.target.value)}
                             placeholder="+91 WhatsApp Contact"
                             className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${
-                              isLight ? 'bg-slate-50 border-slate-300 text-slate-950' : 'bg-[#071326] border-blue-900/40 text-white'
+                              isLight ? 'bg-slate-50 border-slate-300 text-slate-950 placeholder:text-slate-400' : 'bg-[#071326] border-blue-900/40 text-white'
                             }`}
                           />
                         </div>
@@ -811,6 +915,154 @@ export default function LandingPage({
             </AnimatePresence>
           </div>
         )}
+
+      {/* --- SECTION CB: ACTIVE WORKSHOPS & PRACTICAL BOOTCAMPS (VIEWABLE BY ANYONE) --- */}
+      {landingWorkshops.length > 0 && (
+        <div id="workshops" className="max-w-4xl mx-auto px-4 space-y-8 scroll-mt-24">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-l-2 pl-4 border-purple-500 text-left">
+            <div className="space-y-1">
+              <span className={`text-3xs font-mono tracking-widest uppercase font-black text-purple-400`}>
+                Vocational Technical Bootcamps
+              </span>
+              <h2 className={`text-base md:text-lg font-black tracking-wide uppercase ${textTitle}`}>
+                Active Workshops & Hands-On Demonstrations
+              </h2>
+              <p className={`text-xs max-w-xl ${textMuted}`}>
+                Explore physical and institutional workshops conducted across schools, colleges, and polytechnics. Click any session to explore photos, videos, and lab highlights.
+              </p>
+            </div>
+
+            {onOpenWorkshopDirectory && (
+              <button
+                type="button"
+                onClick={onOpenWorkshopDirectory}
+                className={`self-start sm:self-auto shrink-0 text-xs font-mono font-bold px-3.5 py-2 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                  isLight 
+                    ? 'bg-purple-50 hover:bg-purple-100 text-purple-950 border-purple-200' 
+                    : 'bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border-purple-500/30'
+                }`}
+              >
+                <span>All Workshops Directory ({landingWorkshops.length})</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Workshop Tiles Grid (Each tile contains thumbnail of uploaded image) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+            {landingWorkshops.slice(0, 6).map((ws) => {
+              const photosCount = (ws.photos && ws.photos.length) || 0;
+              const videosCount = (ws.videos && ws.videos.length) || 0;
+              const thumbnailUrl = ws.thumbnailUrl || (ws.photos && ws.photos.length > 0 ? ws.photos[0] : 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80');
+
+              return (
+                <motion.div
+                  layout
+                  key={ws.id}
+                  onClick={() => setSelectedWorkshopForDetails(ws)}
+                  className={`group border rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] flex flex-col justify-between ${
+                    isLight 
+                      ? 'border-blue-900/10 bg-white hover:border-purple-500/40 hover:shadow-[0_8px_30px_rgba(15,23,42,0.08)]' 
+                      : 'border-blue-800/30 bg-[#0d1f38]/60 hover:border-purple-400/50 hover:shadow-[0_0_25px_rgba(168,85,247,0.15)]'
+                  }`}
+                >
+                  {/* Workshop Thumbnail of uploaded image */}
+                  <div className="relative w-full h-52 overflow-hidden bg-slate-950">
+                    <img 
+                      src={thumbnailUrl} 
+                      alt={ws.name}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+
+                    {/* Gradient shade */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/30 pointer-events-none" />
+
+                    {/* Floating Badges */}
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10 pointer-events-none">
+                      <span className={`text-[8.5px] font-mono font-black px-2.5 py-1 rounded-lg uppercase tracking-wider border shadow-xs backdrop-blur-md ${
+                        ws.isActive 
+                          ? 'border-emerald-400/40 bg-emerald-500/90 text-slate-950' 
+                          : 'border-slate-700 bg-slate-800/80 text-slate-300'
+                      }`}>
+                        {ws.isActive ? '● Active Workshop' : '○ Concluded'}
+                      </span>
+                      
+                      <div className="flex items-center gap-1">
+                        <span className="text-[8.5px] font-mono font-black px-2 py-1 rounded-lg bg-black/70 text-cyan-300 border border-cyan-400/30 shadow-xs flex items-center gap-1 backdrop-blur-md">
+                          <Camera className="w-3 h-3 text-cyan-400" />
+                          <span>{photosCount}</span>
+                        </span>
+                        {videosCount > 0 && (
+                          <span className="text-[8.5px] font-mono font-black px-2 py-1 rounded-lg bg-black/70 text-purple-300 border border-purple-400/30 shadow-xs flex items-center gap-1 backdrop-blur-md">
+                            <Video className="w-3 h-3 text-purple-400" />
+                            <span>{videosCount}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom Action on Thumbnail */}
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white z-10 pointer-events-none">
+                      <span className="text-[8.5px] font-mono font-bold text-slate-200 flex items-center gap-1 bg-black/60 px-2 py-1 rounded-lg backdrop-blur-xs border border-white/10">
+                        <Building2 className="w-3 h-3 text-purple-400" />
+                        <span>ID: {ws.id}</span>
+                      </span>
+
+                      <div className="bg-purple-600 group-hover:bg-cyan-400 group-hover:text-slate-950 text-white text-[8.5px] font-mono font-black px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 shadow-md border border-white/20">
+                        <Maximize2 className="w-2.5 h-2.5" />
+                        <span>View Details & Media &rarr;</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tile Card Body */}
+                  <div className={`p-4 space-y-2.5 flex-1 flex flex-col justify-between transition-colors duration-200 ${isLight ? 'bg-purple-50/20' : 'bg-[#0a192f]/70'}`}>
+                    <div className="space-y-1.5">
+                      <h4 className={`text-2xs font-extrabold uppercase transition-colors tracking-wide line-clamp-1 ${
+                        isLight ? 'text-slate-900 group-hover:text-purple-950' : 'text-white group-hover:text-purple-300'
+                      }`}>
+                        {ws.name}
+                      </h4>
+
+                      <div className="space-y-1 text-[10px] font-mono text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3 text-amber-400 shrink-0" />
+                          <span className={isLight ? 'text-slate-700 font-semibold' : 'text-slate-300'}>{ws.date}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3 h-3 text-sky-400 shrink-0" />
+                          <span className="truncate">{ws.venue}</span>
+                        </div>
+                        {ws.trainerName && (
+                          <div className="flex items-center gap-1.5">
+                            <User className="w-3 h-3 text-emerald-400 shrink-0" />
+                            <span className="truncate">{ws.trainerName}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <p className={`text-[10px] leading-relaxed line-clamp-2 pt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                        {ws.description || 'Hands-on practical training and laboratory deployment.'}
+                      </p>
+                    </div>
+
+                    <div className={`pt-2 border-t flex items-center justify-between text-[8px] font-mono uppercase tracking-wider ${
+                      isLight ? 'border-slate-200 text-slate-500' : 'border-purple-900/30 text-slate-400'
+                    }`}>
+                      <span>{ws.targetAudience || 'STEM Candidates'}</span>
+                      <span className="font-bold text-purple-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                        Explore Workshop &rarr;
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* --- SECTION D: AUTHENTIC captioned PHOTO GALLERY --- */}
       <div className="max-w-4xl mx-auto px-4 space-y-8">
@@ -839,54 +1091,98 @@ export default function LandingPage({
           ))}
         </div>
 
-        {/* Images Grid */}
-        {filteredGallery.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-left">
-            {filteredGallery.map((img) => (
-              <motion.div
-                layout
-                key={img.id}
-                onClick={() => setLightboxImage(img)}
-                className={`group border rounded-2xl overflow-hidden cursor-pointer transition-all hover:scale-[1.01] ${
-                  isLight 
-                    ? 'border-blue-900/10 bg-white hover:border-blue-900/30 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)]' 
-                    : 'border-blue-800/30 bg-[#0d1f38]/60 hover:border-blue-500/40 hover:shadow-[0_0_20px_rgba(59,130,246,0.1)]'
-                }`}
-              >
-                <div className="h-44 w-full overflow-hidden relative bg-slate-900">
-                  <img 
-                    src={img.imageUrl} 
-                    alt={img.title}
-                    referrerPolicy="no-referrer"
-                    className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-transparent opacity-80" />
-                  
-                  <span className={`absolute top-3 left-3 text-[8px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
-                    isLight ? 'border-blue-900/20 bg-blue-50 text-blue-950' : 'border-blue-500/30 bg-black/75 text-sky-300'
-                  }`}>
-                    {img.category.replace('_', ' ')}
-                  </span>
-                </div>
+        {/* Event Snapshot Tiles Grid */}
+        {filteredEvents.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+            {filteredEvents.map((event) => {
+              const photoCount = event.images.length;
+              return (
+                <motion.div
+                  layout
+                  key={event.id}
+                  onClick={() => {
+                    setSelectedEventSnapshot(event);
+                    setActivePhotoIndex(0);
+                    setEventViewMode('slideshow');
+                  }}
+                  className={`group border rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] flex flex-col justify-between ${
+                    isLight 
+                      ? 'border-blue-900/10 bg-white hover:border-blue-900/30 hover:shadow-[0_8px_30px_rgba(15,23,42,0.08)]' 
+                      : 'border-blue-800/30 bg-[#0d1f38]/60 hover:border-blue-500/40 hover:shadow-[0_0_25px_rgba(59,130,246,0.15)]'
+                  }`}
+                >
+                  {/* Single Clean Thumbnail of one uploaded image for the Event Snapshot */}
+                  <div className="relative w-full h-52 overflow-hidden bg-slate-950">
+                    <img 
+                      src={event.images[0]?.imageUrl} 
+                      alt={event.title}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
 
-                <div className={`p-4 space-y-1 transition-colors duration-305 ${isLight ? 'bg-blue-50/30' : 'bg-[#0a192f]/80'}`}>
-                  <h4 className={`text-2xs font-extrabold uppercase transition-colors tracking-wide ${
-                    isLight ? 'text-slate-800 group-hover:text-blue-950' : 'text-white group-hover:text-sky-300'
-                  }`}>
-                    {img.title}
-                  </h4>
-                  <p className={`text-[10px] leading-relaxed line-clamp-2 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                    {img.description}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
+                    {/* Subtle Gradient Shade */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/35 pointer-events-none" />
+
+                    {/* Floating Badges */}
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10 pointer-events-none">
+                      <span className={`text-[8.5px] font-mono font-extrabold px-2.5 py-1 rounded-lg uppercase tracking-wider border shadow-xs backdrop-blur-md ${
+                        isLight ? 'border-blue-900/20 bg-white/95 text-blue-950 font-black' : 'border-blue-500/40 bg-black/80 text-sky-300'
+                      }`}>
+                        {event.category.replace('_', ' ')}
+                      </span>
+                      
+                      <span className="text-[8.5px] font-mono font-black px-2.5 py-1 rounded-lg bg-blue-600/90 text-white border border-blue-400/40 shadow-xs flex items-center gap-1.5 backdrop-blur-md">
+                        <Camera className="w-3 h-3 text-cyan-300" />
+                        <span>{photoCount} {photoCount === 1 ? 'Photo' : 'Photos'}</span>
+                      </span>
+                    </div>
+
+                    {/* Bottom Hover Action Banner */}
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white z-10 pointer-events-none">
+                      <span className="text-[8.5px] font-mono font-bold text-slate-200 flex items-center gap-1 bg-black/60 px-2 py-1 rounded-lg backdrop-blur-xs border border-white/10">
+                        <Layers className="w-3 h-3 text-cyan-400" />
+                        <span>Snapshot Album</span>
+                      </span>
+
+                      <div className="bg-blue-600 group-hover:bg-cyan-400 group-hover:text-slate-950 text-white text-[8.5px] font-mono font-black px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 shadow-md border border-white/20">
+                        <Maximize2 className="w-2.5 h-2.5" />
+                        <span>View All {photoCount} Photos &rarr;</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Body */}
+                  <div className={`p-4 space-y-2 flex-1 flex flex-col justify-between transition-colors duration-200 ${isLight ? 'bg-blue-50/25' : 'bg-[#0a192f]/70'}`}>
+                    <div className="space-y-1">
+                      <h4 className={`text-2xs font-extrabold uppercase transition-colors tracking-wide line-clamp-1 ${
+                        isLight ? 'text-slate-900 group-hover:text-blue-950' : 'text-white group-hover:text-sky-300'
+                      }`}>
+                        {event.title}
+                      </h4>
+                      <p className={`text-[10px] leading-relaxed line-clamp-2 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                        {event.description || 'Live technical and vocational training snapshot.'}
+                      </p>
+                    </div>
+
+                    <div className={`pt-2 border-t flex items-center justify-between text-[8px] font-mono uppercase tracking-wider ${
+                      isLight ? 'border-slate-200 text-slate-500' : 'border-blue-900/30 text-slate-500'
+                    }`}>
+                      <span>{event.createdAt}</span>
+                      <span className="font-bold text-sky-500 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                        Explore Event &rarr;
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         ) : (
           <div className={`p-12 border rounded-2xl max-w-sm mx-auto text-center space-y-2 font-mono ${cardCourseBg}`}>
-            <ImageIcon className="w-8 h-8 text-slate-550 mx-auto" />
-            <h3 className={`text-xs font-bold uppercase ${textTitle}`}>No photos posted</h3>
-            <p className={`text-3xs ${textMutedLight}`}>Wait for Admin supervisor to publish gallery uploads.</p>
+            <ImageIcon className="w-8 h-8 text-slate-500 mx-auto" />
+            <h3 className={`text-xs font-bold uppercase ${textTitle}`}>No event photos posted</h3>
+            <p className={`text-3xs ${textMutedLight}`}>Wait for Admin supervisor to publish gallery snapshots.</p>
           </div>
         )}
       </div>
@@ -963,71 +1259,157 @@ export default function LandingPage({
         </div>
       </div>
 
-      {/* --- LIGHTBOX MODAL --- */}
-      <AnimatePresence>
-        {lightboxImage && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setLightboxImage(null)}
-              className="absolute inset-0 bg-black/90 backdrop-blur-sm cursor-pointer"
-            />
-            
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={`border rounded-2xl max-w-xl w-full overflow-hidden relative z-10 text-left space-y-4 flex flex-col justify-between max-h-[90vh] overflow-y-auto ${
-                isLight ? 'bg-white border-blue-900/20 shadow-[0_4px_30px_rgba(15,23,42,0.1)]' : 'bg-[#0a192f] border-blue-700/40 shadow-[0_0_40px_rgba(30,58,138,0.25)]'
-              }`}
-            >
-              <div className="relative aspect-video w-full bg-slate-900">
-                <img 
-                  src={lightboxImage.imageUrl} 
-                  alt={lightboxImage.title}
-                  referrerPolicy="no-referrer"
-                  className="h-full w-full object-cover"
-                />
-                
-                {/* Close Button */}
-                <button
-                  onClick={() => setLightboxImage(null)}
-                  className={`absolute top-3 right-3 p-2 rounded-full border bg-black/80 text-white hover:text-red-400 transition-colors cursor-pointer text-xs font-mono ${
-                    isLight ? 'border-blue-300/30' : 'border-blue-500/30'
-                  }`}
-                >
-                  ✕ CLOSE
-                </button>
-              </div>
-
-              <div className="p-5 sm:p-6 space-y-2.5">
-                <span className={`text-[8px] font-mono font-black tracking-widest uppercase px-2 py-0.5 rounded border ${
-                  isLight ? 'text-blue-950 bg-blue-50 border-blue-900/20' : 'text-sky-300 bg-blue-950/60 border-blue-500/30'
-                }`}>
-                  {lightboxImage.category.replace('_', ' ')}
+      {/* --- EVENT SNAPSHOT MULTI-PHOTO SHOWCASE LIGHTBOX (PORTALIZED: OPENS ON SAME SCREEN, ZERO SCROLL) --- */}
+      {selectedEventSnapshot && typeof document !== 'undefined' && createPortal(
+        <div 
+          className="fixed inset-0 z-[99999] w-screen h-screen flex flex-col justify-between bg-black/95 backdrop-blur-xl p-2 sm:p-4 overflow-hidden overscroll-none"
+          role="dialog"
+          aria-modal="true"
+          style={{ top: 0, left: 0, right: 0, bottom: 0, position: 'fixed' }}
+        >
+          {/* Top Bar - Header Controls */}
+          <div className="shrink-0 flex items-center justify-between gap-3 px-2 sm:px-4 py-2 border-b border-white/10 text-white z-10">
+            <div className="space-y-0.5 min-w-0 text-left">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[9px] font-mono font-black uppercase tracking-wider px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                  {selectedEventSnapshot.category.replace('_', ' ')}
                 </span>
-                
-                <h3 className={`text-xs sm:text-sm font-black uppercase ${textTitle}`}>
-                  {lightboxImage.title}
-                </h3>
-                
-                <p className={`text-3xs sm:text-2xs leading-relaxed font-sans ${isLight ? 'text-slate-700' : 'text-slate-350'}`}>
-                  {lightboxImage.description}
-                </p>
-
-                <div className={`text-[8px] font-mono border-t pt-2.5 flex justify-between items-center ${
-                  isLight ? 'text-slate-500 border-blue-900/10' : 'text-slate-500 border-blue-900/20'
-                }`}>
-                  <span>SYSTEM UNIQUE ID: {lightboxImage.id}</span>
-                  <span>RECORDED: {lightboxImage.createdAt}</span>
-                </div>
+                <span className="text-[10px] font-mono text-slate-300 font-bold bg-white/10 px-2 py-0.5 rounded-full">
+                  Photo {activePhotoIndex + 1} of {selectedEventSnapshot.images.length}
+                </span>
+                <span className="text-[9px] font-mono text-slate-400 hidden sm:inline">
+                  • {selectedEventSnapshot.createdAt}
+                </span>
               </div>
-            </motion.div>
+              <h3 className="text-xs sm:text-sm font-black uppercase tracking-wide truncate max-w-md sm:max-w-xl text-white">
+                {selectedEventSnapshot.title}
+              </h3>
+            </div>
+
+            {/* Top Right Actions */}
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href={selectedEventSnapshot.images[activePhotoIndex]?.imageUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-2xs font-mono font-bold border border-white/20 flex items-center gap-1.5 cursor-pointer transition-all"
+                title="Open Full Resolution Photo in New Tab"
+              >
+                <Download className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">Full Resolution</span>
+              </a>
+
+              <button
+                type="button"
+                onClick={() => setSelectedEventSnapshot(null)}
+                className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all shadow-md"
+                title="Close Photo Viewer (Esc)"
+                aria-label="Close photo viewer"
+              >
+                <X className="w-4 h-4" />
+                <span className="hidden sm:inline text-2xs">ESC</span>
+              </button>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+
+          {/* Center Stage: Photo strictly fitted within screen, zero scrolling required */}
+          <div 
+            className="relative flex-1 min-h-0 w-full flex items-center justify-center p-1 sm:p-2 overflow-hidden my-auto cursor-pointer"
+            onClick={() => setSelectedEventSnapshot(null)}
+          >
+            <div 
+              className="relative max-h-full max-w-full flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img 
+                key={selectedEventSnapshot.images[activePhotoIndex]?.id || activePhotoIndex}
+                src={selectedEventSnapshot.images[activePhotoIndex]?.imageUrl} 
+                alt={selectedEventSnapshot.title}
+                referrerPolicy="no-referrer"
+                className="max-h-[74vh] sm:max-h-[78vh] md:max-h-[81vh] max-w-[94vw] w-auto h-auto object-contain mx-auto select-none rounded-xl sm:rounded-2xl shadow-2xl border border-white/10"
+              />
+
+              {/* Left Navigation Arrow */}
+              {selectedEventSnapshot.images.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActivePhotoIndex(prev => (prev - 1 + selectedEventSnapshot.images.length) % selectedEventSnapshot.images.length);
+                  }}
+                  className="absolute -left-2 sm:left-2 top-1/2 -translate-y-1/2 p-2 sm:p-3 rounded-full bg-black/80 hover:bg-cyan-500 text-white hover:text-slate-950 border border-white/30 backdrop-blur-md hover:scale-110 active:scale-95 transition-all cursor-pointer shadow-2xl z-20"
+                  title="Previous Photo (← Left Arrow)"
+                  aria-label="Previous Photo"
+                >
+                  <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              )}
+
+              {/* Right Navigation Arrow */}
+              {selectedEventSnapshot.images.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActivePhotoIndex(prev => (prev + 1) % selectedEventSnapshot.images.length);
+                  }}
+                  className="absolute -right-2 sm:right-2 top-1/2 -translate-y-1/2 p-2 sm:p-3 rounded-full bg-black/80 hover:bg-cyan-500 text-white hover:text-slate-950 border border-white/30 backdrop-blur-md hover:scale-110 active:scale-95 transition-all cursor-pointer shadow-2xl z-20"
+                  title="Next Photo (→ Right Arrow)"
+                  aria-label="Next Photo"
+                >
+                  <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Bar: Compact Filmstrip & Caption */}
+          <div className="shrink-0 flex flex-col items-center gap-1.5 pt-2 pb-1 border-t border-white/10 text-2xs font-mono text-center">
+            {/* Filmstrip if multiple photos */}
+            {selectedEventSnapshot.images.length > 1 ? (
+              <div className="flex items-center gap-2 overflow-x-auto py-0.5 custom-scrollbar max-w-full px-2">
+                {selectedEventSnapshot.images.map((img, idx) => (
+                  <button
+                    key={img.id ? `${img.id}-${idx}` : idx}
+                    type="button"
+                    onClick={() => setActivePhotoIndex(idx)}
+                    className={`relative w-12 sm:w-16 h-9 sm:h-11 rounded-lg overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                      activePhotoIndex === idx 
+                        ? 'border-cyan-400 scale-105 shadow-[0_0_12px_rgba(34,211,238,0.6)] z-10' 
+                        : 'border-transparent opacity-50 hover:opacity-100 hover:border-white/40'
+                    }`}
+                  >
+                    <img src={img.imageUrl} alt="" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-0 right-0 bg-black/80 text-[7px] font-mono text-white px-1 font-bold">
+                      {idx + 1}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {selectedEventSnapshot.description && (
+              <p className="text-[10px] text-slate-300 font-sans truncate max-w-2xl px-4">
+                {selectedEventSnapshot.description}
+              </p>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* WORKSHOP DETAILS & MULTI-MEDIA SHOWCASE MODAL (VIEWABLE BY ANYONE, EDITABLE BY ADMIN & TRAINER) */}
+      <WorkshopDetailsModal
+        workshop={selectedWorkshopForDetails}
+        isOpen={!!selectedWorkshopForDetails}
+        onClose={() => setSelectedWorkshopForDetails(null)}
+        theme={theme}
+        currentUserRole={effectiveUserRole}
+        onWorkshopUpdated={(updated) => {
+          setSelectedWorkshopForDetails(updated);
+          setLandingWorkshops(prev => prev.map(w => w.id === updated.id ? updated : w));
+        }}
+      />
 
     </div>
   );

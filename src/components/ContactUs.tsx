@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Phone, MapPin, Send, HelpCircle, CheckCircle2, MessageSquare, ArrowRight, AlertTriangle } from 'lucide-react';
 import { notifySuccess, notifyError } from '../utils/toast';
+import { DakshyamDatabase } from '../utils/db';
 
 interface ContactUsProps {
   theme: 'dark' | 'light';
@@ -9,6 +10,11 @@ interface ContactUsProps {
 
 export default function ContactUs({ theme }: ContactUsProps) {
   const isLight = theme === 'light';
+  const aboutData = DakshyamDatabase.getCompanyAbout();
+  const contactEmail = aboutData.contactEmail || 'support@dakshyaminnovations.in';
+  const contactPhone = aboutData.contactPhone || '+91 7632 234567';
+  const officeLocation = aboutData.officeLocation || 'Ward No. 4, Siddhivinayak Complex, First Floor, Balaghat Road, Waraseoni - 481331';
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -82,9 +88,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
               <div className="space-y-1">
                 <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Registered Office</h3>
                 <p className={`text-xs leading-relaxed font-sans ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
-                  Ward No. 4, Siddhivinayak Complex, First Floor<br />
-                  Balaghat Road, Waraseoni - 481331<br />
-                  Madhya Pradesh, India
+                  {officeLocation}
                 </p>
               </div>
             </div>
@@ -99,8 +103,8 @@ export default function ContactUs({ theme }: ContactUsProps) {
               </div>
               <div className="space-y-1">
                 <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Electronic Mail</h3>
-                <a href="mailto:support@dakshyaminnovations.in" className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-sky-300'}`}>
-                  support@dakshyaminnovations.in
+                <a href={`mailto:${contactEmail}`} className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-sky-300'}`}>
+                  {contactEmail}
                 </a>
                 <span className="text-4xs font-mono text-slate-500 block uppercase">24-hour Dispatch SLA</span>
               </div>
@@ -116,8 +120,8 @@ export default function ContactUs({ theme }: ContactUsProps) {
               </div>
               <div className="space-y-1">
                 <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Cooperative Hotlines</h3>
-                <a href="tel:+919876543210" className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-sky-300'}`}>
-                  +91 98765 43210
+                <a href={`tel:${contactPhone.replace(/\s+/g, '')}`} className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-sky-300'}`}>
+                  {contactPhone}
                 </a>
                 <span className="text-4xs font-mono text-slate-500 block uppercase flex items-center gap-1">
                   10:00 AM - 6:00 PM IST
@@ -197,7 +201,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
                         required
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="e.g. kunal@example.com"
+                        placeholder="e.g. participant@dakshyam.com"
                         className={isLight 
                           ? "w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-950 focus:bg-white transition-all" 
                           : "w-full bg-[#071326] border border-blue-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-sky-400 transition-all"

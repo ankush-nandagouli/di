@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Award, Users, FileText, CheckCircle2, Clock, MapPin, Phone, Briefcase, BookOpen, Camera, Eye, ClipboardList, Building2 } from 'lucide-react';
-import { StudentUser, StudentGroup, Course, CourseApplication, Certificate } from '../types';
+import { User, Users, FileText, CheckCircle2, Clock, MapPin, Phone, Briefcase, BookOpen, Camera, ClipboardList, Building2 } from 'lucide-react';
+import { StudentUser, StudentGroup, Course, CourseApplication } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import SyllabusExplorer from './SyllabusExplorer';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
-import OfficialCertificate from './OfficialCertificate';
 import WorkshopDirectoryModal from './WorkshopDirectoryModal';
 import SupportTicketManager from './SupportTicketManager';
 
@@ -13,7 +12,7 @@ interface StudentDashboardProps {
   user: StudentUser;
   courses: Course[];
   groups: StudentGroup[];
-  certificates: Certificate[];
+  certificates?: any[];
   applications: CourseApplication[];
   onRefresh: () => void;
   onNavigateTab?: (tab: string) => void;
@@ -24,7 +23,6 @@ export default function StudentDashboard({
   user,
   courses,
   groups,
-  certificates,
   applications,
   onRefresh,
   onNavigateTab,
@@ -34,11 +32,9 @@ export default function StudentDashboard({
   // Find student's group
   const myGroup = groups.find(g => g.memberIds.includes(user.id));
   const myApplications = applications.filter(app => app.email.toLowerCase() === user.email.toLowerCase());
-  const myCertificates = certificates.filter(cert => cert.studentEmail.toLowerCase() === user.email.toLowerCase());
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState<'overview' | 'syllabus' | 'tickets'>('overview');
-  const [viewCert, setViewCert] = useState<Certificate | null>(null);
   const [isDirModalOpen, setIsDirModalOpen] = useState(false);
 
   // Editing profile details states
@@ -320,53 +316,38 @@ export default function StudentDashboard({
               </form>
             </div>
 
-            {/* Quick Link: Workshop Feedback Portal */}
-            {onNavigateTab && (
-              <div className={`border rounded-2xl p-4.5 space-y-3 transition-all ${
-                isLight ? 'bg-gradient-to-br from-amber-50/70 to-white border-amber-200/80 shadow-xs' : 'bg-[#0a192f]/60 border-amber-500/25'
-              }`}>
-                <div className="flex items-center gap-2.5">
-                  <div className={`p-2 rounded-xl border ${
-                    isLight ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                  }`}>
-                    <ClipboardList className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className={`text-xs font-bold font-mono uppercase tracking-wider ${isLight ? 'text-amber-950' : 'text-amber-300'}`}>
-                      Workshop Feedback
-                    </h4>
-                    <p className={`text-[10px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                      Attended a hands-on lab or bootcamp? Submit your evaluation.
-                    </p>
-                  </div>
+            {/* Quick Link: Workshop Catalog */}
+            <div className={`border rounded-2xl p-4.5 space-y-3 transition-all ${
+              isLight ? 'bg-gradient-to-br from-purple-50/70 to-white border-purple-200/80 shadow-xs' : 'bg-[#0a192f]/60 border-purple-500/25'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-xl border ${
+                  isLight ? 'bg-purple-100 border-purple-300 text-purple-900' : 'bg-purple-500/15 border-purple-500/30 text-purple-400'
+                }`}>
+                  <Building2 className="w-4 h-4" />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onNavigateTab('feedback')}
-                    className={`w-full py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs ${
-                      isLight
-                        ? 'bg-amber-900 hover:bg-amber-800 text-white'
-                        : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold'
-                    }`}
-                  >
-                    Open Feedback Form →
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsDirModalOpen(true)}
-                    className={`w-full py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
-                      isLight
-                        ? 'bg-purple-50 hover:bg-purple-100 text-purple-950 border-purple-200'
-                        : 'bg-purple-950/30 hover:bg-purple-900/40 text-purple-300 border-purple-500/30'
-                    }`}
-                  >
-                    <Building2 className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Browse Workshops Directory</span>
-                  </button>
+                <div>
+                  <h4 className={`text-xs font-bold font-mono uppercase tracking-wider ${isLight ? 'text-purple-950' : 'text-purple-300'}`}>
+                    Workshops & Bootcamps
+                  </h4>
+                  <p className={`text-[10px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                    Explore hands-on robotics, IoT, and coding sessions.
+                  </p>
                 </div>
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => setIsDirModalOpen(true)}
+                className={`w-full py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 border transition-all cursor-pointer shadow-xs ${
+                  isLight
+                    ? 'bg-purple-900 hover:bg-purple-800 text-white border-purple-900'
+                    : 'bg-purple-600 hover:bg-purple-500 text-white border-purple-500 font-bold'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Browse Workshops Directory</span>
+              </button>
+            </div>
           </div>
 
           {/* RIGHT COLUMN: Active details */}
@@ -437,63 +418,6 @@ export default function StudentDashboard({
               )}
             </div>
 
-            {/* Secure verify/awards link */}
-            <div className={`border rounded-2xl p-5 space-y-4 transition-all duration-300 ${
-              isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#0a192f]/70 border-blue-800/40'
-            }`}>
-              <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 flex items-center gap-2 ${
-                isLight ? 'text-blue-950 border-slate-100' : 'text-sky-300 border-blue-900/30'
-              }`}>
-                <Award className={`w-4 h-4 ${isLight ? 'text-blue-950' : 'text-sky-400'}`} /> My Issued Certificates
-              </h3>
-
-              {myCertificates.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {myCertificates.map((cert, idx) => (
-                    <div 
-                      key={cert.id ? `${cert.id}-${idx}` : `cert-${idx}`}
-                      className={`p-4 rounded-xl border flex flex-col justify-between space-y-3 ${
-                        isLight 
-                          ? 'bg-gradient-to-br from-blue-50/50 to-white border-blue-900/15' 
-                          : 'bg-gradient-to-br from-[#0c1e3a] to-[#0a192f] border-blue-800/40'
-                      }`}
-                    >
-                      <div>
-                        <span className={`text-[9px] font-mono block font-bold ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>CODE: {cert.id}</span>
-                        <h4 className={`text-xs font-bold tracking-wide mt-1 ${isLight ? 'text-slate-800' : 'text-white'}`}>{cert.courseTitle}</h4>
-                        <p className={`text-[10px] font-sans mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Issuer: {cert.trainerName}</p>
-                      </div>
-
-                      <div className={`pt-2 border-t flex justify-between items-center text-xs font-mono ${
-                        isLight ? 'border-blue-900/10' : 'border-blue-900/30'
-                      }`}>
-                        <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{cert.issueDate}</span>
-                        <span className={`text-3xs font-bold font-sans ${isLight ? 'text-blue-950' : 'text-sky-400'}`}>
-                          Verified Document
-                        </span>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setViewCert(cert)}
-                        className={`w-full text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                          isLight 
-                            ? 'bg-blue-950 hover:bg-blue-900 text-white shadow-xs' 
-                            : 'bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black shadow-md'
-                        }`}
-                      >
-                        <Eye className="w-3.5 h-3.5" /> View Official Certificate
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className={`text-xs font-mono italic text-center py-4 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                  No performance awards published yet. Once the trainer grading cycle finishes in August, they are safe to print.
-                </div>
-              )}
-            </div>
-
           </div>
 
         </div>
@@ -516,41 +440,12 @@ export default function StudentDashboard({
         </motion.div>
       </AnimatePresence>
 
-      {/* Official Certificate Modal for Students */}
-      {viewCert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
-          <div 
-            onClick={() => setViewCert(null)}
-            className="fixed inset-0 bg-black/85 backdrop-blur-md cursor-pointer"
-          />
-
-          <div className="bg-[#050b14] border border-amber-500/30 rounded-3xl max-w-5xl w-full relative z-10 p-4 md:p-7 space-y-4 text-center max-h-[96vh] overflow-y-auto shadow-[0_0_60px_rgba(0,0,0,0.8)]">
-            <OfficialCertificate 
-              certificate={viewCert}
-              onClose={() => setViewCert(null)}
-              showControls={true}
-              theme={theme}
-            />
-          </div>
-        </div>
-      )}
-
       {/* WORKSHOP DIRECTORY MODAL */}
       <WorkshopDirectoryModal
         isOpen={isDirModalOpen}
         onClose={() => setIsDirModalOpen(false)}
         theme={theme}
         currentUserRole="student"
-        onSelectWorkshop={(ws) => {
-          if (onNavigateTab) {
-            onNavigateTab('feedback');
-          }
-        }}
-        onOpenForm={(wsId) => {
-          if (onNavigateTab) {
-            onNavigateTab('feedback');
-          }
-        }}
       />
 
     </div>

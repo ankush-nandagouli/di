@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Users, Award, Percent, Printer, FileText, CheckCircle2, Bookmark, Check, ShieldCheck, BookOpen, User, Mail, Phone, Briefcase, MapPin, Eye } from 'lucide-react';
-import { StudentUser, StudentGroup, Course, CourseApplication, Certificate, TrainerUser } from '../types';
+import { Plus, Users, Percent, Printer, FileText, CheckCircle2, Bookmark, Check, ShieldCheck, BookOpen, User, Mail, Phone, Briefcase, MapPin } from 'lucide-react';
+import { StudentUser, StudentGroup, Course, CourseApplication, TrainerUser } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import { uploadMediaToCloudinary } from '../utils/mediaUpload';
 import TrainerGuide from './TrainerGuide';
 import { BeautifulErrorDisplay } from '../utils/errorShield';
-import OfficialCertificate from './OfficialCertificate';
-import AdminWorkshopFeedbackManager from './AdminWorkshopFeedbackManager';
 import SupportTicketManager from './SupportTicketManager';
+import { notifyError, notifySuccess } from '../utils/toast';
+import WorkshopDirectoryManager from './WorkshopDirectoryManager';
 
 interface TrainerDashboardProps {
   trainer: TrainerUser;
@@ -16,7 +16,7 @@ interface TrainerDashboardProps {
   courses: Course[];
   groups: StudentGroup[];
   applications: CourseApplication[];
-  certificates: Certificate[];
+  certificates?: any[];
   onRefresh: () => void;
   theme?: 'light' | 'dark';
 }
@@ -27,13 +27,12 @@ export default function TrainerDashboard({
   courses,
   groups,
   applications,
-  certificates,
   onRefresh,
   theme = 'dark'
 }: TrainerDashboardProps) {
   const isLight = theme === 'light';
   // Navigation states inside dashboard
-  const [activeTab, setActiveTab] = useState<'groups' | 'assessment' | 'certificates' | 'guide' | 'feedback' | 'tickets' | 'profile'>('groups');
+  const [activeTab, setActiveTab] = useState<'groups' | 'assessment' | 'workshops' | 'guide' | 'tickets' | 'profile'>('groups');
 
   // Trainer Profile States
   const [phone, setPhone] = useState(trainer.profile?.phone || '');
@@ -58,16 +57,7 @@ export default function TrainerDashboard({
   const [newPoints, setNewPoints] = useState<number>(80);
   const [gradeSuccess, setGradeSuccess] = useState('');
 
-  // Certificate generation form states
-  const [selectedAppIdForCert, setSelectedAppIdForCert] = useState<string>('');
-  const [certProjectTitle, setCertProjectTitle] = useState('');
-  const [certCustomLogoUrl, setCertCustomLogoUrl] = useState<string>('');
-  const [certCustomSealUrl, setCertCustomSealUrl] = useState<string>('');
-  const [certTrainingPartnerName, setCertTrainingPartnerName] = useState<string>('');
-  const [certTrainingPartnerLogoUrl, setCertTrainingPartnerLogoUrl] = useState<string>('');
-  const [certError, setCertError] = useState('');
-  const [certSuccess, setCertSuccess] = useState('');
-  const [viewCertModal, setViewCertModal] = useState<Certificate | null>(null);
+
 
   // CREATE GROUP HANDLER
   const handleCreateGroup = (e: React.FormEvent) => {
@@ -113,7 +103,7 @@ export default function TrainerDashboard({
     setGradeSuccess('');
 
     if (!selectedGroupIdForGrading) {
-      alert('Select a group to grade.');
+      notifyError('Please select a group to grade.');
       return;
     }
 
@@ -123,70 +113,13 @@ export default function TrainerDashboard({
       if (match) {
         match.points = Number(newPoints);
         DakshyamDatabase.saveGroups(allGroups);
-        setGradeSuccess(`✓ Assigned ${newPoints} PTS successfully! Rankings and leaderboard updated.`);
+        setGradeSuccess(`✓ Assigned ${newPoints} PTS successfully! Group scores updated.`);
+        notifySuccess(`Assigned ${newPoints} PTS to ${match.name}!`);
         setTimeout(() => setGradeSuccess(''), 2000);
         onRefresh();
       }
     } catch {
-      alert('Error updating score record.');
-    }
-  };
-
-  // GENERATE CERTIFICATE HANDLER
-  const handleGenerateCertificate = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCertError('');
-    setCertSuccess('');
-
-    if (!selectedAppIdForCert || !certProjectTitle.trim()) {
-      setCertError('Please select an applicant and specify their major project design title.');
-      return;
-    }
-
-    try {
-      const apps = DakshyamDatabase.getApplications();
-      const appMatch = apps.find(a => a.id === selectedAppIdForCert);
-      
-      if (!appMatch) {
-         setCertError('Application record trace missing.');
-         return;
-      }
-
-      const allCerts = DakshyamDatabase.getCertificates();
-      const randomId = `DKM-2026-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-      const newCert: Certificate = {
-        id: randomId,
-        studentName: appMatch.fullName,
-        studentEmail: appMatch.email,
-        courseTitle: courses.find(c => c.id === appMatch.courseId)?.title || 'Advanced Technology Sector',
-        projectTitle: certProjectTitle,
-        issueDate: new Date().toISOString().split('T')[0],
-        trainerId: trainer.id,
-        trainerName: trainer.name,
-        customLogoUrl: certCustomLogoUrl || undefined,
-        customSealUrl: certCustomSealUrl || undefined,
-        trainingPartnerName: certTrainingPartnerName.trim() || undefined,
-        trainingPartnerLogoUrl: certTrainingPartnerLogoUrl || undefined
-      };
-
-      allCerts.push(newCert);
-      DakshyamDatabase.saveCertificates(allCerts);
-
-      // Approve application immediately
-      appMatch.status = 'approved';
-      DakshyamDatabase.saveApplications(apps);
-
-      setCertSuccess(`✓ Credential code ${randomId} fully published to student workspace!`);
-      setSelectedAppIdForCert('');
-      setCertProjectTitle('');
-      setCertCustomLogoUrl('');
-      setCertCustomSealUrl('');
-      setCertTrainingPartnerName('');
-      setCertTrainingPartnerLogoUrl('');
-      onRefresh();
-    } catch (err: any) {
-      setCertError(err?.message || 'Database transaction error.');
+      notifyError('Error updating score record.');
     }
   };
 
@@ -264,7 +197,7 @@ export default function TrainerDashboard({
       <div className={`flex flex-wrap gap-1.5 border-b pb-0.5 font-mono text-2xs uppercase ${
         isLight ? 'border-slate-200' : 'border-cyan-500/10'
       }`}>
-        {(['groups', 'assessment', 'certificates', 'guide', 'feedback', 'tickets', 'profile'] as const).map(tab => (
+        {(['groups', 'assessment', 'workshops', 'guide', 'tickets', 'profile'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -274,7 +207,7 @@ export default function TrainerDashboard({
                 : (isLight ? 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50' : 'border-transparent text-slate-450 hover:text-white hover:bg-slate-500/5')
             }`}
           >
-            {tab === 'groups' ? 'Group Builder' : tab === 'assessment' ? 'Assessment Matrix' : tab === 'certificates' ? 'Publish Certificates' : tab === 'guide' ? '📖 Curriculum Guides' : tab === 'feedback' ? '📋 Workshop Feedbacks' : tab === 'tickets' ? '🎫 Support Tickets' : '👤 Profile Details'}
+            {tab === 'groups' ? 'Group Builder' : tab === 'assessment' ? 'Assessment Matrix' : tab === 'workshops' ? '🏢 Workshops Directory' : tab === 'guide' ? '📖 Curriculum Guides' : tab === 'tickets' ? '🎫 Support Tickets' : '👤 Profile Details'}
           </button>
         ))}
       </div>
@@ -524,265 +457,15 @@ export default function TrainerDashboard({
           </div>
         )}
 
-        {/* TAB 3: PUBLISH DECK CERTIFICATE */}
-        {activeTab === 'certificates' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-left">
-            
-            {/* Cert Generator Form */}
-            <form onSubmit={handleGenerateCertificate} className="space-y-4">
-              <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 flex items-center gap-1.5 ${
-                isLight ? 'text-amber-800 border-slate-150' : 'text-[#22d3ee] border-cyan-500/5'
-              }`}>
-                <Award className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-cyan-400'}`} /> Issue Certificate of Completion
-              </h3>
-
-              <BeautifulErrorDisplay errorText={certError} isLight={isLight} />
-              {certSuccess && <div className={`text-xs font-mono font-bold ${isLight ? 'text-emerald-700' : 'text-cyan-400'}`}>{certSuccess}</div>}
-
-              <div>
-                <label className={`block text-3xs font-mono uppercase mb-1 ${isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'}`}>Select Student Applicant</label>
-                <select
-                  value={selectedAppIdForCert}
-                  onChange={(e) => setSelectedAppIdForCert(e.target.value)}
-                  required
-                  className={`w-full rounded-xl px-3 py-2.5 text-xs focus:outline-none border ${
-                    isLight 
-                      ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-amber-500' 
-                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
-                  }`}
-                >
-                  <option value="">-- Choose Applicant --</option>
-                  {eligibleApplicants.map((app, idx) => {
-                    const courseName = courses.find(c => c.id === app.courseId)?.title || 'Training Sector';
-                    return (
-                      <option key={app.id ? `${app.id}-${idx}` : `app-opt-${idx}`} value={app.id}>
-                        {app.fullName} ({courseName})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              <div>
-                <label className={`block text-3xs font-mono uppercase mb-1 ${isLight ? 'text-amber-800 font-bold' : 'text-cyan-400'}`}>Major Development / Project Title</label>
-                <input
-                  type="text"
-                  value={certProjectTitle}
-                  onChange={(e) => setCertProjectTitle(e.target.value)}
-                  placeholder="e.g. Smart Agri Moisture Controller System"
-                  required
-                  className={`w-full rounded-xl px-3 py-2.5 text-xs focus:outline-none border ${
-                    isLight 
-                      ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500' 
-                      : 'bg-[#111]/80 border-cyan-500/10 text-white placeholder-slate-500 focus:border-cyan-45'
-                  }`}
-                />
-              </div>
-
-              {/* Customizable Branding and Partners for Trainer too! */}
-              <div className={`border-t pt-3 space-y-3 ${isLight ? 'border-slate-150' : 'border-cyan-500/10'}`}>
-                <h4 className={`text-[10px] font-mono uppercase tracking-widest font-extrabold text-left ${
-                  isLight ? 'text-amber-900' : 'text-cyan-400'
-                }`}>Custom Branding & Partnership Options</h4>
-                
-                <div className="grid grid-cols-2 gap-3 text-left">
-                  {/* Custom Logo Upload */}
-                  <div>
-                    <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Custom Issuer Logo (Cloudinary)</label>
-                    <div className="relative">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const res = await uploadMediaToCloudinary(file, 'image');
-                            setCertCustomLogoUrl(res.url);
-                          }
-                        }}
-                        className="hidden"
-                        id="trainer-logo-upload"
-                      />
-                      <label
-                        htmlFor="trainer-logo-upload"
-                        className={`flex items-center justify-center gap-1 border text-[9px] font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase ${
-                          isLight 
-                            ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700' 
-                            : 'bg-black/40 border-slate-500/10 hover:border-cyan-500/30 text-slate-300'
-                        }`}
-                      >
-                        {certCustomLogoUrl ? "✓ Logo Loaded" : "Upload Logo"}
-                      </label>
-                    </div>
-                    {certCustomLogoUrl && (
-                      <button
-                        type="button"
-                        onClick={() => setCertCustomLogoUrl("")}
-                        className="text-[8px] text-red-500 hover:underline mt-1 block"
-                      >
-                        Remove Logo
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Custom Seal Upload */}
-                  <div>
-                    <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Custom Seal Image (Cloudinary)</label>
-                    <div className="relative">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const res = await uploadMediaToCloudinary(file, 'image');
-                            setCertCustomSealUrl(res.url);
-                          }
-                        }}
-                        className="hidden"
-                        id="trainer-seal-upload"
-                      />
-                      <label
-                        htmlFor="trainer-seal-upload"
-                        className={`flex items-center justify-center gap-1 border text-[9px] font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase ${
-                          isLight 
-                            ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700' 
-                            : 'bg-black/40 border-slate-500/10 hover:border-cyan-500/30 text-slate-300'
-                        }`}
-                      >
-                        {certCustomSealUrl ? "✓ Seal Loaded" : "Upload Seal"}
-                      </label>
-                    </div>
-                    {certCustomSealUrl && (
-                      <button
-                        type="button"
-                        onClick={() => setCertCustomSealUrl("")}
-                        className="text-[8px] text-red-500 hover:underline mt-1 block"
-                      >
-                        Remove Seal
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Training Partner */}
-                <div className="space-y-2 text-left">
-                  <div>
-                    <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Training Partner Name (Optional)</label>
-                    <input
-                      type="text"
-                      value={certTrainingPartnerName}
-                      onChange={(e) => setCertTrainingPartnerName(e.target.value)}
-                      placeholder="e.g. State Science Council"
-                      className={`w-full rounded-xl px-3 py-1.5 text-xs focus:outline-none border ${
-                        isLight 
-                          ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-amber-500' 
-                          : 'w-full bg-[#111]/80 border border-[#22d3ee]/10 text-white placeholder-slate-500 focus:border-cyan-400 text-slate-350'
-                      }`}
-                    />
-                  </div>
-
-                  {certTrainingPartnerName && (
-                    <div>
-                      <label className={`block text-[8px] font-mono uppercase mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Partner Logo (Cloudinary)</label>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const res = await uploadMediaToCloudinary(file, 'image');
-                              setCertTrainingPartnerLogoUrl(res.url);
-                            }
-                          }}
-                          className="hidden"
-                          id="trainer-partner-logo-upload"
-                        />
-                        <label
-                          htmlFor="trainer-partner-logo-upload"
-                          className={`flex items-center justify-center gap-1 border text-[9px] font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase ${
-                            isLight 
-                              ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700' 
-                              : 'bg-black/40 border-slate-500/10 hover:border-cyan-500/30 text-slate-300'
-                          }`}
-                        >
-                          {certTrainingPartnerLogoUrl ? "✓ Partner Logo Loaded" : "Upload Partner Logo"}
-                        </label>
-                      </div>
-                      {certTrainingPartnerLogoUrl && (
-                        <button
-                          type="button"
-                          onClick={() => setCertTrainingPartnerLogoUrl("")}
-                          className="text-[8px] text-red-500 hover:underline mt-1 block"
-                        >
-                          Remove Partner Logo
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className={`p-3 border rounded-xl text-3xs leading-relaxed space-y-1 ${
-                isLight ? 'bg-amber-500/5 border-amber-500/10 text-slate-600' : 'bg-[#111]/50 border-cyan-500/5 text-slate-400'
-              }`}>
-                <div className={`font-semibold ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>AUTHORITY CLAUSE:</div>
-                <p>Generating this credential locks the record into the immutable directory query. It registers signatures and permits official student export packages.</p>
-              </div>
-
-              <button
-                type="submit"
-                className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer border ${
-                  isLight 
-                    ? 'bg-amber-600 hover:bg-amber-700 border-amber-600 text-white shadow-sm' 
-                    : 'bg-cyan-500 hover:bg-cyan-450 border-cyan-500 text-slate-950'
-                }`}
-              >
-                Sign & Issue Certificate of Completion
-              </button>
-            </form>
-
-            {/* List of Issued Certs */}
-            <div className="space-y-4">
-              <h3 className={`text-xs font-bold font-mono tracking-wider uppercase border-b pb-2 ${
-                isLight ? 'text-amber-800 border-slate-150' : 'text-[#22d3ee] border-cyan-500/5'
-              }`}>
-                Published Certificates Log ({certificates.length})
-              </h3>
-
-              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
-                {certificates.map((cert, idx) => (
-                  <div 
-                    key={cert.id ? `${cert.id}-${idx}` : `cert-${idx}`}
-                    className={`p-3 rounded-xl border text-left text-2xs space-y-1.5 ${
-                      isLight 
-                        ? 'bg-slate-50/50 border-slate-200/60' 
-                        : 'bg-[#111]/45 border-cyan-500/5'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center text-3xs font-mono">
-                      <span className={`font-bold ${isLight ? 'text-amber-800' : 'text-[#22d3ee]'}`}>{cert.id}</span>
-                      <span className="text-slate-500">{cert.issueDate}</span>
-                    </div>
-                    <div className={`font-semibold ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>{cert.studentName}</div>
-                    <div className={`text-3xs block italic ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Project: "{cert.projectTitle}"</div>
-                    
-                    <button
-                      type="button"
-                      onClick={() => setViewCertModal(cert)}
-                      className={`inline-flex items-center gap-1 text-3xs font-bold font-mono px-2 py-1 rounded-lg transition-all cursor-pointer ${
-                        isLight ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300' : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20'
-                      }`}
-                    >
-                      <Eye className="w-3 h-3" /> View Certificate of Completion
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
+        {/* TAB 3: WORKSHOPS DIRECTORY CRUD CONSOLE */}
+        {activeTab === 'workshops' && (
+          <WorkshopDirectoryManager
+            userRole="trainer"
+            currentUserEmail={trainer.email}
+            currentTrainerName={trainer.name}
+            theme={theme}
+            onRefresh={onRefresh}
+          />
         )}
 
         {/* TAB 4: TRAINER SYLLABUS & KNOWLEDGE KITS GUIDE */}
@@ -804,7 +487,7 @@ export default function TrainerDashboard({
                     Update Trainer Profile Credentials
                   </h3>
                   <p className={`text-3xs font-sans leading-relaxed mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                    Your profile values specify your center location and credential parameters printed onto generated student performance certificates.
+                    Your profile values specify your center location, expertise domain, and educational instructor credentials.
                   </p>
                 </div>
 
@@ -1104,21 +787,14 @@ export default function TrainerDashboard({
                 isLight ? 'bg-amber-500/5 border-amber-500/10 text-slate-650' : 'bg-cyan-950/10 border-cyan-500/5 text-slate-400'
               }`}>
                 <span className={`font-extrabold uppercase block mb-1 ${isLight ? 'text-amber-850' : 'text-cyan-400'}`}>Board Sync Node verified</span>
-                <p>This supervisor profile card represents your official active credential recorded inside local and state training registers. All digital signatures on certificates are tracked dynamically by the Dakshyam Board office.</p>
+                <p>This supervisor profile card represents your official active credential recorded inside local and state training registers. All profile parameters are synchronized with the central register.</p>
               </div>
             </div>
 
           </div>
         )}
 
-        {/* TAB 6: WORKSHOP FEEDBACK REVIEW & EXPORT */}
-        {activeTab === 'feedback' && (
-          <div className="w-full">
-            <AdminWorkshopFeedbackManager theme={theme} currentUserRole="trainer" />
-          </div>
-        )}
-
-        {/* TAB 7: SUPPORT TICKETS & BUG REPORTS */}
+        {/* TAB: SUPPORT TICKETS & BUG REPORTS */}
         {activeTab === 'tickets' && (
           <div className="w-full">
             <SupportTicketManager
@@ -1136,21 +812,6 @@ export default function TrainerDashboard({
           </motion.div>
         </AnimatePresence>
       </div>
-
-      {/* Official Certificate Modal */}
-      {viewCertModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-md" onClick={() => setViewCertModal(null)} />
-          <div className="bg-[#050b14] border border-amber-500/30 rounded-3xl max-w-5xl w-full relative z-10 p-4 md:p-7 space-y-4 text-center max-h-[96vh] overflow-y-auto shadow-[0_0_60px_rgba(0,0,0,0.8)]">
-            <OfficialCertificate
-              certificate={viewCertModal}
-              onClose={() => setViewCertModal(null)}
-              showControls={true}
-              theme={theme}
-            />
-          </div>
-        </div>
-      )}
 
     </div>
   );

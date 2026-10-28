@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Plus, Trash2, Sparkles, Layers, Building2, MapPin, Compass, Eye, EyeOff, Share2 } from 'lucide-react';
+import { ShieldCheck, Plus, Trash2, Sparkles, Layers, Building2, MapPin, Compass, Eye, EyeOff, Share2, Instagram, ExternalLink, Github, Linkedin, Twitter, Youtube } from 'lucide-react';
 import { CompanyAbout, CompanyService } from '../types';
 import { DakshyamDatabase, DEFAULT_SERVICES } from '../utils/db';
+import { notifyError, notifySuccess } from '../utils/toast';
 
 interface AboutEditorTabProps {
   onRefresh: () => void;
@@ -32,15 +33,16 @@ export function AboutEditorTab({ onRefresh, theme }: AboutEditorTabProps) {
   const handleSavePin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!/^\d{6}$/.test(supervisorPin)) {
-      alert('Error: The directorship access lock PIN must be exactly 6 numeric digits.');
+      notifyError('The directorship access lock PIN must be exactly 6 numeric digits.');
       return;
     }
     try {
       DakshyamDatabase.saveSupervisorPin(supervisorPin);
       setPinUpdateMsg('✓ 6-Digit supervisory security access PIN successfully updated! Active immediately on all entrance node links.');
+      notifySuccess('Supervisory PIN successfully updated!');
       setTimeout(() => setPinUpdateMsg(''), 5000);
     } catch {
-      alert('Could not write updated protocol lock keys to regional database.');
+      notifyError('Could not write updated protocol lock keys to regional database.');
     }
   };
 
@@ -55,10 +57,11 @@ export function AboutEditorTab({ onRefresh, theme }: AboutEditorTabProps) {
       };
       DakshyamDatabase.saveCompanyAbout(cleanedData);
       setStatusMsg('✓ Corporate parameters & vocational services updated successfully! Reflecting live on the platform.');
+      notifySuccess('Corporate parameters updated successfully!');
       setTimeout(() => setStatusMsg(''), 4000);
       onRefresh();
     } catch {
-      alert('Failed updating company database.');
+      notifyError('Failed updating company database.');
     } finally {
       setSaving(false);
     }
@@ -436,40 +439,201 @@ export function AboutEditorTab({ onRefresh, theme }: AboutEditorTabProps) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="block text-3xs font-mono text-slate-500 uppercase">GitHub Profile URL</label>
+            {/* INSTAGRAM */}
+            <div className={`p-3.5 rounded-2xl border transition-all sm:col-span-2 ${
+              aboutData.hideInstagram 
+                ? (isLight ? 'bg-slate-100/70 border-slate-300 opacity-75' : 'bg-slate-900/40 border-slate-800 opacity-70')
+                : (isLight ? 'border-pink-300/60 bg-pink-50/50' : 'border-pink-500/25 bg-pink-500/5')
+            }`}>
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <label className="text-3xs font-mono font-bold uppercase flex items-center gap-1.5 text-pink-500">
+                  <Instagram className="w-4 h-4" />
+                  <span>Instagram Profile URL</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  {aboutData.socialInstagram && (
+                    <a
+                      href={aboutData.socialInstagram}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[9.5px] font-mono font-bold text-pink-500 hover:text-pink-400 flex items-center gap-1"
+                    >
+                      <span>Test Link</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setAboutData({ ...aboutData, hideInstagram: !aboutData.hideInstagram })}
+                    className={`px-2.5 py-1 rounded-xl text-3xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all border ${
+                      aboutData.hideInstagram
+                        ? (isLight ? 'bg-rose-100 text-rose-700 border-rose-300' : 'bg-rose-950/40 text-rose-400 border-rose-500/30')
+                        : (isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30')
+                    }`}
+                  >
+                    {aboutData.hideInstagram ? <EyeOff className="w-3 h-3 text-rose-500" /> : <Eye className="w-3 h-3 text-emerald-500" />}
+                    <span>{aboutData.hideInstagram ? 'Hidden by Admin' : 'Visible on Site'}</span>
+                  </button>
+                </div>
+              </div>
               <input
                 type="url"
-                className={`w-full rounded-xl px-3 py-1.5 text-xs focus:outline-none border font-mono ${inputBg}`}
-                value={aboutData.socialGithub}
-                onChange={(e) => setAboutData({ ...aboutData, socialGithub: e.target.value })}
+                className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none border font-mono ${inputBg} focus:border-pink-500`}
+                value={aboutData.socialInstagram || ''}
+                onChange={(e) => setAboutData({ ...aboutData, socialInstagram: e.target.value })}
+                placeholder="https://instagram.com/dakshyam_innovations"
               />
             </div>
-            <div className="space-y-1">
-              <label className="block text-3xs font-mono text-slate-500 uppercase">LinkedIn Profile URL</label>
+
+            {/* LINKEDIN */}
+            <div className={`p-3.5 rounded-2xl border transition-all ${
+              aboutData.hideLinkedin
+                ? (isLight ? 'bg-slate-100/70 border-slate-300 opacity-75' : 'bg-slate-900/40 border-slate-800 opacity-70')
+                : (isLight ? 'border-blue-300/60 bg-blue-50/50' : 'border-blue-500/25 bg-blue-500/5')
+            }`}>
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <label className="text-3xs font-mono font-bold uppercase flex items-center gap-1.5 text-blue-500">
+                  <Linkedin className="w-3.5 h-3.5" />
+                  <span>LinkedIn Profile</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setAboutData({ ...aboutData, hideLinkedin: !aboutData.hideLinkedin })}
+                  className={`px-2 py-0.5 rounded-lg text-3xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all border ${
+                    aboutData.hideLinkedin
+                      ? (isLight ? 'bg-rose-100 text-rose-700 border-rose-300' : 'bg-rose-950/40 text-rose-400 border-rose-500/30')
+                      : (isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30')
+                  }`}
+                >
+                  {aboutData.hideLinkedin ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  <span>{aboutData.hideLinkedin ? 'Hidden' : 'Visible'}</span>
+                </button>
+              </div>
               <input
                 type="url"
                 className={`w-full rounded-xl px-3 py-1.5 text-xs focus:outline-none border font-mono ${inputBg}`}
-                value={aboutData.socialLinkedin}
+                value={aboutData.socialLinkedin || ''}
                 onChange={(e) => setAboutData({ ...aboutData, socialLinkedin: e.target.value })}
+                placeholder="https://linkedin.com/company/dakshyam-innovations"
               />
             </div>
-            <div className="space-y-1">
-              <label className="block text-3xs font-mono text-slate-500 uppercase">Twitter Profile URL</label>
+
+            {/* YOUTUBE */}
+            <div className={`p-3.5 rounded-2xl border transition-all ${
+              aboutData.hideYoutube
+                ? (isLight ? 'bg-slate-100/70 border-slate-300 opacity-75' : 'bg-slate-900/40 border-slate-800 opacity-70')
+                : (isLight ? 'border-red-300/60 bg-red-50/50' : 'border-red-500/25 bg-red-500/5')
+            }`}>
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <label className="text-3xs font-mono font-bold uppercase flex items-center gap-1.5 text-red-500">
+                  <Youtube className="w-3.5 h-3.5" />
+                  <span>YouTube Channel</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setAboutData({ ...aboutData, hideYoutube: !aboutData.hideYoutube })}
+                  className={`px-2 py-0.5 rounded-lg text-3xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all border ${
+                    aboutData.hideYoutube
+                      ? (isLight ? 'bg-rose-100 text-rose-700 border-rose-300' : 'bg-rose-950/40 text-rose-400 border-rose-500/30')
+                      : (isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30')
+                  }`}
+                >
+                  {aboutData.hideYoutube ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  <span>{aboutData.hideYoutube ? 'Hidden' : 'Visible'}</span>
+                </button>
+              </div>
               <input
                 type="url"
                 className={`w-full rounded-xl px-3 py-1.5 text-xs focus:outline-none border font-mono ${inputBg}`}
-                value={aboutData.socialTwitter}
-                onChange={(e) => setAboutData({ ...aboutData, socialTwitter: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-3xs font-mono text-slate-500 uppercase">YouTube Channel URL</label>
-              <input
-                type="url"
-                className={`w-full rounded-xl px-3 py-1.5 text-xs focus:outline-none border font-mono ${inputBg}`}
-                value={aboutData.socialYoutube}
+                value={aboutData.socialYoutube || ''}
                 onChange={(e) => setAboutData({ ...aboutData, socialYoutube: e.target.value })}
+                placeholder="https://youtube.com/@dakshyaminnovations"
+              />
+            </div>
+
+            {/* TWITTER / X */}
+            <div className={`p-3.5 rounded-2xl border transition-all ${
+              aboutData.hideTwitter
+                ? (isLight ? 'bg-slate-100/70 border-slate-300 opacity-75' : 'bg-slate-900/40 border-slate-800 opacity-70')
+                : (isLight ? 'border-slate-300 bg-slate-50/50' : 'border-slate-700 bg-slate-800/40')
+            }`}>
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <label className={`text-3xs font-mono font-bold uppercase flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+                  <Twitter className="w-3.5 h-3.5" />
+                  <span>Twitter / X Profile</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setAboutData({ ...aboutData, hideTwitter: !aboutData.hideTwitter })}
+                  className={`px-2 py-0.5 rounded-lg text-3xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all border ${
+                    aboutData.hideTwitter
+                      ? (isLight ? 'bg-rose-100 text-rose-700 border-rose-300' : 'bg-rose-950/40 text-rose-400 border-rose-500/30')
+                      : (isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30')
+                  }`}
+                >
+                  {aboutData.hideTwitter ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  <span>{aboutData.hideTwitter ? 'Hidden' : 'Visible'}</span>
+                </button>
+              </div>
+              <input
+                type="url"
+                className={`w-full rounded-xl px-3 py-1.5 text-xs focus:outline-none border font-mono ${inputBg}`}
+                value={aboutData.socialTwitter || ''}
+                onChange={(e) => setAboutData({ ...aboutData, socialTwitter: e.target.value })}
+                placeholder="https://twitter.com/dakshyam_in"
+              />
+            </div>
+
+            {/* GITHUB */}
+            <div className={`p-3.5 rounded-2xl border transition-all ${
+              aboutData.hideGithub
+                ? (isLight ? 'bg-slate-100/70 border-slate-300 opacity-75' : 'bg-slate-900/40 border-slate-800 opacity-70')
+                : (isLight ? 'border-slate-300 bg-slate-50/50' : 'border-slate-700 bg-slate-800/40')
+            }`}>
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <label className={`text-3xs font-mono font-bold uppercase flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+                  <Github className="w-3.5 h-3.5" />
+                  <span>GitHub Organization</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setAboutData({ ...aboutData, hideGithub: !aboutData.hideGithub })}
+                  className={`px-2 py-0.5 rounded-lg text-3xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all border ${
+                    aboutData.hideGithub
+                      ? (isLight ? 'bg-rose-100 text-rose-700 border-rose-300' : 'bg-rose-950/40 text-rose-400 border-rose-500/30')
+                      : (isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30')
+                  }`}
+                >
+                  {aboutData.hideGithub ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  <span>{aboutData.hideGithub ? 'Hidden' : 'Visible'}</span>
+                </button>
+              </div>
+              <input
+                type="url"
+                className={`w-full rounded-xl px-3 py-1.5 text-xs focus:outline-none border font-mono ${inputBg}`}
+                value={aboutData.socialGithub || ''}
+                onChange={(e) => setAboutData({ ...aboutData, socialGithub: e.target.value })}
+                placeholder="https://github.com/dakshyam-innovations"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-3xs font-mono text-slate-500 uppercase">Official Support Email</label>
+              <input
+                type="email"
+                className={`w-full rounded-xl px-3 py-1.5 text-xs focus:outline-none border font-mono ${inputBg}`}
+                value={aboutData.contactEmail || ''}
+                onChange={(e) => setAboutData({ ...aboutData, contactEmail: e.target.value })}
+                placeholder="support@dakshyaminnovations.in"
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <label className="block text-3xs font-mono text-slate-500 uppercase">Official Hotline / Phone</label>
+              <input
+                type="text"
+                className={`w-full rounded-xl px-3 py-1.5 text-xs focus:outline-none border font-mono ${inputBg}`}
+                value={aboutData.contactPhone || ''}
+                onChange={(e) => setAboutData({ ...aboutData, contactPhone: e.target.value })}
+                placeholder="+91 7632 234567"
               />
             </div>
           </div>

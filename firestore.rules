@@ -108,7 +108,7 @@ service cloud.firestore {
     // Workshop Feedback Configurations
     match /workshop_feedback_configs/{configId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isTrainer();
     }
 
     // Role-based In-App Notifications

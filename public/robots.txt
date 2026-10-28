@@ -6,9 +6,7 @@ User-agent: *
 Allow: /
 Allow: /?tab=home
 Allow: /?tab=services
-Allow: /?tab=verification
 Allow: /?tab=about
-Allow: /?tab=leaderboard
 Allow: /?tab=social
 Allow: /?tab=contact
 Allow: /?tab=portal

@@ -33,28 +33,12 @@
     <priority>0.90</priority>
   </url>
 
-  <!-- 4. Digital Credential & Certificate Verification Engine -->
-  <url>
-    <loc>https://dakshyaminnovations.in/?tab=verification</loc>
-    <lastmod>2026-09-11</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.90</priority>
-  </url>
-
-  <!-- 5. Corporate Identity & Mission -->
+  <!-- 4. Corporate Identity & Mission -->
   <url>
     <loc>https://dakshyaminnovations.in/?tab=about</loc>
     <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
-  </url>
-
-  <!-- 6. Student Assessment Leaderboard & Competency Rankings -->
-  <url>
-    <loc>https://dakshyaminnovations.in/?tab=leaderboard</loc>
-    <lastmod>2026-09-11</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.80</priority>
   </url>
 
   <!-- 7. Innovation Feeds, Community Exhibits & Video Showcases -->

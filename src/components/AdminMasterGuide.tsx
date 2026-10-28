@@ -145,7 +145,7 @@ export default function AdminMasterGuide({
         'Trainer Registration: Instructors register through the Portal using their email and credentials.',
         'Manual Approval: By default, new trainer accounts show as "Pending Approval". Admin can click "Approve Trainer" to grant lab privileges.',
         'Instant Passcode: Alternatively, instructors can enter the administrator-provided Trainer Registration Code during signup for instant autonomous approval.',
-        'Group Assignment: Assign approved trainers to supervise specific student groups on the Leaderboard matrix.'
+        'Group Assignment: Assign approved trainers to supervise specific student groups and lab projects.'
       ],
       tips: [
         'Trainers only have access to their assigned student groups and workshops, preventing unauthorized edits to root system settings.'
@@ -153,54 +153,20 @@ export default function AdminMasterGuide({
       targetAdminTab: 'trainers'
     },
     {
-      id: 'sec-certificates',
-      title: '7. Verifiable Certificates & QR Engine',
-      badge: 'Credentials',
-      icon: <Award className="w-4 h-4 text-amber-500" />,
-      summary: 'Issue tamper-proof certificates with unique cryptographic verification codes and scannable QR verification engines.',
-      steps: [
-        'Generating a Certificate: Enter the Student Name, Course/Workshop Title, Completion Date, Grade, and Issue Date.',
-        'Unique Verification ID: The engine generates a collision-resistant verifiable ID (e.g., DKY-2026-XXXX).',
-        'Public Verification: Anyone (employers, colleges) can visit the Verification tab and enter the ID to instantly verify authenticity.',
-        'Export & Print: Download print-ready high-resolution certificates with embedded QR codes.'
-      ],
-      tips: [
-        'Certificates stored in Firestore cannot be altered once issued, guaranteeing zero counterfeit diploma generation.'
-      ],
-      targetAdminTab: 'certificates'
-    },
-    {
-      id: 'sec-leaderboard',
-      title: '8. Leaderboard & Student Competition',
-      badge: 'Gamification',
-      icon: <BarChart3 className="w-4 h-4 text-teal-400" />,
-      summary: 'Motivate students through team-based competition, scoring points for project milestones and hardware prototypes.',
-      steps: [
-        'Group Creation: Form student teams (e.g., "Autonomous Rovers", "Smart Agriculture").',
-        'Awarding Points: Award points for prototype milestones, code reviews, and project exhibitions.',
-        'Real-time Ranking: The live leaderboard automatically sorts teams by score and highlights the top-performing innovators.',
-        'Linking Exhibition Videos: Attach demo video links directly to student group profiles.'
-      ],
-      tips: [
-        'Points updates reflect in real-time on the public Leaderboard view without requiring a page reload.'
-      ],
-      targetAdminTab: 'analytics'
-    },
-    {
       id: 'sec-multimedia',
-      title: '9. Page Loader, 3D Art & Video Wall',
+      title: '7. Home 3D Art Studio & Innovation Exhibition',
       badge: 'Visual Experience',
       icon: <Video className="w-4 h-4 text-rose-400" />,
-      summary: 'Manage the animated full-screen video lazy loader, interactive 3D WebGL art, and Innovation Exhibition videos.',
+      summary: 'Manage the interactive 3D WebGL art, OBJ mesh models, and Innovation Exhibition postings.',
       steps: [
-        'Page Loader Settings: Upload custom intro videos or GIFs (via URL or local file). Configure minimum duration, overlay theme, and audio playback.',
-        'Home 3D Art Viewer: Customize the interactive WebGL vector canvas, particle density, and wireframe wave heights.',
-        'Exhibition Video Wall: Add student project showcase videos using YouTube URLs or Cloudinary direct video links.'
+        'Home 3D Art Studio: Upload and calibrate custom 3D OBJ models, vector coordinates, wireframe waves, and rotational presets.',
+        'Interactive Lighting: Adjust ambient light intensity, point light colors, and wireframe opacity with live feedback.',
+        'Exhibition Wall: Add student project showcase videos and high-resolution engineering captures.'
       ],
       tips: [
-        'Large video assets are intelligently cached in IndexedDB to avoid repeated network downloads.'
+        '3D models and materials render smoothly using GPU hardware acceleration.'
       ],
-      targetAdminTab: 'page_loader'
+      targetAdminTab: 'home_3d_art'
     },
     {
       id: 'sec-notifications',

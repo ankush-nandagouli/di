@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ThumbsUp, Eye, MessageSquare, Send, Plus, Film, AlertCircle, Sparkles } from 'lucide-react';
 import { VideoPost } from '../types';
 import { DakshyamDatabase } from '../utils/db';
+import { notifyWarning } from '../utils/toast';
 
 interface SocialVideoWallProps {
   videos: VideoPost[];
@@ -36,7 +37,7 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
   // Handle Likes / Upvotes
   const handleLike = (postId: string) => {
     if (!loggedInUser) {
-      alert('🔒 Please sign in to upvote and like other students\' projects.');
+      notifyWarning('Please sign in to upvote and like other student projects.', 'Sign-in Required');
       return;
     }
 
@@ -63,7 +64,7 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
     if (!commentText) return;
 
     if (!loggedInUser) {
-      alert('🔒 Please authenticate to leave feedback comments.');
+      notifyWarning('Please authenticate to leave feedback comments.', 'Sign-in Required');
       return;
     }
 
@@ -109,8 +110,12 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
       
       videoElement.onloadedmetadata = () => {
         URL.revokeObjectURL(videoElement.src);
-        if (videoElement.duration > 61) { // 61 sec tolerance for precision
-          setErrorText(`❌ Selected video duration is ${Math.round(videoElement.duration)} seconds. Demonstration video must be 60 seconds or less.`);
+        const isAdmin = loggedInUser?.role === 'admin';
+        const maxDuration = isAdmin ? 121 : 61; // 2 min for admin, 60s for student demos
+        const maxLabel = isAdmin ? '2 minutes (120 seconds)' : '60 seconds';
+
+        if (videoElement.duration > maxDuration) {
+          setErrorText(`❌ Selected video duration is ${Math.round(videoElement.duration)} seconds. Demonstration video must be ${maxLabel} or less.`);
           e.target.value = '';
           return;
         }
@@ -273,7 +278,7 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
           <button
             onClick={() => {
               if (!loggedInUser) {
-                alert('🔒 Please register as a student and login to present videos.');
+                notifyWarning('Please register as a student and login to present videos.', 'Sign-in Required');
                 return;
               }
               setShowUpload(!showUpload);
@@ -347,7 +352,11 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
                         : 'bg-[#111]/80 border border-cyan-500/10 text-white focus:border-cyan-450 focus:ring-cyan-500/20'
                     }`}
                   >
-                    <option value="video">Project Video Demonstration (Max 60 Seconds)</option>
+                    <option value="video">
+                      {loggedInUser?.role === 'admin' 
+                        ? '🎬 Dakshyam Innovations Project Video (Up to 2 Min / 120s)' 
+                        : 'Project Video Demonstration (Max 60 Seconds)'}
+                    </option>
                     <option value="image">Project Photo Snapshot Showcase</option>
                   </select>
                 </div>
@@ -375,7 +384,9 @@ export default function SocialVideoWall({ videos, onVideoUpdated, theme = 'dark'
                   )}
                   {selectedMediaType === 'video' && (
                     <p className={`text-[10px] mt-1 font-mono ${isLight ? 'text-amber-800' : 'text-amber-400'}`}>
-                      ⚠️ Absolute limit: 60 seconds video file. Ensure file is trimmed properly.
+                      {loggedInUser?.role === 'admin' 
+                        ? '⚡ Administrator Mode: Up to 2 minutes (120 seconds) video clips supported.' 
+                        : '⚠️ Student project limit: 60 seconds video file. Ensure file is trimmed properly.'}
                     </p>
                   )}
                 </div>

@@ -84,51 +84,14 @@ export const getLiveAppWorkshopShareUrl = (ws?: WorkshopItem | string | null): s
   return getWorkshopShareUrl(ws, false);
 };
 
-export const DEFAULT_WORKSHOPS: WorkshopItem[] = [
-  {
-    id: 'WS-IOT-ROBO',
-    name: 'Industrial IoT & Autonomous Robotics Bootcamp',
-    date: '2026-09-10',
-    venue: 'Dakshyam Central STEM & Robotics Lab, Balaghat',
-    trainerName: 'Anand Gautam & Dakshyam Tech Leads',
-    description: 'Hands-on ESP32 sensor telemetry, dual H-Bridge motor controls, firmware flashing, and live cloud dashboards.',
-    isActive: true
-  },
-  {
-    id: 'WS-NEP-STEM',
-    name: 'NEP 2020 Computational STEM & Embedded Prototyping',
-    date: '2026-08-25',
-    venue: 'Govt. Polytechnic & Model Higher Secondary School',
-    trainerName: 'Rohit Bhajipale & Kunal Raut',
-    description: 'Vocational computational thinking, circuit schematic mapping, breadboard diagnostics, and logic design.',
-    isActive: true
-  },
-  {
-    id: 'WS-SMART-FARM',
-    name: 'Smart Agro-Telemetry & Environmental Sensor Interfacing',
-    date: '2026-08-12',
-    venue: 'Agricultural Engineering Campus & Rural Innovation Wing',
-    trainerName: 'Shikhar Bisen & Hardware Team',
-    description: 'Analog/Digital soil moisture sensing, automated relay irrigation switches, LoRa wireless RF, and field diagnostics.',
-    isActive: true
-  },
-  {
-    id: 'WS-FULLSTACK-DASH',
-    name: 'Full-Stack Web Engineering for IoT Telemetry',
-    date: '2026-07-28',
-    venue: 'Dakshyam Software Center, Balaghat',
-    trainerName: 'Dakshyam Web Engineering Team',
-    description: 'RESTful API integration, WebSocket pipelines, interactive real-time visual telemetry, and dashboard architecture.',
-    isActive: true
-  }
-];
+export const DEFAULT_WORKSHOPS: WorkshopItem[] = [];
 
 export const DEFAULT_FEEDBACK_CONFIG: WorkshopFeedbackConfig = {
   id: 'global-workshop-feedback-config',
   formTitle: 'Dakshyam Innovations Workshop Evaluation & Feedback',
   formSubtitle: 'Your candid evaluation directly powers our curriculum optimization, laboratory equipment enhancements, and hands-on trainer methodologies.',
   isOpen: true,
-  workshops: DEFAULT_WORKSHOPS,
+  workshops: [],
   customQuestions: [
     {
       id: 'q-pace',
@@ -147,131 +110,19 @@ export const DEFAULT_FEEDBACK_CONFIG: WorkshopFeedbackConfig = {
   updatedAt: new Date().toISOString()
 };
 
-export const SEEDED_FEEDBACKS: WorkshopFeedbackSubmission[] = [
-  {
-    id: 'fb-demo-001',
-    workshopId: 'WS-IOT-ROBO',
-    workshopName: 'Industrial IoT & Autonomous Robotics Bootcamp',
-    workshopDate: '2026-09-10',
-    workshopVenue: 'Dakshyam Central STEM & Robotics Lab, Balaghat',
-    participantCategory: 'student',
-    fullName: 'Aditya Verma',
-    email: 'aditya.verma@example.edu',
-    phone: '9826123456',
-    institutionName: 'Govt. Engineering College, Jabalpur',
-    city: 'Balaghat',
-    state: 'Madhya Pradesh',
-    branchOrGrade: 'B.Tech ECE (3rd Year)',
-    rollOrEmployeeId: '0101EC231012',
-    designationOrRole: 'Student Participant',
-    overallRating: 5,
-    trainerKnowledgeRating: 5,
-    practicalHardwareRating: 5,
-    industryRelevanceRating: 5,
-    labManagementRating: 4,
-    keyLearnings: 'Learned register-level ESP32 Wi-Fi telemetry, MQTT message brokering, and PWM motor driver configuration.',
-    favoriteComponent: 'Live motor kinetics and Wi-Fi dashboard sync',
-    improvementSuggestions: 'Please organize an advanced 5-day session on ROS2 and drone flight controllers.',
-    futureInterests: ['ROS2 & Drone Kinematics', 'Embedded C Firmware', 'Industrial Automation'],
-    recommendDakshyam: 'Yes, Definitely',
-    testimonial: 'One of the most practical and well-equipped workshops in Central India. Every student received their own hardware kit.',
-    customAnswers: { 'q-pace': 'Just Right & Balanced', 'q-kit': 'Yes' },
-    submittedAt: '2026-09-10T16:45:00.000Z'
-  },
-  {
-    id: 'fb-demo-002',
-    workshopId: 'WS-NEP-STEM',
-    workshopName: 'NEP 2020 Computational STEM & Embedded Prototyping',
-    workshopDate: '2026-08-25',
-    workshopVenue: 'Govt. Polytechnic & Model Higher Secondary School',
-    participantCategory: 'school',
-    fullName: 'Dr. Sunita Sharma',
-    email: 'principal.model@mpeducation.gov.in',
-    phone: '9425890123',
-    institutionName: 'Model Excellence Higher Secondary School',
-    city: 'Waraseoni',
-    state: 'Madhya Pradesh',
-    branchOrGrade: 'Science & Vocational Faculty',
-    rollOrEmployeeId: 'FAC-EMP-8841',
-    designationOrRole: 'Principal / STEM Coordinator',
-    overallRating: 5,
-    trainerKnowledgeRating: 5,
-    practicalHardwareRating: 4,
-    industryRelevanceRating: 5,
-    labManagementRating: 5,
-    keyLearnings: 'Translating theoretical physics concepts into interactive sensor-driven circuits for high school students.',
-    favoriteComponent: 'Breadboard circuit logic and interactive simulation tools',
-    improvementSuggestions: 'We request Dakshyam Innovations to establish a permanent Atal Tinkering Lab setup in our school.',
-    futureInterests: ['School STEM Labs', 'Teacher Training & NEP 2020', 'Robotics Curriculum'],
-    recommendDakshyam: 'Yes, Definitely',
-    testimonial: 'Dakshyam brought true experiential learning to our rural students. The trainers were patient and highly knowledgeable.',
-    customAnswers: { 'q-pace': 'Just Right & Balanced', 'q-kit': 'Yes' },
-    submittedAt: '2026-08-25T17:20:00.000Z'
-  },
-  {
-    id: 'fb-demo-003',
-    workshopId: 'WS-IOT-ROBO',
-    workshopName: 'Industrial IoT & Autonomous Robotics Bootcamp',
-    workshopDate: '2026-09-10',
-    workshopVenue: 'Dakshyam Central STEM & Robotics Lab, Balaghat',
-    participantCategory: 'college',
-    fullName: 'Prof. Rajesh K. Tiwari',
-    email: 'rktiwari.polytechnic@gmail.com',
-    phone: '9752044819',
-    institutionName: 'Govt. Polytechnic College, Balaghat',
-    city: 'Balaghat',
-    state: 'Madhya Pradesh',
-    branchOrGrade: 'Department of Electrical Engineering',
-    rollOrEmployeeId: 'HOD-EE-201',
-    designationOrRole: 'Head of Department',
-    overallRating: 5,
-    trainerKnowledgeRating: 5,
-    practicalHardwareRating: 5,
-    industryRelevanceRating: 5,
-    labManagementRating: 5,
-    keyLearnings: 'Direct industrial sensor calibration, analog signal conversion, and cloud telemetry integration.',
-    favoriteComponent: 'Hands-on hardware troubleshooting & oscilloscopes',
-    improvementSuggestions: 'Conduct a faculty development program (FDP) of 2 weeks with certification.',
-    futureInterests: ['Industrial Automation & PLC', 'Faculty Development', 'IoT Lab Setup'],
-    recommendDakshyam: 'Yes, Definitely',
-    testimonial: 'Exemplary industrial standards. The hardware kits provided by Dakshyam are top grade.',
-    customAnswers: { 'q-pace': 'Just Right & Balanced', 'q-kit': 'Yes' },
-    submittedAt: '2026-09-10T17:05:00.000Z'
-  },
-  {
-    id: 'fb-demo-004',
-    workshopId: 'WS-SMART-FARM',
-    workshopName: 'Smart Agro-Telemetry & Environmental Sensor Interfacing',
-    workshopDate: '2026-08-12',
-    workshopVenue: 'Agricultural Engineering Campus & Rural Innovation Wing',
-    participantCategory: 'other',
-    fullName: 'Mahendra Patel',
-    email: 'mahendra.patel.agro@yahoo.com',
-    phone: '9893112233',
-    institutionName: 'Krishi Vikas Agritech FPO',
-    city: 'Lalbarra',
-    state: 'Madhya Pradesh',
-    branchOrGrade: 'Agri-Tech Enterprise Lead',
-    rollOrEmployeeId: 'FPO-DIR-09',
-    designationOrRole: 'Operations Director',
-    overallRating: 4,
-    trainerKnowledgeRating: 5,
-    practicalHardwareRating: 4,
-    industryRelevanceRating: 5,
-    labManagementRating: 4,
-    keyLearnings: 'Automated relay control for drip irrigation and soil nitrogen sensor reading.',
-    favoriteComponent: 'Solar-powered LoRa telemetry prototype',
-    improvementSuggestions: 'Provide a translated Hindi reference manual for local farmers and rural youth.',
-    futureInterests: ['Solar Telemetry', 'Smart Agriculture', 'LoRa Wireless Mesh'],
-    recommendDakshyam: 'Likely',
-    testimonial: 'Practical technology designed for real rural challenges.',
-    customAnswers: { 'q-pace': 'A Bit Slow', 'q-kit': 'Yes' },
-    submittedAt: '2026-08-12T15:30:00.000Z'
-  }
-];
+export const SEEDED_FEEDBACKS: WorkshopFeedbackSubmission[] = [];
 
 const LOCAL_STORAGE_FEEDBACK_KEY = 'dakshyam_workshop_feedbacks';
 const LOCAL_STORAGE_CONFIG_KEY = 'dakshyam_workshop_feedback_config';
+
+const MOCK_WORKSHOP_IDS = [
+  'WS-IOT-ROBO', 
+  'WS-NEP-STEM', 
+  'WS-SMART-FARM', 
+  'WS-FULLSTACK-DASH',
+  'WS-MU6VJUDX',
+  'WS-MU85HKNB'
+];
 
 export class WorkshopFeedbackStorage {
   // --- CONFIG MANAGEMENT ---
@@ -280,7 +131,20 @@ export class WorkshopFeedbackStorage {
       const stored = localStorage.getItem(LOCAL_STORAGE_CONFIG_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed && parsed.formTitle) return parsed;
+        if (parsed && parsed.formTitle) {
+          if (Array.isArray(parsed.workshops)) {
+            const hasMock = parsed.workshops.some((w: any) => MOCK_WORKSHOP_IDS.includes(w.id));
+            if (hasMock) {
+              parsed.workshops = parsed.workshops.filter((w: any) => !MOCK_WORKSHOP_IDS.includes(w.id));
+              try {
+                localStorage.setItem(LOCAL_STORAGE_CONFIG_KEY, JSON.stringify(parsed));
+              } catch {}
+            }
+          } else {
+            parsed.workshops = [];
+          }
+          return parsed;
+        }
       }
     } catch (e) {
       console.warn('Config local read warning:', e);
@@ -295,7 +159,20 @@ export class WorkshopFeedbackStorage {
       if (snap.exists()) {
         const data = snap.data() as WorkshopFeedbackConfig;
         if (data && data.formTitle) {
-          localStorage.setItem(LOCAL_STORAGE_CONFIG_KEY, JSON.stringify(data));
+          if (Array.isArray(data.workshops)) {
+            const hasMock = data.workshops.some((w: any) => MOCK_WORKSHOP_IDS.includes(w.id));
+            if (hasMock) {
+              data.workshops = data.workshops.filter((w: any) => !MOCK_WORKSHOP_IDS.includes(w.id));
+              try {
+                await setDoc(docRef, data, { merge: true });
+              } catch {}
+            }
+          } else {
+            data.workshops = [];
+          }
+          try {
+            localStorage.setItem(LOCAL_STORAGE_CONFIG_KEY, JSON.stringify(data));
+          } catch {}
           return data;
         }
       }
@@ -316,6 +193,19 @@ export class WorkshopFeedbackStorage {
         await setDoc(docRef, config, { merge: true });
       } catch (fbErr) {
         console.warn('Firestore config write warning (cached locally):', fbErr);
+      }
+
+      // Sync with backend MongoDB API
+      if (typeof fetch !== 'undefined') {
+        const token = DakshyamDatabase.getAuthToken();
+        fetch('/api/db/workshop_feedback_config', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ data: config })
+        }).catch(() => {});
       }
 
       DakshyamDatabase.logEvent(
@@ -345,9 +235,20 @@ export class WorkshopFeedbackStorage {
       date: string;
       venue: string;
       trainerName?: string;
+      trainerEmail?: string;
       description?: string;
       targetAudience?: string;
       isActive?: boolean;
+      status?: 'upcoming' | 'concluded';
+      thumbnailUrl?: string;
+      photos?: string[];
+      videos?: any[];
+      keyHighlights?: string[];
+      equipmentUsed?: string[];
+      schedule?: string;
+      prerequisites?: string;
+      contactEmail?: string;
+      contactPhone?: string;
     },
     operatorEmail = 'admin@dakshyam.com',
     operatorRole = 'admin'
@@ -364,18 +265,33 @@ export class WorkshopFeedbackStorage {
       const id = `WS-${Date.now().toString(36).toUpperCase()}`;
       const slug = toWorkshopSlug(workshopData.name) || toWorkshopSlug(id);
 
+      const photos = Array.isArray(workshopData.photos) ? workshopData.photos : [];
+      const thumbnailUrl = workshopData.thumbnailUrl || (photos.length > 0 ? photos[0] : undefined);
+      const workshopStatus: 'upcoming' | 'concluded' = workshopData.status || (workshopData.isActive === false ? 'concluded' : 'upcoming');
+
       const newWs: WorkshopItem = {
         id,
         name: workshopData.name.trim(),
         date: workshopData.date.trim(),
         venue: workshopData.venue?.trim() || 'Dakshyam Central STEM & Robotics Lab, Balaghat',
         trainerName: workshopData.trainerName?.trim() || 'Dakshyam Tech Lead',
+        trainerEmail: workshopData.trainerEmail?.trim() || operatorEmail,
         description: workshopData.description?.trim() || '',
         targetAudience: workshopData.targetAudience?.trim() || 'School, College & Vocational STEM Candidates',
-        isActive: workshopData.isActive ?? true,
+        isActive: workshopData.isActive ?? (workshopStatus === 'upcoming'),
+        status: workshopStatus,
         createdAt: new Date().toISOString(),
         slug,
-        formUrl: `/feedback-form/${slug}`
+        formUrl: `/feedback-form/${slug}`,
+        thumbnailUrl,
+        photos,
+        videos: Array.isArray(workshopData.videos) ? workshopData.videos : [],
+        keyHighlights: Array.isArray(workshopData.keyHighlights) ? workshopData.keyHighlights : [],
+        equipmentUsed: Array.isArray(workshopData.equipmentUsed) ? workshopData.equipmentUsed : [],
+        schedule: workshopData.schedule?.trim() || '',
+        prerequisites: workshopData.prerequisites?.trim() || '',
+        contactEmail: workshopData.contactEmail?.trim() || '',
+        contactPhone: workshopData.contactPhone?.trim() || ''
       };
 
       // Check for duplicate by name
@@ -539,12 +455,17 @@ export class WorkshopFeedbackStorage {
       const stored = localStorage.getItem(LOCAL_STORAGE_FEEDBACK_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           const seen = new Set<string>();
           const deduped: WorkshopFeedbackSubmission[] = [];
           let hadDuplicates = false;
           for (const item of parsed) {
             if (!item) continue;
+            // Purge any legacy demo seeds from local storage
+            if (item.id && item.id.startsWith('fb-demo-')) {
+              hadDuplicates = true;
+              continue;
+            }
             const id = item.id || `fb-${Math.random().toString(36).substring(2, 9)}`;
             if (seen.has(id)) {
               hadDuplicates = true;
@@ -562,7 +483,7 @@ export class WorkshopFeedbackStorage {
     } catch (e) {
       console.warn('Submissions local read warning:', e);
     }
-    return SEEDED_FEEDBACKS;
+    return [];
   }
 
   static saveLocalSubmissions(items: WorkshopFeedbackSubmission[]): void {
@@ -610,8 +531,17 @@ export class WorkshopFeedbackStorage {
         submittedAt: new Date().toISOString()
       };
 
-      // 1. Update local storage
+      // 1. Idempotency check: prevent duplicate submissions for the same participant and workshop
       const currentList = this.getSubmissions();
+      const existing = currentList.find(item => 
+        item.workshopId === submissionData.workshopId && 
+        item.email && submissionData.email &&
+        item.email.trim().toLowerCase() === submissionData.email.trim().toLowerCase()
+      );
+      if (existing) {
+        return { success: true, id: existing.id };
+      }
+
       const updatedList = [submission, ...currentList.filter(item => item.id !== id)];
       this.saveLocalSubmissions(updatedList);
 

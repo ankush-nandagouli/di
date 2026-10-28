@@ -125,6 +125,7 @@ export interface VideoPost {
   description: string;
   videoUrl: string; // URL of the video or image hosted in Cloudinary or fallback focus track ID
   mediaType?: 'video' | 'image'; // Decides whether it's a demonstration video or a photographic showcase
+  duration?: number; // Video duration in seconds (supports up to 120s for Dakshyam Innovations project videos)
   likes: number;
   likedByUserIds: string[];
   views: number;
@@ -180,8 +181,31 @@ export interface CompanyAbout {
   socialLinkedin: string;
   socialTwitter: string;
   socialYoutube: string;
+  socialInstagram?: string;
+  hideGithub?: boolean;
+  hideLinkedin?: boolean;
+  hideTwitter?: boolean;
+  hideYoutube?: boolean;
+  hideInstagram?: boolean;
+  contactEmail?: string;
+  contactPhone?: string;
   founders?: CompanyFounder[];
   services: CompanyService[];
+}
+
+export interface ActiveSessionInfo {
+  sessionId: string;
+  userId: string;
+  email: string;
+  role: string;
+  deviceName: string;
+  deviceType: 'Desktop' | 'Mobile' | 'Tablet';
+  browser: string;
+  os: string;
+  ip: string;
+  createdAt: string;
+  lastActive: string;
+  isCurrent?: boolean;
 }
 
 export interface SpecialProgramEnrollment {
@@ -231,19 +255,42 @@ export interface PageLoaderConfig {
 // Workshop Feedback System Types
 export type ParticipantCategory = 'student' | 'school' | 'college' | 'other';
 
+export interface WorkshopVideo {
+  id: string;
+  title: string;
+  url: string;
+  description?: string;
+  duration?: string;
+  thumbnailUrl?: string;
+}
+
 export interface WorkshopItem {
   id: string;
   name: string;
   date: string;
   venue: string;
   trainerName?: string;
+  trainerEmail?: string;
   description?: string;
   isActive: boolean;
+  status?: 'upcoming' | 'concluded';
   createdAt?: string;
   slug?: string;
   formUrl?: string;
   targetAudience?: string;
   submissionCount?: number;
+  avgRating?: number;
+  
+  // Media & Rich Details
+  thumbnailUrl?: string;
+  photos?: string[];
+  videos?: WorkshopVideo[];
+  keyHighlights?: string[];
+  equipmentUsed?: string[];
+  schedule?: string;
+  prerequisites?: string;
+  contactEmail?: string;
+  contactPhone?: string;
 }
 
 export interface CustomFeedbackQuestion {
@@ -311,7 +358,7 @@ export interface AppNotification {
   category: NotificationCategory;
   priority: NotificationPriority;
   isRead?: boolean;
-  linkTab?: 'home' | 'services' | 'leaderboard' | 'social' | 'portal' | 'verification' | 'about' | 'contact' | 'feedback';
+  linkTab?: 'home' | 'services' | 'social' | 'portal' | 'about' | 'contact' | 'notfound';
   actionData?: Record<string, any>;
 }
 

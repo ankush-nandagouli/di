@@ -5,22 +5,20 @@ import {
   Settings, CheckCircle, HelpCircle, Activity, Award, Check, 
   ShieldCheck, Sparkles, Image as ImageIcon, ToggleLeft, ToggleRight, X,
   Download, FileSpreadsheet, Printer, RotateCcw, Eye, RefreshCw,
-  ShieldAlert, Lock, Unlock, Cookie, Globe
+  ShieldAlert, Lock, Unlock, Cookie, Globe, Video, Film, Smartphone, Laptop, Monitor, AlertCircle, Play, Pause, ExternalLink, Instagram, Box
 } from 'lucide-react';
 import { Course, CourseApplication, StudentGroup, StudentUser, TrainerUser, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, Certificate, CompanyAbout } from '../types';
 import { DakshyamDatabase } from '../utils/db';
 import { uploadMediaToCloudinary } from '../utils/mediaUpload';
 import AnalyticsCharts from './AnalyticsCharts';
 import { AboutEditorTab } from './AboutEditorTab';
-import OfficialCertificate from './OfficialCertificate';
-import PageLoaderSettingsTab from './PageLoaderSettingsTab';
 import Home3DArtSettingsTab from './Home3DArtSettingsTab';
-import AdminWorkshopFeedbackManager from './AdminWorkshopFeedbackManager';
 import AdminMasterGuide from './AdminMasterGuide';
 import AdminAccountsManager from './AdminAccountsManager';
 import SupportTicketManager from './SupportTicketManager';
 import { SecurityGuard } from '../utils/security';
-import { WorkshopFeedbackStorage } from '../utils/feedbackStorage';
+import { notifyError, notifySuccess, notifyInfo, notifyWarning } from '../utils/toast';
+import WorkshopDirectoryManager from './WorkshopDirectoryManager';
 
 interface AdminDashboardProps {
   courses: Course[];
@@ -46,9 +44,17 @@ export default function AdminDashboard({
   onOpenPublicFeedbackForm
 }: AdminDashboardProps) {
   const isLight = theme === 'light';
-  // Navigation tabs
-  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'accounts' | 'tickets' | 'promotions' | 'gallery' | 'special_training' | 'certificates' | 'about_editor' | 'page_loader' | 'home_3d_art' | 'logs' | 'workshop_feedback' | 'admin_guide';
+  // Navigation tabs (3D art OBJ studio & tools restored)
+  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'workshops' | 'accounts' | 'tickets' | 'promotions' | 'gallery' | 'devices' | 'special_training' | 'about_editor' | 'home_3d_art' | 'logs' | 'admin_guide';
   const [adminTab, setAdminTab] = useState<TabType>('analytics');
+
+  // Instagram Link Admin Editor Modal States
+  const [showInstagramQuickModal, setShowInstagramQuickModal] = useState(false);
+  const [quickInstagramUrl, setQuickInstagramUrl] = useState(() => {
+    return DakshyamDatabase.getCompanyAbout().socialInstagram || 'https://instagram.com/dakshyam_innovations';
+  });
+  const [isSavingInstagram, setIsSavingInstagram] = useState(false);
+  const [instagramSaveSuccess, setInstagramSaveSuccess] = useState(false);
 
   // Audit Logs Filtering States
   const [searchLog, setSearchLog] = useState('');
@@ -213,6 +219,29 @@ export default function AdminDashboard({
   const trainersList = DakshyamDatabase.getTrainers();
   const bannersList = DakshyamDatabase.getBanners();
   const galleryList = DakshyamDatabase.getGalleryImages();
+  const videosList = DakshyamDatabase.getVideos();
+
+  // Exhibition Tab Modes: Photos Snapshots or Project Videos
+  const [exhibitionMode, setExhibitionMode] = useState<'photos' | 'videos'>('photos');
+
+  // Dakshyam Innovations Project Videos (up to 2 min) state
+  const [projVideoTitle, setProjVideoTitle] = useState('');
+  const [projVideoDesc, setProjVideoDesc] = useState('');
+  const [projVideoUrl, setProjVideoUrl] = useState('');
+  const [projVideoFileBase64, setProjVideoFileBase64] = useState('');
+  const [projVideoFileName, setProjVideoFileName] = useState('');
+  const [projVideoDuration, setProjVideoDuration] = useState<number | null>(null);
+  const [projVideoTrack, setProjVideoTrack] = useState('ROBOTICS_DEMO');
+  const [projVideoError, setProjVideoError] = useState('');
+  const [projVideoSuccess, setProjVideoSuccess] = useState('');
+  const [isUploadingProjVideo, setIsUploadingProjVideo] = useState(false);
+  const [projVideoUploadProgress, setProjVideoUploadProgress] = useState('');
+  const [activeVideoModal, setActiveVideoModal] = useState<string | null>(null);
+
+  // Dynamic Active Sessions Tracking
+  const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionActionMsg, setSessionActionMsg] = useState('');
 
   // --- MODAL CONTROLLERS ---
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -328,13 +357,13 @@ export default function AdminDashboard({
     );
     if (!confirmation) return;
     if (confirmation.trim() !== 'CONFIRM_PERMANENT_DATABASE_CLEAR') {
-      alert("❌ Invalid confirmation code. You must enter exact code: CONFIRM_PERMANENT_DATABASE_CLEAR");
+      notifyError("Invalid confirmation code. You must enter exact code: CONFIRM_PERMANENT_DATABASE_CLEAR");
       return;
     }
 
     try {
       DakshyamDatabase.clearUserRelatedData();
-      await WorkshopFeedbackStorage.purgeAllFeedbackSubmissions('CONFIRM_PERMANENT_DATABASE_CLEAR');
+      // Cleared user-related data
       const token = DakshyamDatabase.getAuthToken();
       const res = await fetch('/api/db/clear', {
         method: 'POST',
@@ -345,14 +374,14 @@ export default function AdminDashboard({
         body: JSON.stringify({ confirmation: 'CONFIRM_PERMANENT_DATABASE_CLEAR' })
       });
       if (res.ok) {
-        alert('✓ Success: All seeded user databases, testing records, and server directories successfully wiped clean!');
+        notifySuccess('All seeded user databases, testing records, and server directories successfully wiped clean!');
       } else {
-        alert('✓ Client Cache and workshop test records wiped clean.');
+        notifySuccess('Client Cache and workshop test records wiped clean.');
       }
       onRefresh();
     } catch (err) {
       console.error("Purge fail:", err);
-      alert('✓ Client cache cleared successfully!');
+      notifySuccess('Client cache cleared successfully!');
       onRefresh();
     }
   };
@@ -383,18 +412,7 @@ export default function AdminDashboard({
   const specialProgramsAll = DakshyamDatabase.getSpecialProgramsAll(); // Full archive/list
   const specialEnrollments = DakshyamDatabase.getSpecialEnrollments();
 
-  // --- DYNAMIC CERTIFICATE GENERATOR STATE ---
-  const [certSelectedCourseId, setCertSelectedCourseId] = useState<string>('');
-  const [certProjectTitle, setCertProjectTitle] = useState<string>('');
-  const [certIssueDate, setCertIssueDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [certTrainerName, setCertTrainerName] = useState<string>('Trainer Vivek Mathur');
-  const [certTrainerId, setCertTrainerId] = useState<string>('usr-t1');
-  const [certSearchQuery, setCertSearchQuery] = useState<string>('');
-  const [certCustomLogoUrl, setCertCustomLogoUrl] = useState<string>('');
-  const [certCustomSealUrl, setCertCustomSealUrl] = useState<string>('');
-  const [certTrainingPartnerName, setCertTrainingPartnerName] = useState<string>('');
-  const [certTrainingPartnerLogoUrl, setCertTrainingPartnerLogoUrl] = useState<string>('');
-  const [certPreviewObj, setCertPreviewObj] = useState<Certificate | null>(null);
+
 
   // Create special program
   const handleCreateSpecialProgram = (e: React.FormEvent) => {
@@ -505,101 +523,13 @@ export default function AdminDashboard({
     }
   };
 
-  // Generate Unique Key for Certificate
-  const generateUniqueCertificateKey = () => {
-    const currentYear = new Date().getFullYear();
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let randomPart = '';
-    for (let i = 0; i < 6; i++) {
-      randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return `DKM-${currentYear}-${randomPart}`;
-  };
 
-  // Generate individual student certificate
-  const handleGenerateCertificateForStudent = (enroll: SpecialProgramEnrollment, program: SpecialTrainingProgram) => {
-    try {
-      const certificates = DakshyamDatabase.getCertificates();
-      
-      // Check if certificate already exists
-      const exists = certificates.some(c => c.studentEmail.toLowerCase() === enroll.email.toLowerCase() && c.courseTitle === program.trainingName);
-      if (exists) {
-        alert('Certificate already generated and issued for this candidate!');
-        return;
-      }
-
-      const certKey = generateUniqueCertificateKey();
-      const newCert: Certificate = {
-        id: certKey,
-        studentName: enroll.name,
-        studentEmail: enroll.email,
-        courseTitle: program.trainingName,
-        projectTitle: `Completed Special Training Program at ${program.institutionName}`,
-        issueDate: new Date().toISOString().split('T')[0],
-        trainerId: 'admin',
-        trainerName: 'Dakshyam Innovations Board'
-      };
-
-      certificates.push(newCert);
-      DakshyamDatabase.saveCertificates(certificates);
-      
-      alert(`Certificate issued successfully! Unique Verification Key: ${certKey}`);
-      onRefresh();
-    } catch {
-      alert('Error saving certificate.');
-    }
-  };
-
-  // Bulk generate certificates
-  const handleBulkGenerate = (program: SpecialTrainingProgram) => {
-    const enrolls = specialEnrollments.filter(e => e.programId === program.id);
-    if (!enrolls.length) {
-      alert('No registered students in this program to issue certificates!');
-      return;
-    }
-
-    if (confirm(`Are you sure you want to bulk generate certificates for all ${enrolls.length} students?`)) {
-      try {
-        const certificates = DakshyamDatabase.getCertificates();
-        let count = 0;
-
-        enrolls.forEach(enroll => {
-          const exists = certificates.some(c => c.studentEmail.toLowerCase() === enroll.email.toLowerCase() && c.courseTitle === program.trainingName);
-          if (!exists) {
-            const certKey = generateUniqueCertificateKey();
-            const newCert: Certificate = {
-              id: certKey,
-              studentName: enroll.name,
-              studentEmail: enroll.email,
-              courseTitle: program.trainingName,
-              projectTitle: `Completed Special Training Program at ${program.institutionName}`,
-              issueDate: new Date().toISOString().split('T')[0],
-              trainerId: 'admin',
-              trainerName: 'Dakshyam Innovations Board'
-            };
-            certificates.push(newCert);
-            count++;
-          }
-        });
-
-        if (count > 0) {
-          DakshyamDatabase.saveCertificates(certificates);
-          alert(`Successfully generated and verified ${count} certificates in bulk format!`);
-          onRefresh();
-        } else {
-          alert('All registered students already possess active issued certificates for this program.');
-        }
-      } catch {
-        alert('Error processing bulk generations.');
-      }
-    }
-  };
 
   // Export Special training program registry to CSV format
   const handleExportToCSV = (program: SpecialTrainingProgram) => {
     const enrolls = specialEnrollments.filter(e => e.programId === program.id);
     if (!enrolls.length) {
-      alert('No enrolled student records found to export.');
+      notifyWarning('No enrolled student records found to export.', 'Export Empty');
       return;
     }
 
@@ -629,108 +559,12 @@ export default function AdminDashboard({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      notifySuccess(`Exported ${enrolls.length} candidate records to CSV!`, 'Export Complete');
     } catch (err) {
-      alert('Failed exporting registry file. Ensure browser permits popup file triggers.');
+      notifyError('Failed exporting registry file. Ensure browser permits downloads.', 'Export Error');
     }
   };
 
-  // --- CERTIFICATE DASHBOARD HANDLERS ---
-  const handleGenerateFromDashboard = (student: { name: string; email: string; institution: string; courseTitle: string; defaultProject: string }) => {
-    try {
-      const certificates = DakshyamDatabase.getCertificates();
-      
-      const exists = certificates.some(c => c.studentEmail.toLowerCase() === student.email.toLowerCase() && c.courseTitle.trim().toLowerCase() === student.courseTitle.trim().toLowerCase());
-      if (exists) {
-        alert('Credentials certificate has already been issued for this student candidate!');
-        return;
-      }
-
-      const certKey = generateUniqueCertificateKey();
-      const newCert: Certificate = {
-        id: certKey,
-        studentName: student.name,
-        studentEmail: student.email,
-        courseTitle: student.courseTitle,
-        projectTitle: certProjectTitle.trim() || student.defaultProject,
-        issueDate: certIssueDate,
-        trainerId: certTrainerId,
-        trainerName: certTrainerName,
-        customLogoUrl: certCustomLogoUrl || undefined,
-        customSealUrl: certCustomSealUrl || undefined,
-        trainingPartnerName: certTrainingPartnerName.trim() || undefined,
-        trainingPartnerLogoUrl: certTrainingPartnerLogoUrl || undefined
-      };
-
-      certificates.push(newCert);
-      DakshyamDatabase.saveCertificates(certificates);
-
-      setCertPreviewObj(newCert);
-      onRefresh();
-    } catch {
-      alert('Failed saving certificate record.');
-    }
-  };
-
-  const handleBulkGenerateFromDashboard = (courseTitleStr: string, studentsList: Array<{ name: string; email: string; institution: string; defaultProject: string }>) => {
-    if (!studentsList.length) {
-      alert('No students found to issue certificates to.');
-      return;
-    }
-
-    if (confirm(`Bulk generate verified credentials certificates for all ${studentsList.length} candidate students?`)) {
-      try {
-        const certificates = DakshyamDatabase.getCertificates();
-        let count = 0;
-
-        studentsList.forEach(st => {
-          const exists = certificates.some(c => c.studentEmail.toLowerCase() === st.email.toLowerCase() && c.courseTitle.trim().toLowerCase() === courseTitleStr.trim().toLowerCase());
-          if (!exists) {
-            const certKey = generateUniqueCertificateKey();
-            const newCert: Certificate = {
-              id: certKey,
-              studentName: st.name,
-              studentEmail: st.email,
-              courseTitle: courseTitleStr,
-              projectTitle: certProjectTitle.trim() || st.defaultProject,
-              issueDate: certIssueDate,
-              trainerId: certTrainerId,
-              trainerName: certTrainerName,
-              customLogoUrl: certCustomLogoUrl || undefined,
-              customSealUrl: certCustomSealUrl || undefined,
-              trainingPartnerName: certTrainingPartnerName.trim() || undefined,
-              trainingPartnerLogoUrl: certTrainingPartnerLogoUrl || undefined
-            };
-            certificates.push(newCert);
-            count++;
-          }
-        });
-
-        if (count > 0) {
-          DakshyamDatabase.saveCertificates(certificates);
-          alert(`Successfully generated and verified ${count} credentials certificates in bulk!`);
-          onRefresh();
-        } else {
-          alert('All active students already possess approved certificate records.');
-        }
-      } catch {
-        alert('Error processing bulk generations.');
-      }
-    }
-  };
-
-  const handleDeleteCertificate = (certId: string) => {
-    if (confirm('Are you sure you want to revoke/delete this issued certificate record?')) {
-      try {
-        const certificates = DakshyamDatabase.getCertificates();
-        const filtered = certificates.filter(c => c.id !== certId);
-        DakshyamDatabase.saveCertificates(filtered);
-        alert('Certificate revoked successfully.');
-        onRefresh();
-      } catch {
-        alert('Error deleting certificate.');
-      }
-    }
-  };
 
   // Handle Create Course
   const handleCreateCourse = (e: React.FormEvent) => {
@@ -948,6 +782,248 @@ export default function AdminDashboard({
     }
   };
 
+  // --- DAKSHYAM INNOVATIONS PROJECT VIDEOS (UP TO 2 MIN) ---
+  const handleProjectVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setProjVideoError('');
+    setProjVideoSuccess('');
+    setProjVideoFileBase64('');
+    setProjVideoFileName('');
+    setProjVideoDuration(null);
+
+    if (!file.type.startsWith('video/')) {
+      setProjVideoError('❌ Invalid file format. Please choose an MP4, WebM, or video recording file.');
+      e.target.value = '';
+      return;
+    }
+
+    // Inspect duration in browser first
+    const tempVideo = document.createElement('video');
+    tempVideo.preload = 'metadata';
+    const blobUrl = URL.createObjectURL(file);
+    tempVideo.src = blobUrl;
+
+    tempVideo.onloadedmetadata = () => {
+      URL.revokeObjectURL(blobUrl);
+      const dur = tempVideo.duration;
+      // 121 seconds max (2 minutes with slight precision buffer)
+      if (dur > 121) {
+        const mins = Math.floor(dur / 60);
+        const secs = Math.round(dur % 60);
+        setProjVideoError(`❌ Selected video duration is ${mins}m ${secs}s (${Math.round(dur)} seconds). Dakshyam Innovations project videos must be 2 minutes (120s) or less. Please select a trimmed demonstration video.`);
+        e.target.value = '';
+        return;
+      }
+
+      setProjVideoDuration(dur);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProjVideoFileBase64(reader.result as string);
+        setProjVideoFileName(file.name);
+      };
+      reader.readAsDataURL(file);
+    };
+
+    tempVideo.onerror = () => {
+      URL.revokeObjectURL(blobUrl);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProjVideoFileBase64(reader.result as string);
+        setProjVideoFileName(file.name);
+      };
+      reader.readAsDataURL(file);
+    };
+  };
+
+  const handleCreateProjectVideo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProjVideoError('');
+    setProjVideoSuccess('');
+
+    if (!projVideoTitle.trim()) {
+      setProjVideoError('Please enter a project video title.');
+      return;
+    }
+
+    const hasFile = Boolean(projVideoFileBase64);
+    const hasUrl = Boolean(projVideoUrl.trim());
+
+    if (!hasFile && !hasUrl) {
+      setProjVideoError('Please select a demonstration video file (up to 2 min) or enter a video URL.');
+      return;
+    }
+
+    try {
+      setIsUploadingProjVideo(true);
+      setProjVideoUploadProgress('Encoding & uploading project video to Cloudinary/server...');
+
+      let finalUrl = projVideoUrl.trim();
+
+      if (hasFile) {
+        const token = DakshyamDatabase.getAuthToken();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            file: projVideoFileBase64,
+            resourceType: 'video'
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          finalUrl = data.url || finalUrl;
+        } else {
+          finalUrl = projVideoFileBase64;
+        }
+      }
+
+      const newVideo = {
+        id: `vid_dakshyam_${Date.now()}`,
+        groupId: 'dakshyam-official-innovations',
+        groupName: 'Dakshyam Innovations Project',
+        title: projVideoTitle.trim(),
+        description: projVideoDesc.trim(),
+        videoUrl: finalUrl,
+        mediaType: 'video' as const,
+        duration: projVideoDuration ? Math.round(projVideoDuration) : 90,
+        likes: 0,
+        likedByUserIds: [],
+        views: 1,
+        comments: [],
+        createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
+      };
+
+      // Save to API
+      const token = DakshyamDatabase.getAuthToken();
+      fetch('/api/videos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(newVideo)
+      }).catch(() => {});
+
+      // Save to local state
+      const currentVideos = DakshyamDatabase.getVideos();
+      DakshyamDatabase.saveVideos([newVideo, ...currentVideos]);
+
+      setProjVideoSuccess('✓ Dakshyam Innovations project video (up to 2 min) published successfully!');
+      setProjVideoTitle('');
+      setProjVideoDesc('');
+      setProjVideoUrl('');
+      setProjVideoFileBase64('');
+      setProjVideoFileName('');
+      setProjVideoDuration(null);
+      setProjVideoUploadProgress('');
+      onRefresh();
+    } catch (err: any) {
+      setProjVideoError(err.message || 'Video upload process failed.');
+    } finally {
+      setIsUploadingProjVideo(false);
+    }
+  };
+
+  const handleDeleteProjectVideo = (videoId: string) => {
+    if (confirm('Delete this Dakshyam Innovations project video from the exhibition?')) {
+      const current = DakshyamDatabase.getVideos().filter(v => v.id !== videoId);
+      DakshyamDatabase.saveVideos(current);
+      const token = DakshyamDatabase.getAuthToken();
+      fetch(`/api/videos/${videoId}`, {
+        method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      }).catch(() => {});
+      onRefresh();
+    }
+  };
+
+  // --- DYNAMIC ACTIVE SESSION MANAGEMENT ---
+  const fetchSessions = async () => {
+    setSessionsLoading(true);
+    try {
+      const currentSessionId = DakshyamDatabase.getSessionId();
+      const token = DakshyamDatabase.getAuthToken();
+      const res = await fetch(`/api/auth/sessions?sessionId=${encodeURIComponent(currentSessionId)}`, {
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'x-session-id': currentSessionId
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.sessions && data.sessions.length > 0) {
+          setActiveSessions(data.sessions);
+        } else {
+          // Provide dynamic current session
+          setActiveSessions([{
+            sessionId: currentSessionId,
+            userId: 'usr-admin-master',
+            email: 'admin@dakshyam.com',
+            role: 'admin',
+            deviceName: 'Active Administrator Console',
+            deviceType: 'Desktop',
+            browser: 'Production Browser',
+            os: 'Secure Workspace',
+            ip: 'Production Gateway',
+            createdAt: new Date().toISOString(),
+            lastActive: new Date().toISOString(),
+            isCurrent: true
+          }]);
+        }
+      }
+    } catch {} finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchSessions();
+    const interval = setInterval(fetchSessions, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleRevokeSession = async (sessionId: string) => {
+    if (confirm('Revoke access and log out this device?')) {
+      try {
+        const token = DakshyamDatabase.getAuthToken();
+        await fetch(`/api/auth/sessions/${sessionId}`, {
+          method: 'DELETE',
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        setSessionActionMsg('✓ Device session revoked and logged out successfully.');
+        setTimeout(() => setSessionActionMsg(''), 4000);
+        fetchSessions();
+      } catch {}
+    }
+  };
+
+  const handleTerminateOtherSessions = async () => {
+    if (confirm('Log out from all other logged-in devices except this one?')) {
+      try {
+        const currentSessionId = DakshyamDatabase.getSessionId();
+        const token = DakshyamDatabase.getAuthToken();
+        await fetch('/api/auth/sessions/terminate-others', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            'x-session-id': currentSessionId
+          },
+          body: JSON.stringify({ sessionId: currentSessionId })
+        });
+        setSessionActionMsg('✓ All other device sessions successfully terminated.');
+        setTimeout(() => setSessionActionMsg(''), 4000);
+        fetchSessions();
+      } catch {}
+    }
+  };
+
   // --- ANALYTICS DATAPOINTS ---
   const courseRegistrationData = courses.map(course => {
     const count = applications.filter(app => app.courseId === course.id).length;
@@ -1037,9 +1113,53 @@ export default function AdminDashboard({
                   : 'bg-amber-950/20 border-amber-500/15 text-amber-400 hover:bg-amber-900/30 hover:border-amber-500/30'
               }`}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> DB Fallback Mode
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> Storage: Local Cache Active
             </button>
           )}
+          <button
+            onClick={() => setAdminTab('devices')}
+            className={`px-3 py-1 border rounded-full font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              isLight 
+                ? 'bg-blue-50 border-blue-900/20 text-blue-950 hover:bg-blue-100' 
+                : 'bg-cyan-950/40 border-cyan-400/30 text-cyan-300 hover:bg-cyan-900/40 shadow-[0_0_10px_rgba(34,211,238,0.15)]'
+            }`}
+            title="View all active devices where admin is logged in"
+          >
+            <Smartphone className="w-3 h-3 text-cyan-400" />
+            <span>Devices: {activeSessions.length || 1} Logged In</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setQuickInstagramUrl(DakshyamDatabase.getCompanyAbout().socialInstagram || 'https://instagram.com/dakshyam_innovations');
+              setShowInstagramQuickModal(true);
+            }}
+            className={`px-3 py-1 border rounded-full font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              isLight 
+                ? 'bg-pink-50 border-pink-400/30 text-pink-900 hover:bg-pink-100 shadow-xs' 
+                : 'bg-gradient-to-r from-pink-950/40 to-purple-950/40 border-pink-500/30 text-pink-300 hover:border-pink-400 shadow-[0_0_10px_rgba(236,72,153,0.15)]'
+            }`}
+            title="Edit Instagram & Social Media Profile URL"
+          >
+            <Instagram className="w-3 h-3 text-pink-400" />
+            <span>Edit Instagram Link</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAdminTab('home_3d_art')}
+            className={`px-3 py-1 border rounded-full font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              isLight 
+                ? 'bg-cyan-50 border-cyan-500/30 text-cyan-900 hover:bg-cyan-100 shadow-xs' 
+                : 'bg-cyan-950/40 border-cyan-400/30 text-cyan-300 hover:bg-cyan-900/40 shadow-[0_0_10px_rgba(34,211,238,0.15)]'
+            }`}
+            title="Open Home Page 3D Art & OBJ Studio"
+          >
+            <Box className="w-3 h-3 text-cyan-400" />
+            <span>Home 3D Art Studio</span>
+          </button>
         </div>
       </div>
 
@@ -1070,7 +1190,7 @@ export default function AdminDashboard({
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
                   isDbConnected ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                 }`}>
-                  {isDbConnected ? 'Live Connected' : 'Failsafe Fallback Active'}
+                  {isDbConnected ? 'Live Connected' : 'Local Resilient Storage Active'}
                 </span>
               </div>
 
@@ -1150,7 +1270,7 @@ export default function AdminDashboard({
       <div className={`flex flex-wrap gap-1.5 border-b pb-0.5 font-mono text-3xs uppercase font-extrabold scrollbar-none overflow-x-auto ${
         isLight ? 'border-slate-200' : 'border-cyan-500/10'
       }`}>
-        {(['analytics', 'courses', 'applications', 'trainers', 'accounts', 'tickets', 'promotions', 'gallery', 'special_training', 'certificates', 'about_editor', 'page_loader', 'home_3d_art', 'workshop_feedback', 'logs', 'admin_guide'] as const).map(tab => (
+        {(['analytics', 'courses', 'applications', 'trainers', 'workshops', 'accounts', 'tickets', 'promotions', 'gallery', 'devices', 'special_training', 'about_editor', 'home_3d_art', 'logs', 'admin_guide'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setAdminTab(tab)}
@@ -1164,16 +1284,15 @@ export default function AdminDashboard({
             {tab === 'courses' && 'Publisher'}
             {tab === 'applications' && 'Admissions'}
             {tab === 'trainers' && 'Verify Trainers'}
+            {tab === 'workshops' && '🏢 Workshops Directory'}
             {tab === 'accounts' && '👥 Registered Accounts'}
             {tab === 'tickets' && '🎫 Support & Bug Tickets'}
             {tab === 'promotions' && 'Promo Banners'}
-            {tab === 'gallery' && 'Class Gallery'}
+            {tab === 'gallery' && 'Class Gallery & Exhibition'}
+            {tab === 'devices' && `📱 Active Devices (${activeSessions.length || 1})`}
             {tab === 'special_training' && '🎓 Special Training Forms'}
-            {tab === 'certificates' && '🎖 Certificate Dashboard'}
             {tab === 'about_editor' && '✏️ About Page Editor'}
-            {tab === 'page_loader' && '🎬 Video Page Loader'}
             {tab === 'home_3d_art' && '🧊 Home 3D Art (.obj)'}
-            {tab === 'workshop_feedback' && '📋 Workshop Feedbacks'}
             {tab === 'logs' && '🛡️ System Audit Logs'}
             {tab === 'admin_guide' && '📖 Admin Master Guide'}
           </button>
@@ -1705,6 +1824,17 @@ export default function AdminDashboard({
           </div>
         )}
 
+        {/* TAB: WORKSHOPS DIRECTORY CRUD CONSOLE */}
+        {adminTab === 'workshops' && (
+          <WorkshopDirectoryManager
+            userRole="admin"
+            currentUserEmail="admin@dakshyam.com"
+            currentTrainerName="Dakshyam Administration"
+            theme={theme}
+            onRefresh={onRefresh}
+          />
+        )}
+
         {/* TAB 5: BANNER PROMOTIONS MANAGEMENT */}
         {adminTab === 'promotions' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1859,241 +1989,698 @@ export default function AdminDashboard({
           </div>
         )}
 
-        {/* TAB 6: CAPTIONED PROJECT IMAGE GALLERY */}
+        {/* TAB 6: CAPTIONED PROJECT IMAGE GALLERY & INNOVATION EXHIBITION VIDEOS */}
         {adminTab === 'gallery' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
             
-            {/* Gallery Upload Form */}
-            <form onSubmit={handleCreateGalleryImage} className="space-y-3.5 font-sans">
-              <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
-                isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
-              }`}>
-                Post Photo snapshot to Public Exhibition
-              </h3>
-
-              {galError && <div className="text-3xs font-mono text-red-400 bg-red-950/25 p-2 rounded-xl">{galError}</div>}
-              {galSuccess && <div className="text-3xs font-mono text-cyan-400 bg-cyan-950/25 p-2 rounded-xl font-bold">{galSuccess}</div>}
-
-              <div>
-                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Event Snapshot Title</label>
-                <input
-                  type="text"
-                  required
-                  value={galTitle}
-                  onChange={(e) => setGalTitle(e.target.value)}
-                  placeholder="e.g. Waraseoni School IT Delivery"
-                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
-                    isLight 
-                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
-                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+            {/* Sub-Panel Switcher */}
+            <div className={`flex flex-wrap items-center justify-between gap-3 border-b pb-3 ${
+              isLight ? 'border-slate-200' : 'border-cyan-500/10'
+            }`}>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExhibitionMode('photos')}
+                  className={`px-4 py-2 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                    exhibitionMode === 'photos'
+                      ? (isLight ? 'bg-amber-600 text-white shadow-xs' : 'bg-cyan-500 text-slate-950 font-black shadow-[0_0_12px_rgba(34,211,238,0.25)]')
+                      : (isLight ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-[#111] text-slate-400 hover:text-white')
                   }`}
-                />
+                >
+                  <ImageIcon className="w-4 h-4" />
+                  <span>📸 Event Photo Snapshots ({galleryList.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExhibitionMode('videos')}
+                  className={`px-4 py-2 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                    exhibitionMode === 'videos'
+                      ? (isLight ? 'bg-amber-600 text-white shadow-xs' : 'bg-cyan-500 text-slate-950 font-black shadow-[0_0_12px_rgba(34,211,238,0.25)]')
+                      : (isLight ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-[#111] text-slate-400 hover:text-white')
+                  }`}
+                >
+                  <Video className="w-4 h-4" />
+                  <span>🎬 Project Videos (Up to 2 Min) ({videosList.length})</span>
+                </button>
               </div>
 
-              <div>
-                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Image Description (Contextual Caption)</label>
-                <textarea
-                  required
-                  value={galDesc}
-                  onChange={(e) => setGalDesc(e.target.value)}
-                  placeholder="Details on active training setups, logical loops designed, or hardware used..."
-                  rows={2}
-                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
-                    isLight 
-                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
-                      : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
-                  }`}
-                />
-              </div>
+              <span className={`text-[9px] font-mono font-bold uppercase ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                {exhibitionMode === 'photos' ? 'Batch Image Multi-Uploader' : 'Video Duration Limit: 120 Seconds (2 Min)'}
+              </span>
+            </div>
 
-              <div className="space-y-2.5">
-                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>
-                  Exhibition Photo Upload (Upload Single or Multiple Images)
-                </label>
+            {exhibitionMode === 'photos' ? (
+              /* --- SUB-MODE A: PHOTO SNAPSHOTS --- */
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* Multi-Photo File Picker */}
-                <div className={`p-3 rounded-xl border border-dashed transition-all ${
-                  isLight 
-                    ? 'border-amber-300 bg-amber-50/50 hover:bg-amber-50' 
-                    : 'border-cyan-500/30 bg-[#071326]/50 hover:bg-cyan-950/20'
-                }`}>
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                {/* Gallery Upload Form */}
+                <form onSubmit={handleCreateGalleryImage} className="space-y-3.5 font-sans">
+                  <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
+                    isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
+                  }`}>
+                    Post Photo snapshot to Public Exhibition
+                  </h3>
+
+                  {galError && <div className="text-3xs font-mono text-red-400 bg-red-950/25 p-2 rounded-xl">{galError}</div>}
+                  {galSuccess && <div className="text-3xs font-mono text-cyan-400 bg-cyan-950/25 p-2 rounded-xl font-bold">{galSuccess}</div>}
+
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Event Snapshot Title</label>
                     <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleGalFileUpload}
-                      disabled={isUploadingGalImage}
-                      className={`block w-full text-4xs cursor-pointer file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-3xs file:font-bold disabled:opacity-50 ${
+                      type="text"
+                      required
+                      value={galTitle}
+                      onChange={(e) => setGalTitle(e.target.value)}
+                      placeholder="e.g. Waraseoni School IT Delivery"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
                         isLight 
-                          ? 'text-slate-600 file:bg-amber-600 file:text-white hover:file:bg-amber-700' 
-                          : 'text-slate-300 file:bg-cyan-500 file:text-slate-950 hover:file:bg-cyan-400'
+                          ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                          : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
                       }`}
                     />
                   </div>
 
-                  {isUploadingGalImage && (
-                    <div className="mt-2.5 flex items-center gap-2 p-2 rounded-lg bg-cyan-950/40 border border-cyan-500/20">
-                      <div className="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin shrink-0" />
-                      <span className="text-3xs font-mono text-cyan-300 animate-pulse">
-                        {galUploadProgress || 'Uploading images...'}
-                      </span>
-                    </div>
-                  )}
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Image Description (Contextual Caption)</label>
+                    <textarea
+                      required
+                      value={galDesc}
+                      onChange={(e) => setGalDesc(e.target.value)}
+                      placeholder="Details on active training setups, logical loops designed, or hardware used..."
+                      rows={2}
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                        isLight 
+                          ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-450' 
+                          : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                      }`}
+                    />
+                  </div>
 
-                  <p className="text-[8px] font-mono text-slate-400 mt-2">
-                    💡 Tip: You can select multiple photos at once. JPEG, PNG, and WebP are supported.
-                  </p>
-                </div>
-
-                {/* Staged Uploaded Images List with Thumbnails and Remove Button */}
-                {uploadedGalImages.length > 0 && (
-                  <div className="space-y-1.5 pt-1">
-                    <div className="flex items-center justify-between text-3xs font-mono text-cyan-400 font-bold">
-                      <span>Staged Photos Ready to Publish ({uploadedGalImages.length}):</span>
-                      <button
-                        type="button"
-                        onClick={() => setUploadedGalImages([])}
-                        className="text-red-400 hover:text-red-300 cursor-pointer text-4xs uppercase"
-                      >
-                        Clear All
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
-                      {uploadedGalImages.map((img, idx) => (
-                        <div 
-                          key={idx} 
-                          className={`relative group rounded-lg overflow-hidden border p-1 flex items-center gap-2 ${
-                            isLight ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-cyan-500/20'
+                  <div className="space-y-2.5">
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>
+                      Exhibition Photo Upload (Upload Single or Multiple Images)
+                    </label>
+                    
+                    {/* Multi-Photo File Picker */}
+                    <div className={`p-3 rounded-xl border border-dashed transition-all ${
+                      isLight 
+                        ? 'border-amber-300 bg-amber-50/50 hover:bg-amber-50' 
+                        : 'border-cyan-500/30 bg-[#071326]/50 hover:bg-cyan-950/20'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleGalFileUpload}
+                          disabled={isUploadingGalImage}
+                          className={`block w-full text-4xs cursor-pointer file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-3xs file:font-bold disabled:opacity-50 ${
+                            isLight 
+                              ? 'text-slate-600 file:bg-amber-600 file:text-white hover:file:bg-amber-700' 
+                              : 'text-slate-300 file:bg-cyan-500 file:text-slate-950 hover:file:bg-cyan-400'
                           }`}
-                        >
-                          <img 
-                            src={img.url} 
-                            alt={img.name} 
-                            className="w-10 h-10 object-cover rounded shrink-0"
-                            referrerPolicy="no-referrer"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-4xs font-mono truncate text-slate-300">{img.name || `Photo ${idx + 1}`}</p>
-                            <span className="text-[8px] font-mono text-emerald-400">✓ Ready</span>
-                          </div>
+                        />
+                      </div>
+
+                      {isUploadingGalImage && (
+                        <div className="mt-2.5 flex items-center gap-2 p-2 rounded-lg bg-cyan-950/40 border border-cyan-500/20">
+                          <div className="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                          <span className="text-3xs font-mono text-cyan-300 animate-pulse">
+                            {galUploadProgress || 'Uploading images...'}
+                          </span>
+                        </div>
+                      )}
+
+                      <p className="text-[8px] font-mono text-slate-400 mt-2">
+                        💡 Tip: You can select multiple photos at once. JPEG, PNG, and WebP are supported.
+                      </p>
+                    </div>
+
+                    {/* Staged Uploaded Images List with Thumbnails and Remove Button */}
+                    {uploadedGalImages.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-3xs font-mono text-cyan-400 font-bold">
+                          <span>Staged Photos Ready to Publish ({uploadedGalImages.length}):</span>
                           <button
                             type="button"
-                            onClick={() => handleRemoveUploadedGalImage(idx)}
-                            className="p-1 rounded bg-red-950/80 text-red-400 hover:text-red-200 cursor-pointer text-3xs shrink-0"
-                            title="Remove photo"
+                            onClick={() => setUploadedGalImages([])}
+                            className="text-red-400 hover:text-red-300 cursor-pointer text-4xs uppercase"
                           >
-                            <X className="w-3 h-3" />
+                            Clear All
                           </button>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
+                          {uploadedGalImages.map((img, idx) => (
+                            <div 
+                              key={idx} 
+                              className={`relative group rounded-lg overflow-hidden border p-1 flex items-center gap-2 ${
+                                isLight ? 'bg-white border-slate-200' : 'bg-slate-900/80 border-cyan-500/20'
+                              }`}
+                            >
+                              <img 
+                                src={img.url} 
+                                alt={img.name} 
+                                className="w-10 h-10 object-cover rounded shrink-0"
+                                referrerPolicy="no-referrer"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-4xs font-mono truncate text-slate-300">{img.name || `Photo ${idx + 1}`}</p>
+                                <span className="text-[8px] font-mono text-emerald-400">✓ Ready</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveUploadedGalImage(idx)}
+                                className="p-1 rounded bg-red-950/80 text-red-400 hover:text-red-200 cursor-pointer text-3xs shrink-0"
+                                title="Remove photo"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                {/* Optional Image URL Input */}
-                <div className="pt-1 space-y-1.5">
-                  <div className="text-[8px] font-mono text-slate-400 flex items-center gap-2">
-                    <span>Optional: Or paste direct photo URL (Leave blank if you uploaded files above):</span>
-                  </div>
+                    {/* Optional Image URL Input */}
+                    <div className="pt-1 space-y-1.5">
+                      <div className="text-[8px] font-mono text-slate-400 flex items-center gap-2">
+                        <span>Optional: Or paste direct photo URL (Leave blank if you uploaded files above):</span>
+                      </div>
 
-                  <input
-                    type="url"
-                    value={galImageUrl}
-                    onChange={(e) => setGalImageUrl(e.target.value)}
-                    placeholder="https://... (Optional)"
-                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
-                      isLight 
-                        ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-455' 
-                        : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45 placeholder:text-slate-500'
-                    }`}
-                  />
-
-                  {galImageUrl && (
-                    <div className="flex items-center gap-2 pt-1">
-                      <img 
-                        src={galImageUrl} 
-                        alt="Exhibition preview" 
-                        className="w-12 h-12 object-cover rounded-lg border border-slate-500/20" 
-                        referrerPolicy="no-referrer"
+                      <input
+                        type="url"
+                        value={galImageUrl}
+                        onChange={(e) => setGalImageUrl(e.target.value)}
+                        placeholder="https://... (Optional)"
+                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                          isLight 
+                            ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-455' 
+                            : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45 placeholder:text-slate-500'
+                        }`}
                       />
-                      <span className="text-[9px] font-mono text-emerald-400 flex items-center gap-1">
-                        ✓ Snapshot Image URL Loaded {galImageUrl.includes('cloudinary.com') ? '(Cloudinary Hosted)' : ''}
-                      </span>
+
+                      {galImageUrl && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <img 
+                            src={galImageUrl} 
+                            alt="Exhibition preview" 
+                            className="w-12 h-12 object-cover rounded-lg border border-slate-500/20" 
+                            referrerPolicy="no-referrer"
+                          />
+                          <span className="text-[9px] font-mono text-emerald-400 flex items-center gap-1">
+                            ✓ Snapshot Image URL Loaded {galImageUrl.includes('cloudinary.com') ? '(Cloudinary Hosted)' : ''}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
+                  </div>
 
-              <div>
-                <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Program Classification Category</label>
-                <select
-                  value={galCategory}
-                  onChange={(e) => setGalCategory(e.target.value as any)}
-                  className={`w-full border rounded-xl px-3 py-2.5 text-xs focus:outline-none transition-all ${
-                    isLight 
-                      ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50' 
-                      : 'bg-[#111]/80 border border-cyan-500/10 text-white'
-                  }`}
-                >
-                  <option value="school_programs" className={isLight ? 'text-slate-800' : 'text-black'}>School Programs</option>
-                  <option value="iot_robotics" className={isLight ? 'text-slate-800' : 'text-black'}>IoT & Computational Robotics</option>
-                  <option value="mern_web" className={isLight ? 'text-slate-800' : 'text-black'}>Web & Django Engineering</option>
-                  <option value="lab_setups" className={isLight ? 'text-slate-800' : 'text-black'}>Lab Setup Logistics</option>
-                </select>
-              </div>
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>Program Classification Category</label>
+                    <select
+                      value={galCategory}
+                      onChange={(e) => setGalCategory(e.target.value as any)}
+                      className={`w-full border rounded-xl px-3 py-2.5 text-xs focus:outline-none transition-all ${
+                        isLight 
+                          ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50' 
+                          : 'bg-[#111]/80 border border-cyan-500/10 text-white'
+                      }`}
+                    >
+                      <option value="school_programs" className={isLight ? 'text-slate-800' : 'text-black'}>School Programs</option>
+                      <option value="iot_robotics" className={isLight ? 'text-slate-800' : 'text-black'}>IoT & Computational Robotics</option>
+                      <option value="mern_web" className={isLight ? 'text-slate-800' : 'text-black'}>Web & Django Engineering</option>
+                      <option value="lab_setups" className={isLight ? 'text-slate-800' : 'text-black'}>Lab Setup Logistics</option>
+                    </select>
+                  </div>
 
-              <button
-                type="submit"
-                className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-xs transition-all ${
-                  isLight 
-                    ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/10' 
-                    : 'bg-cyan-500 hover:bg-cyan-440 text-slate-950 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
-                }`}
-              >
-                Publish Event Snapshot
-              </button>
-            </form>
-
-            {/* List snaps */}
-            <div className="space-y-4">
-              <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
-                isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
-              }`}>
-                Live Snapshots Directory ({galleryList.length})
-              </h3>
-
-              <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                {galleryList.map((g, idx) => (
-                  <div 
-                    key={g.id ? `${g.id}-${idx}` : `gal-${idx}`}
-                    className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-left animate-fadeIn ${
+                  <button
+                    type="submit"
+                    className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-xs transition-all ${
                       isLight 
-                        ? 'bg-slate-50 border-slate-200 hover:border-amber-500/15 shadow-3xs' 
-                        : 'bg-[#111]/45 border border-cyan-500/5'
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/10' 
+                        : 'bg-cyan-500 hover:bg-cyan-440 text-slate-950 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
                     }`}
                   >
-                    <div className={`w-14 h-11 rounded overflow-hidden shrink-0 ${isLight ? 'bg-slate-200' : 'bg-slate-900'}`}>
-                      <img src={g.imageUrl} alt="" className="w-full h-full object-cover" />
-                    </div>
+                    Publish Event Snapshot
+                  </button>
+                </form>
 
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <h4 className={`text-3xs font-extrabold uppercase truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{g.title}</h4>
-                      <p className={`text-[9px] uppercase font-mono tracking-wider ${isLight ? 'text-amber-750' : 'text-[#22d3ee]'}`}>{g.category.replace('_', ' ')}</p>
-                    </div>
+                {/* List snaps */}
+                <div className="space-y-4">
+                  <h3 className={`text-xs font-bold tracking-wider uppercase border-b pb-2 ${
+                    isLight ? 'text-amber-800 border-slate-200' : 'text-white border-cyan-500/5'
+                  }`}>
+                    Live Snapshots Directory ({galleryList.length})
+                  </h3>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteGalleryImage(g.id)}
-                      className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
-                        isLight ? 'text-slate-400 hover:text-red-650' : 'text-slate-500 hover:text-red-400'
-                      }`}
-                      title="Delete snapshot"
-                    >
-                      <Trash className="w-4 h-4" />
-                    </button>
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                    {galleryList.map((g, idx) => (
+                      <div 
+                        key={g.id ? `${g.id}-${idx}` : `gal-${idx}`}
+                        className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-left animate-fadeIn ${
+                          isLight 
+                            ? 'bg-slate-50 border-slate-200 hover:border-amber-500/15 shadow-3xs' 
+                            : 'bg-[#111]/45 border border-cyan-500/5'
+                        }`}
+                      >
+                        <div className={`w-14 h-11 rounded overflow-hidden shrink-0 ${isLight ? 'bg-slate-200' : 'bg-slate-900'}`}>
+                          <img src={g.imageUrl} alt="" className="w-full h-full object-cover" />
+                        </div>
+
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <h4 className={`text-3xs font-extrabold uppercase truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{g.title}</h4>
+                          <p className={`text-[9px] uppercase font-mono tracking-wider ${isLight ? 'text-amber-750' : 'text-[#22d3ee]'}`}>{g.category.replace('_', ' ')}</p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteGalleryImage(g.id)}
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                            isLight ? 'text-slate-400 hover:text-red-650' : 'text-slate-500 hover:text-red-400'
+                          }`}
+                          title="Delete snapshot"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              </div>
+            ) : (
+              /* --- SUB-MODE B: DAKSHYAM INNOVATIONS PROJECT VIDEOS (UP TO 2 MIN) --- */
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Video Upload Form */}
+                <form onSubmit={handleCreateProjectVideo} className="space-y-3.5 font-sans">
+                  <div className="border-b pb-2">
+                    <h3 className={`text-xs font-bold tracking-wider uppercase ${
+                      isLight ? 'text-amber-800' : 'text-white'
+                    }`}>
+                      🎬 Upload Dakshyam Innovations Project Video (Up to 2 Min)
+                    </h3>
+                    <p className={`text-[9px] font-mono mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Upload hardware demo clips, robotics trials, or IoT firmware demonstrations. Maximum duration: 120 seconds (2 mins).
+                    </p>
+                  </div>
+
+                  {projVideoError && <div className="text-3xs font-mono text-red-400 bg-red-950/25 p-2.5 rounded-xl border border-red-500/20">{projVideoError}</div>}
+                  {projVideoSuccess && <div className="text-3xs font-mono text-cyan-400 bg-cyan-950/25 p-2.5 rounded-xl font-bold border border-cyan-500/20">{projVideoSuccess}</div>}
+
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>
+                      Project Title
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={projVideoTitle}
+                      onChange={(e) => setProjVideoTitle(e.target.value)}
+                      placeholder="e.g. ESP32 Autonomous Obstacle Avoiding Rover Test"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                        isLight 
+                          ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50' 
+                          : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-[9px] font-mono uppercase mb-1 ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>
+                      Project Demonstration Description
+                    </label>
+                    <textarea
+                      required
+                      value={projVideoDesc}
+                      onChange={(e) => setProjVideoDesc(e.target.value)}
+                      placeholder="Explain the hardware architecture, sensors calibrated, logic controller, or test results..."
+                      rows={2}
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                        isLight 
+                          ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50' 
+                          : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Project Video File Picker with Duration Check */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className={`block text-[9px] font-mono uppercase ${isLight ? 'text-amber-800/90' : 'text-cyan-400'}`}>
+                        Video Demonstration File (Max 2 Minutes)
+                      </label>
+                      {projVideoDuration !== null && (
+                        <span className="text-[9px] font-mono font-bold text-emerald-400 flex items-center gap-1">
+                          ✓ Duration: {Math.floor(projVideoDuration / 60)}m {Math.round(projVideoDuration % 60)}s / 2m Max
+                        </span>
+                      )}
+                    </div>
+
+                    <div className={`p-3.5 rounded-xl border border-dashed transition-all ${
+                      isLight 
+                        ? 'border-amber-300 bg-amber-50/50 hover:bg-amber-50' 
+                        : 'border-cyan-500/30 bg-[#071326]/50 hover:bg-cyan-950/20'
+                    }`}>
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime,video/*"
+                        onChange={handleProjectVideoFileChange}
+                        disabled={isUploadingProjVideo}
+                        className={`block w-full text-4xs cursor-pointer file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-3xs file:font-bold disabled:opacity-50 ${
+                          isLight 
+                            ? 'text-slate-600 file:bg-amber-600 file:text-white hover:file:bg-amber-700' 
+                            : 'text-slate-300 file:bg-cyan-500 file:text-slate-950 hover:file:bg-cyan-400'
+                        }`}
+                      />
+
+                      {projVideoFileName && (
+                        <div className="mt-2 text-3xs font-mono text-cyan-300 flex items-center gap-2">
+                          <Film className="w-3.5 h-3.5" />
+                          <span className="truncate">Selected: {projVideoFileName}</span>
+                        </div>
+                      )}
+
+                      {/* Video Player Preview if loaded */}
+                      {projVideoFileBase64 && (
+                        <div className="mt-3 aspect-video w-full rounded-xl overflow-hidden bg-black border border-cyan-500/20">
+                          <video 
+                            src={projVideoFileBase64} 
+                            controls 
+                            playsInline 
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                      )}
+
+                      {isUploadingProjVideo && (
+                        <div className="mt-3 p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/30 space-y-1.5">
+                          <div className="flex items-center justify-between text-3xs font-mono text-cyan-300 font-bold">
+                            <span>{projVideoUploadProgress || 'Uploading project video...'}</span>
+                            <div className="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                          </div>
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-cyan-400 h-full animate-pulse w-3/4 rounded-full" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Optional Video URL */}
+                  <div className="space-y-1">
+                    <label className="block text-[8px] font-mono text-slate-400 uppercase">
+                      Or Direct Cloud Video URL (Optional fallback if file is already hosted):
+                    </label>
+                    <input
+                      type="url"
+                      value={projVideoUrl}
+                      onChange={(e) => setProjVideoUrl(e.target.value)}
+                      placeholder="https://... (Cloudinary, MP4, WebM)"
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-all ${
+                        isLight 
+                          ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50' 
+                          : 'bg-[#111]/80 border-cyan-500/10 text-white focus:border-cyan-45'
+                      }`}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isUploadingProjVideo}
+                    className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer uppercase tracking-wider font-mono shadow-xs transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
+                      isLight 
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/10' 
+                        : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-[0_0_12px_rgba(34,211,238,0.2)]'
+                    }`}
+                  >
+                    <Video className="w-4 h-4" />
+                    <span>Publish Project Video (Up to 2 Min)</span>
+                  </button>
+                </form>
+
+                {/* Published Videos List */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <h3 className={`text-xs font-bold tracking-wider uppercase ${
+                      isLight ? 'text-amber-800' : 'text-white'
+                    }`}>
+                      Published Exhibition Videos ({videosList.length})
+                    </h3>
+                    <span className="text-[9px] font-mono text-slate-400">Dakshyam Innovations Wall</span>
+                  </div>
+
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
+                    {videosList.length > 0 ? (
+                      videosList.map((v) => (
+                        <div 
+                          key={v.id}
+                          className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-left transition-all ${
+                            isLight 
+                              ? 'bg-slate-50 border-slate-200 hover:border-amber-500/20' 
+                              : 'bg-[#111]/60 border-cyan-500/10 hover:border-cyan-500/30'
+                          }`}
+                        >
+                          <div className="relative w-full sm:w-28 h-20 rounded-xl overflow-hidden bg-black shrink-0 border border-slate-700/30 group">
+                            <video 
+                              src={v.videoUrl} 
+                              className="w-full h-full object-cover opacity-80" 
+                              preload="metadata"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setActiveVideoModal(v.videoUrl)}
+                              className="absolute inset-0 bg-black/40 hover:bg-black/20 flex items-center justify-center transition-colors cursor-pointer text-white"
+                              title="Play Video"
+                            >
+                              <Play className="w-6 h-6 text-cyan-400 fill-cyan-400" />
+                            </button>
+                            <span className="absolute bottom-1 right-1 bg-black/80 text-[7.5px] font-mono text-cyan-300 px-1 rounded">
+                              {v.duration ? `${Math.floor(v.duration / 60)}m ${v.duration % 60}s` : 'Video'}
+                            </span>
+                          </div>
+
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-900/40 text-sky-300 border border-blue-500/20">
+                                {v.groupName || 'Dakshyam Innovations'}
+                              </span>
+                              <span className="text-[8px] font-mono text-slate-400">{v.createdAt}</span>
+                            </div>
+                            <h4 className={`text-xs font-bold uppercase truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              {v.title}
+                            </h4>
+                            <p className={`text-[10px] line-clamp-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                              {v.description}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            <button
+                              type="button"
+                              onClick={() => setActiveVideoModal(v.videoUrl)}
+                              className={`p-2 rounded-xl text-xs font-mono font-bold border transition-colors cursor-pointer flex items-center gap-1 ${
+                                isLight ? 'bg-white border-slate-300 text-blue-950 hover:bg-blue-50' : 'bg-slate-900 border-cyan-500/20 text-cyan-300 hover:bg-cyan-950/40'
+                              }`}
+                              title="Play Video Preview"
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">Play</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProjectVideo(v.id)}
+                              className={`p-2 rounded-xl transition-colors cursor-pointer text-red-400 hover:text-red-200 hover:bg-red-950/30 border border-transparent hover:border-red-500/20`}
+                              title="Delete project video"
+                            >
+                              <Trash className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-10 font-mono text-slate-400 text-xs border border-dashed rounded-2xl p-6">
+                        No Dakshyam Innovations project videos published yet. Upload your first 2-minute video on the left!
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 6B: DYNAMIC ACTIVE SESSIONS & DEVICE SECURITY TRACKER */}
+        {adminTab === 'devices' && (
+          <div className="space-y-6 text-left font-sans">
+            
+            {/* Header & Controls */}
+            <div className={`p-5 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-[#0d1f38]/60 border-cyan-500/15'
+            }`}>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  </span>
+                  <span className="font-mono text-3xs uppercase font-black tracking-widest text-emerald-400">
+                    Dynamic Security Heartbeat Active
+                  </span>
+                </div>
+                <h3 className={`text-base font-black uppercase tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  Admin Logged In on {activeSessions.length || 1} Device(s)
+                </h3>
+                <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                  Real-time dynamic device registry tracks all active administrator logins across computers, laptops, and mobile devices.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={fetchSessions}
+                  disabled={sessionsLoading}
+                  className={`px-3.5 py-2 rounded-xl font-mono text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isLight ? 'bg-white border-slate-300 text-slate-800 hover:bg-slate-100' : 'bg-slate-900 border-cyan-500/20 text-cyan-300 hover:bg-cyan-950/40'
+                  }`}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${sessionsLoading ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleTerminateOtherSessions}
+                  className="px-3.5 py-2 rounded-xl font-mono text-xs font-bold bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 transition-all cursor-pointer shadow-xs"
+                >
+                  Terminate Other Devices
+                </button>
+              </div>
+            </div>
+
+            {sessionActionMsg && (
+              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 font-mono text-xs">
+                {sessionActionMsg}
+              </div>
+            )}
+
+            {/* Device Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {activeSessions.map((sess, idx) => {
+                const isMobile = sess.deviceType === 'Mobile';
+                const isTablet = sess.deviceType === 'Tablet';
+
+                return (
+                  <div
+                    key={sess.sessionId || idx}
+                    className={`p-5 rounded-2xl border transition-all relative overflow-hidden flex flex-col justify-between space-y-4 ${
+                      sess.isCurrent
+                        ? (isLight ? 'bg-blue-50/70 border-blue-900/30 shadow-md ring-2 ring-blue-900/10' : 'bg-[#0d2240] border-cyan-400/50 shadow-[0_0_20px_rgba(34,211,238,0.15)] ring-1 ring-cyan-400/30')
+                        : (isLight ? 'bg-white border-slate-200' : 'bg-[#071326]/60 border-slate-800')
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`p-2.5 rounded-xl border ${
+                            sess.isCurrent
+                              ? (isLight ? 'bg-blue-900 text-white border-blue-900' : 'bg-cyan-500/20 text-cyan-300 border-cyan-400/30')
+                              : (isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-slate-900 text-slate-400 border-slate-800')
+                          }`}>
+                            {isMobile ? <Smartphone className="w-5 h-5" /> : isTablet ? <Monitor className="w-5 h-5" /> : <Laptop className="w-5 h-5" />}
+                          </div>
+                          <div>
+                            <h4 className={`text-xs font-black uppercase tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                              {sess.deviceName || 'Admin Session Device'}
+                            </h4>
+                            <span className="text-[9px] font-mono text-slate-400">
+                              {sess.os} • {sess.browser}
+                            </span>
+                          </div>
+                        </div>
+
+                        {sess.isCurrent ? (
+                          <span className="text-[8px] font-mono font-black uppercase px-2.5 py-1 rounded-full bg-emerald-500 text-slate-950 tracking-wider shadow-sm flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping" />
+                            THIS DEVICE
+                          </span>
+                        ) : (
+                          <span className="text-[8px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-400 border border-slate-500/20">
+                            REMOTE
+                          </span>
+                        )}
+                      </div>
+
+                      <div className={`p-3 rounded-xl border text-[9px] font-mono space-y-1 ${
+                        isLight ? 'bg-slate-100/70 border-slate-200 text-slate-700' : 'bg-black/40 border-slate-800 text-slate-300'
+                      }`}>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">IP Address:</span>
+                          <span className="font-bold">{sess.ip && sess.ip !== '127.0.0.1' ? sess.ip : 'Client Gateway'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Session ID:</span>
+                          <span className="truncate max-w-[160px] font-bold">{sess.sessionId}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Logged In:</span>
+                          <span>{sess.createdAt ? new Date(sess.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Last Activity:</span>
+                          <span className="text-emerald-400 font-bold">
+                            {sess.isCurrent ? 'Active Now' : sess.lastActive ? new Date(sess.lastActive).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!sess.isCurrent && (
+                      <div className="pt-2 border-t border-slate-500/10 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeSession(sess.sessionId)}
+                          className="px-3 py-1.5 rounded-lg text-[9px] font-mono font-bold text-red-400 hover:text-white bg-red-500/10 hover:bg-red-500/30 border border-red-500/20 transition-all cursor-pointer"
+                        >
+                          Revoke Access & Disconnect
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Video Preview Modal */}
+        {activeVideoModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+              onClick={() => setActiveVideoModal(null)}
+              className="absolute inset-0 bg-black/90 backdrop-blur-sm cursor-pointer"
+            />
+            <div className="relative z-10 max-w-3xl w-full bg-black rounded-2xl overflow-hidden border border-cyan-500/30 shadow-2xl">
+              <div className="p-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center text-white text-xs font-mono">
+                <span>Dakshyam Innovations Exhibition Video Player</span>
+                <button 
+                  onClick={() => setActiveVideoModal(null)}
+                  className="p-1 text-slate-400 hover:text-white cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+              <div className="aspect-video w-full bg-black">
+                <video 
+                  src={activeVideoModal} 
+                  controls 
+                  autoPlay 
+                  playsInline 
+                  className="w-full h-full object-contain"
+                />
               </div>
             </div>
           </div>
@@ -2352,17 +2939,6 @@ export default function AdminDashboard({
                         <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> Export Excel/CSV
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleBulkGenerate(currentProgram)}
-                        className={`px-3.5 py-2 text-2xs font-mono font-black rounded-xl transition-all hover:scale-[1.02] cursor-pointer flex items-center gap-1.5 ${
-                          isLight 
-                            ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/10' 
-                            : 'bg-cyan-500 text-slate-950'
-                        }`}
-                      >
-                        <Award className="w-3.5 h-3.5" /> Bulk Generate certificates
-                      </button>
                     </div>
                   </div>
 
@@ -2451,7 +3027,7 @@ export default function AdminDashboard({
                             required
                             value={manEmail}
                             onChange={(e) => setManEmail(e.target.value)}
-                            placeholder="student@example.com"
+                            placeholder="student@dakshyam.in"
                             className={`w-full border rounded-lg px-2.5 py-1.5 text-2xs focus:outline-none ${
                               isLight 
                                 ? 'bg-slate-50 border-slate-250 text-slate-800 focus:border-amber-500/50 placeholder:text-slate-405' 
@@ -2526,15 +3102,11 @@ export default function AdminDashboard({
                             <th className="p-3">Syllabus Details</th>
                             <th className="p-3">Parent Info</th>
                             <th className="p-3">Email & Mobile</th>
-                            <th className="p-3 text-right">Credentials Certificate Action</th>
+                            <th className="p-3 text-right">Enrollment Status</th>
                           </tr>
                         </thead>
                         <tbody className={`divide-y select-text ${isLight ? 'divide-slate-200' : 'divide-cyan-500/5'}`}>
                           {programEnrolls.map((enroll, idx) => {
-                            const matchedCert = issuedCertificates.find(
-                              c => c.studentEmail.toLowerCase() === enroll.email.toLowerCase() && c.courseTitle === currentProgram.trainingName
-                            );
-
                             return (
                               <tr key={enroll.id ? `${enroll.id}-${idx}` : `enroll-${idx}`} className={`transition-all ${
                                 isLight ? 'hover:bg-slate-100/80 text-slate-700' : 'hover:bg-cyan-500/5 text-slate-305'
@@ -2554,25 +3126,11 @@ export default function AdminDashboard({
                                   <span className="text-[9px] text-slate-500">{enroll.mobileNumber}</span>
                                 </td>
                                 <td className="p-3 text-right">
-                                  {matchedCert ? (
-                                    <div className={`flex items-center justify-end gap-1.5 font-bold border px-2.5 py-1 rounded-lg inline-flex select-all ${
-                                      isLight ? 'border-emerald-300 bg-emerald-50 text-emerald-850' : 'border-emerald-500/10 bg-emerald-500/5 text-emerald-400'
-                                    }`}>
-                                      <Check className="w-3.5 h-3.5" /> Approved: <code>{matchedCert.id}</code>
-                                    </div>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleGenerateCertificateForStudent(enroll, currentProgram)}
-                                      className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer uppercase text-[9px] border ${
-                                        isLight 
-                                          ? 'border-amber-500/25 text-amber-805 bg-amber-50 hover:bg-amber-100' 
-                                          : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-[#22d3ee] border border-cyan-500/20 hover:border-cyan-400/40'
-                                      }`}
-                                    >
-                                      ✓ Issue Certificate
-                                    </button>
-                                  )}
+                                  <div className={`flex items-center justify-end gap-1.5 font-bold border px-2.5 py-1 rounded-lg inline-flex ${
+                                    isLight ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
+                                  }`}>
+                                    <Check className="w-3.5 h-3.5" /> Enrolled Active
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -2591,532 +3149,17 @@ export default function AdminDashboard({
           </div>
         )}
 
-        {/* TAB 8: INTEGRATED CERTIFICATE DASHBOARD & PREMIUM GENERATOR */}
-        {adminTab === 'certificates' && (() => {
-          const issuedCertificates = DakshyamDatabase.getCertificates();
-          
-          // Get all standard courses and special programs to display in selector
-          const allOptions = [
-            ...courses.map(c => ({ id: c.id, title: c.title, isSpecial: false, type: 'Course' })),
-            ...specialProgramsAll.map(p => ({ id: p.id, title: p.trainingName, isSpecial: true, type: 'Special Program', institution: p.institutionName }))
-          ];
-
-          // Determine selected course details
-          const selectedOption = allOptions.find(opt => opt.id === certSelectedCourseId);
-          
-          // Get students for selected option
-          let registeredStudents: Array<{ id: string; name: string; email: string; institution: string; statusInfo: string; isRegistered: boolean; defaultProject: string }> = [];
-          if (selectedOption) {
-            if (selectedOption.isSpecial) {
-              const enrolls = specialEnrollments.filter(e => e.programId === selectedOption.id);
-              registeredStudents = enrolls.map(e => ({
-                id: e.id,
-                name: e.name,
-                email: e.email,
-                institution: e.institutionName,
-                statusInfo: 'Registered for campus training',
-                isRegistered: true,
-                defaultProject: `Completed Special Training Program at ${e.institutionName}`
-              }));
-            } else {
-              const enrolls = applications.filter(a => a.courseId === selectedOption.id);
-              registeredStudents = enrolls.map(e => ({
-                id: e.id,
-                name: e.fullName,
-                email: e.email,
-                institution: e.institution || 'Regional Academy',
-                statusInfo: e.status === 'approved' ? 'Admitted (Approved)' : `Applied (${e.status})`,
-                isRegistered: e.status === 'approved',
-                defaultProject: 'Completed sovereign hardware instrumentation modules'
-              }));
-            }
-          }
-
-          // Filter issued certificates by search query
-          const filteredCerts = issuedCertificates.filter(c => {
-            const query = certSearchQuery.toLowerCase().trim();
-            if (!query) return true;
-            return (
-              c.studentName.toLowerCase().includes(query) ||
-              c.studentEmail.toLowerCase().includes(query) ||
-              c.courseTitle.toLowerCase().includes(query) ||
-              c.id.toLowerCase().includes(query)
-            );
-          });
-
-          return (
-            <div className="space-y-6 font-sans">
-              
-              {/* Part 1: Top Control Panels */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-left">
-                
-                {/* 1A: Setup & Customizer */}
-                <div className="bg-[#050505]/75 border border-cyan-500/10 rounded-2xl p-5 space-y-4 lg:col-span-1">
-                  <div className="border-b border-cyan-500/15 pb-2">
-                    <h3 className="text-xs font-bold text-[#22d3ee] font-mono tracking-wider uppercase flex items-center gap-1.5">
-                      <Award className="w-4 h-4" /> Certificate of Completion Engine
-                    </h3>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
-                      Calibrate custom parameters for instant high-fidelity vector generation. Handlers automatically pull coordinates, roll data, and verify keys.
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Select Target Module/Course</label>
-                      <select
-                        value={certSelectedCourseId}
-                        onChange={(e) => {
-                          setCertSelectedCourseId(e.target.value);
-                          setCertProjectTitle(''); // reset title on change
-                        }}
-                        className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-400 text-slate-300"
-                      >
-                        <option value="">-- Choose Course/Program ({allOptions.length}) --</option>
-                        {allOptions.map((opt) => (
-                          <option key={opt.id} value={opt.id}>
-                            [{opt.type}] {opt.title.substring(0, 45)}{opt.title.length > 45 ? '...' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Custom Project/Curricula Title (Optional)</label>
-                      <input
-                        type="text"
-                        value={certProjectTitle}
-                        onChange={(e) => setCertProjectTitle(e.target.value)}
-                        placeholder="e.g. Smart IoT Soil moisture solar node"
-                        className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-400 text-slate-350"
-                      />
-                      <span className="text-[8px] text-slate-500 block mt-0.5 leading-relaxed">
-                        If left blank, custom modules assign standard completions.
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Issue Date</label>
-                        <input
-                          type="date"
-                          value={certIssueDate}
-                          onChange={(e) => setCertIssueDate(e.target.value)}
-                          className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-400 text-slate-300 font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[9px] font-mono text-cyan-400 uppercase mb-1">Assigned Trainer</label>
-                        <select
-                          value={certTrainerId}
-                          onChange={(e) => {
-                            setCertTrainerId(e.target.value);
-                            const matched = trainersList.find(t => t.id === e.target.value);
-                            if (matched) setCertTrainerName(matched.name);
-                          }}
-                          className="w-full bg-[#111]/80 border border-cyan-500/10 text-white rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-400 text-slate-300"
-                        >
-                          <option value="admin">Admin Board</option>
-                          {trainersList.map(t => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Integrated Custom Branding & Partner Configuration */}
-                    <div className="border-t border-cyan-500/10 pt-3 space-y-3">
-                      <h4 className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest font-extrabold">Custom Branding & Partnership Options</h4>
-                      
-                      <div className="grid grid-cols-2 gap-3">
-                        {/* Custom Logo Upload */}
-                        <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Custom Issuer Logo (Cloudinary)</label>
-                          <div className="relative">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const res = await uploadMediaToCloudinary(file, 'image');
-                                  setCertCustomLogoUrl(res.url);
-                                }
-                              }}
-                              className="hidden"
-                              id="cert-logo-upload"
-                            />
-                            <label
-                              htmlFor="cert-logo-upload"
-                              className="flex items-center justify-center gap-1 bg-black/40 border border-slate-500/10 hover:border-cyan-500/30 text-[9px] text-slate-300 font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase"
-                            >
-                              {certCustomLogoUrl ? "✓ Logo Loaded" : "Upload Logo"}
-                            </label>
-                          </div>
-                          {certCustomLogoUrl && (
-                            <button
-                              type="button"
-                              onClick={() => setCertCustomLogoUrl("")}
-                              className="text-[8px] text-red-400 hover:underline mt-1 block text-left"
-                            >
-                              Remove Logo
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Custom Seal Upload */}
-                        <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Custom Seal Image (Cloudinary)</label>
-                          <div className="relative">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const res = await uploadMediaToCloudinary(file, 'image');
-                                  setCertCustomSealUrl(res.url);
-                                }
-                              }}
-                              className="hidden"
-                              id="cert-seal-upload"
-                            />
-                            <label
-                              htmlFor="cert-seal-upload"
-                              className="flex items-center justify-center gap-1 bg-black/40 border border-slate-500/10 hover:border-cyan-500/30 text-[9px] text-slate-300 font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase"
-                            >
-                              {certCustomSealUrl ? "✓ Seal Loaded" : "Upload Seal"}
-                            </label>
-                          </div>
-                          {certCustomSealUrl && (
-                            <button
-                              type="button"
-                              onClick={() => setCertCustomSealUrl("")}
-                              className="text-[8px] text-red-400 hover:underline mt-1 block text-left"
-                            >
-                              Remove Seal
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Training Partner Segment */}
-                      <div className="space-y-2 text-left">
-                        <div>
-                          <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Training Partner Name (Optional)</label>
-                          <input
-                            type="text"
-                            value={certTrainingPartnerName}
-                            onChange={(e) => setCertTrainingPartnerName(e.target.value)}
-                            placeholder="e.g. State Innovation Cooperative"
-                            className="w-full bg-[#111]/80 border border-slate-500/10 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-400 text-slate-300"
-                          />
-                        </div>
-
-                        {certTrainingPartnerName && (
-                          <div>
-                            <label className="block text-[8px] font-mono text-slate-400 uppercase mb-1">Partner Logo (Cloudinary)</label>
-                            <div className="relative">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const res = await uploadMediaToCloudinary(file, 'image');
-                                    setCertTrainingPartnerLogoUrl(res.url);
-                                  }
-                                }}
-                                className="hidden"
-                                id="cert-partner-logo-upload"
-                              />
-                              <label
-                                htmlFor="cert-partner-logo-upload"
-                                className="flex items-center justify-center gap-1 bg-black/40 border border-slate-500/10 hover:border-cyan-500/30 text-[9px] text-slate-300 font-semibold py-1.5 px-2 rounded-lg cursor-pointer transition-all uppercase"
-                              >
-                                {certTrainingPartnerLogoUrl ? "✓ Partner Logo Loaded" : "Upload Partner Logo"}
-                              </label>
-                            </div>
-                            {certTrainingPartnerLogoUrl && (
-                              <button
-                                type="button"
-                                onClick={() => setCertTrainingPartnerLogoUrl("")}
-                                className="text-[8px] text-red-400 hover:underline mt-1 block text-left"
-                              >
-                                Remove Partner Logo
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {selectedOption && registeredStudents.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleBulkGenerateFromDashboard(selectedOption.title, registeredStudents.map(rs => ({
-                          name: rs.name,
-                          email: rs.email,
-                          institution: rs.institution,
-                          defaultProject: rs.defaultProject
-                        })))}
-                        className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs py-2.5 rounded-xl transition-all cursor-pointer uppercase font-mono tracking-wider hover:shadow-[0_0_12px_rgba(34,211,238,0.22)] flex items-center justify-center gap-1.5 mt-2"
-                      >
-                        <Award className="w-4 h-4" /> Bulk Generate {registeredStudents.length} Certificates
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCertPreviewObj({
-                          id: `DKM-2026-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-                          studentName: registeredStudents[0]?.name || "Alex M. Sharma",
-                          studentEmail: registeredStudents[0]?.email || "alex.sharma@dakshyam.edu",
-                          courseTitle: selectedOption?.title || "Industrial IoT & Edge Computing Systems",
-                          projectTitle: certProjectTitle || registeredStudents[0]?.defaultProject || "Smart Autonomous Telemetry Node",
-                          issueDate: certIssueDate || new Date().toISOString().split('T')[0],
-                          trainerName: certTrainerName || "Er. Aniket Sharma, M.Tech",
-                          customLogoUrl: certCustomLogoUrl || undefined,
-                          customSealUrl: certCustomSealUrl || undefined,
-                          trainingPartnerName: certTrainingPartnerName || undefined,
-                          trainingPartnerLogoUrl: certTrainingPartnerLogoUrl || undefined
-                        });
-                      }}
-                      className="w-full bg-slate-900/90 hover:bg-slate-800 border border-amber-500/30 hover:border-amber-400 text-amber-300 font-bold text-xs py-2 rounded-xl transition-all cursor-pointer uppercase font-mono tracking-wider flex items-center justify-center gap-1.5 mt-2"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> Preview Certificate of Completion
-                    </button>
-                  </div>
-                </div>
-
-                {/* 1B: Candidate Students List */}
-                <div className="bg-[#050505]/75 border border-cyan-500/10 rounded-2xl p-5 space-y-4 lg:col-span-2 text-left">
-                  <div className="border-b border-cyan-500/15 pb-2 flex justify-between items-center">
-                    <div>
-                      <h3 className="text-xs font-bold text-white tracking-wider uppercase font-mono">
-                        Target Candidate Student Registry
-                      </h3>
-                      <p className="text-[10px] text-slate-400 leading-relaxed mt-0.5">
-                        {certSelectedCourseId ? 'Displaying enrolled/admissions roster for selected code.' : 'Please select a training course from the parameter configuration dropdown.'}
-                      </p>
-                    </div>
-                    {certSelectedCourseId && (
-                      <span className="text-[10px] font-mono bg-cyan-500/15 border border-cyan-500/20 px-2.5 py-1 rounded-lg text-[#22d3ee] font-bold">
-                        {registeredStudents.length} Active Candidates
-                      </span>
-                    )}
-                  </div>
-
-                  {certSelectedCourseId ? (
-                    registeredStudents.length > 0 ? (
-                      <div className="overflow-y-auto max-h-[280px] border border-cyan-500/5 rounded-xl bg-black/30 select-text">
-                        <table className="w-full table-auto text-left font-mono text-3xs">
-                          <thead>
-                            <tr className="bg-cyan-950/20 text-[#22d3ee]/80 border-b border-cyan-500/10 uppercase tracking-wider font-extrabold text-[8px]">
-                              <th className="p-2.5">Student Name</th>
-                              <th className="p-2.5">Institution / school</th>
-                              <th className="p-2.5">Email Contact</th>
-                              <th className="p-2.5">Status info</th>
-                              <th className="p-2.5 text-right">Generator Action</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-cyan-500/5 col">
-                            {registeredStudents.map((student, idx) => {
-                              const matchedCert = issuedCertificates.find(
-                                c => c.studentEmail.toLowerCase() === student.email.toLowerCase() && c.courseTitle.trim().toLowerCase() === selectedOption.title.trim().toLowerCase()
-                              );
-
-                              return (
-                                <tr key={student.id ? `${student.id}-${idx}` : `std-${idx}`} className="hover:bg-cyan-500/5 transition-all text-slate-350">
-                                  <td className="p-2.5">
-                                    <span className="font-extrabold text-white uppercase block">{student.name}</span>
-                                  </td>
-                                  <td className="p-2.5 text-slate-450">{student.institution}</td>
-                                  <td className="p-2.5 lowercase">{student.email}</td>
-                                  <td className="p-2.5">
-                                    <span className={`text-[8px] uppercase px-2 py-0.5 rounded-full font-bold font-mono ${
-                                      student.isRegistered
-                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10'
-                                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/10'
-                                    }`}>
-                                      {student.statusInfo}
-                                    </span>
-                                  </td>
-                                  <td className="p-2.5 text-right">
-                                    {matchedCert ? (
-                                      <div className="flex items-center justify-end gap-1 text-emerald-400 font-bold bg-emerald-500/5 border border-emerald-500/15 px-2 py-0.5 rounded-lg text-[9px] inline-flex">
-                                        <Check className="w-3 h-3" /> <code>{matchedCert.id}</code>
-                                      </div>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleGenerateFromDashboard({
-                                          name: student.name,
-                                          email: student.email,
-                                          institution: student.institution,
-                                          courseTitle: selectedOption.title,
-                                          defaultProject: student.defaultProject
-                                        })}
-                                        className="bg-[#22d3ee] hover:bg-cyan-400 text-slate-950 px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer uppercase text-[9px]"
-                                      >
-                                        ✓ Generate
-                                      </button>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="text-center py-12 border border-dashed border-cyan-500/10 rounded-xl">
-                        <p className="text-xs text-slate-500 italic font-mono">No students registered or approved for this module/course yet.</p>
-                      </div>
-                    )
-                  ) : (
-                    <div className="text-center py-16 border border-dashed border-cyan-500/10 rounded-xl">
-                      <p className="text-xs text-slate-500 italic font-mono">Please select a course on the left configure panel to inspect registered student records.</p>
-                    </div>
-                  )}
-                </div>
-
-              </div>
-
-              {/* Part 2: Issued Credentials Archives */}
-              <div className="bg-[#050505]/75 border border-cyan-500/10 rounded-2xl p-5 space-y-4 text-left">
-                <div className="border-b border-cyan-500/15 pb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="text-xs font-bold text-white tracking-wider uppercase font-mono">
-                      Issued Credentials registry & Verification ledger ({issuedCertificates.length})
-                    </h3>
-                    <p className="text-[10px] text-slate-400 leading-relaxed mt-0.5">
-                      Lists all officially verified certificates logged within browser cache. Matches signature values instantly.
-                    </p>
-                  </div>
-                  
-                  {/* Search Query */}
-                  <div className="w-full sm:w-64">
-                    <input
-                      type="text"
-                      value={certSearchQuery}
-                      onChange={(e) => setCertSearchQuery(e.target.value)}
-                      placeholder="Search name, code, or course..."
-                      className="w-full bg-black/60 border border-cyan-500/10 text-white rounded-xl px-3 py-1.5 text-2xs focus:outline-none focus:border-cyan-400 font-mono placeholder:text-slate-600"
-                    />
-                  </div>
-                </div>
-
-                {filteredCerts.length > 0 ? (
-                  <div className="overflow-x-auto border border-cyan-500/5 rounded-xl bg-black/30 select-text">
-                    <table className="w-full table-auto text-left font-mono text-3xs">
-                      <thead>
-                        <tr className="bg-cyan-950/20 text-[#22d3ee]/80 border-b border-cyan-500/10 uppercase tracking-wider font-extrabold text-[8px]">
-                          <th className="p-3">Verified code</th>
-                          <th className="p-3">Candidate name</th>
-                          <th className="p-3">Email address</th>
-                          <th className="p-3">Authorized course</th>
-                          <th className="p-3">Project details</th>
-                          <th className="p-3">Issue date</th>
-                          <th className="p-3 text-right">Signature actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-cyan-500/5">
-                        {filteredCerts.map((cert, cIdx) => (
-                          <tr key={cert.id ? `${cert.id}-${cIdx}` : `cert-${cIdx}`} className="hover:bg-cyan-500/5 transition-all text-slate-350">
-                            <td className="p-3 font-bold text-[#22d3ee] tracking-wide select-all">{cert.id}</td>
-                            <td className="p-3 font-extrabold text-white text-[10px] uppercase">{cert.studentName}</td>
-                            <td className="p-3 lowercase">{cert.studentEmail}</td>
-                            <td className="p-3 text-[#22d3ee] font-medium">{cert.courseTitle}</td>
-                            <td className="p-3 text-slate-400 italic font-mono">"{cert.projectTitle}"</td>
-                            <td className="p-3 font-bold">{cert.issueDate}</td>
-                            <td className="p-3 text-right space-x-1 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => setCertPreviewObj(cert)}
-                                className="bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/25 text-cyan-300 px-2.5 py-1 rounded-md text-[9px] font-bold transition-all uppercase cursor-pointer"
-                              >
-                                View Doc
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteCertificate(cert.id)}
-                                className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 p-1 rounded-md transition-all cursor-pointer inline-flex align-middle"
-                                title="Revoke Certificate"
-                              >
-                                <Trash className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-10">
-                    <p className="text-xs text-slate-500 italic font-mono">No matching verified certificates found.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Dynamic SVG Certificate Preview / Generator Preview Modal Overlay */}
-              {certPreviewObj && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
-                  <div 
-                    onClick={() => setCertPreviewObj(null)}
-                    className="fixed inset-0 bg-black/85 backdrop-blur-md cursor-pointer"
-                  />
-
-                  <div className="bg-[#050b14] border border-amber-500/30 rounded-3xl max-w-5xl w-full relative z-10 p-4 md:p-7 space-y-4 text-center max-h-[96vh] overflow-y-auto shadow-[0_0_60px_rgba(0,0,0,0.8)]">
-                    <OfficialCertificate 
-                      certificate={certPreviewObj}
-                      onClose={() => setCertPreviewObj(null)}
-                      showControls={true}
-                      theme={theme}
-                    />
-
-                    <div className="flex flex-wrap justify-between items-center bg-black/50 border border-slate-700/40 px-4 py-2.5 rounded-xl max-w-3xl mx-auto text-left font-mono text-[11px] gap-2">
-                      <div className="space-y-0.5">
-                        <span className="text-slate-400 uppercase text-[9px] block">Verified Authorizing Issuer</span>
-                        <span className="text-slate-200 font-bold block">{certPreviewObj.trainerName || 'Dakshyam Innovations Board'}</span>
-                      </div>
-                      <div className="space-y-0.5 text-right">
-                        <span className="text-emerald-400 font-black uppercase text-[9px] block">Ledger Status: 100% Cryptographic Match</span>
-                        <span className="text-amber-300 font-mono font-bold tracking-wider">{certPreviewObj.id}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          )
-        })()}
-
         {/* TAB 9: ABOUT PAGE COMMANDER */}
         {adminTab === 'about_editor' && (
-          <AboutEditorTab onRefresh={onRefresh} theme="" />
+          <AboutEditorTab onRefresh={onRefresh} theme={theme} />
         )}
 
-        {/* TAB 10: ANIMATED VIDEO PAGE LOADER SETTINGS */}
-        {adminTab === 'page_loader' && (
-          <PageLoaderSettingsTab 
-            theme={theme}
-            onTestLoader={() => {
-              if (onTestLoader) {
-                onTestLoader();
-              }
-            }}
-          />
-        )}
-
-        {/* TAB 11: HOME PAGE 3D ART & OBJ MODEL */}
+        {/* TAB 11: HOME PAGE 3D ART & OBJ MODEL STUDIO */}
         {adminTab === 'home_3d_art' && (
           <Home3DArtSettingsTab theme={theme} />
         )}
 
-        {/* TAB 11: ADMINISTRATIVE LOG CONTROL */}
+        {/* TAB 12: ADMINISTRATIVE LOG CONTROL */}
         {adminTab === 'logs' && (() => {
           const rawLogs = DakshyamDatabase.getAppLogs();
           const uniqueLogsMap = new Map<string, typeof rawLogs[0]>();
@@ -3260,9 +3303,9 @@ export default function AdminDashboard({
                         SecurityGuard.setBypass(nextBypass);
                         setIsSecurityBypassed(nextBypass);
                         if (nextBypass) {
-                          alert('DevTools & Right-Click protection temporarily bypassed for Admin inspection.');
+                          notifyInfo('DevTools & Right-Click protection temporarily bypassed for Admin inspection.', 'Security Bypass');
                         } else {
-                          alert('Enterprise Security Guard restored. Right-click and DevTools shortcuts are now actively blocked.');
+                          notifySuccess('Enterprise Security Guard restored. Right-click and DevTools shortcuts are now actively blocked.', 'Security Restored');
                         }
                       }}
                       className={`px-3 py-1.5 rounded-xl font-mono text-4xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
@@ -3483,17 +3526,6 @@ export default function AdminDashboard({
             </div>
           );
         })()}
-
-        {/* TAB: WORKSHOP FEEDBACK MANAGER */}
-        {adminTab === 'workshop_feedback' && (
-          <div className="w-full">
-            <AdminWorkshopFeedbackManager 
-              theme={theme} 
-              currentUserRole="admin" 
-              onOpenPublicForm={onOpenPublicFeedbackForm}
-            />
-          </div>
-        )}
 
         {/* TAB: REGISTERED ACCOUNTS REGISTRY */}
         {adminTab === 'accounts' && (
@@ -4507,6 +4539,123 @@ export default function AdminDashboard({
                 >
                   Register & Create Student Profile
                 </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* INSTAGRAM LINK ADMIN QUICK EDITOR MODAL */}
+      <AnimatePresence>
+        {showInstagramQuickModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`w-full max-w-lg rounded-3xl border shadow-2xl p-6 relative ${
+                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#0d1626] border-pink-500/30 text-white'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => setShowInstagramQuickModal(false)}
+                className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex items-center justify-center text-white shadow-md">
+                  <Instagram className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black uppercase font-mono tracking-wide">
+                    Edit Instagram Profile Link
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Updates live across all visitor footers, social badges, and navigation links.
+                  </p>
+                </div>
+              </div>
+
+              {instagramSaveSuccess && (
+                <div className="mb-4 p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <span>✓ Instagram link saved and synced to cloud!</span>
+                </div>
+              )}
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                setIsSavingInstagram(true);
+                try {
+                  const currentAbout = DakshyamDatabase.getCompanyAbout();
+                  const updated: CompanyAbout = {
+                    ...currentAbout,
+                    socialInstagram: quickInstagramUrl.trim()
+                  };
+                  DakshyamDatabase.saveCompanyAbout(updated);
+                  fetch('/api/db/company_about', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updated)
+                  }).catch(() => {});
+                  setInstagramSaveSuccess(true);
+                  onRefresh();
+                  setTimeout(() => {
+                    setInstagramSaveSuccess(false);
+                    setShowInstagramQuickModal(false);
+                  }, 1200);
+                } catch (err) {
+                  console.error('Failed to save Instagram URL:', err);
+                } finally {
+                  setIsSavingInstagram(false);
+                }
+              }} className="space-y-4">
+                <div className="space-y-1.5 text-left">
+                  <label className="block text-2xs font-mono uppercase text-slate-400 font-bold">
+                    Official Instagram Handle / Profile URL
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="url"
+                      required
+                      value={quickInstagramUrl}
+                      onChange={(e) => setQuickInstagramUrl(e.target.value)}
+                      placeholder="https://instagram.com/dakshyam_innovations"
+                      className={`w-full px-4 py-3 rounded-xl border text-xs font-mono focus:outline-none transition-all ${
+                        isLight 
+                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-pink-500' 
+                          : 'bg-black/50 border-pink-500/30 text-white focus:border-pink-400'
+                      }`}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-mono">
+                    Example: https://instagram.com/dakshyam_innovations
+                  </p>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2.5">
+                  <a
+                    href={quickInstagramUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2.5 rounded-xl border border-white/10 hover:bg-white/10 text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Test Link</span>
+                  </a>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingInstagram}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {isSavingInstagram ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    <span>Save Instagram Link</span>
+                  </button>
+                </div>
               </form>
             </motion.div>
           </div>

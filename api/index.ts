@@ -204,6 +204,12 @@ const memoryDb: Record<string, any> = {
     socialLinkedin: 'https://linkedin.com/company/dakshyam-innovations',
     socialTwitter: 'https://twitter.com/dakshyam_in',
     socialYoutube: 'https://youtube.com/@dakshyaminnovations',
+    socialInstagram: 'https://instagram.com/dakshyam_innovations',
+    hideGithub: false,
+    hideLinkedin: false,
+    hideTwitter: false,
+    hideYoutube: false,
+    hideInstagram: false,
     founders: [
       { name: 'Himanshu Patle', role: 'Co-Founder & Chief Director', bio: 'Directs strategic planning & corporate relations, aligning industrial skills development targets with institutions and regional secondary setups.', avatarText: 'HP' },
       { name: 'Ankush Nandagouli', role: 'Co-Founder & Chief Software Architect', bio: 'Directs physical/digital telemetry integrations, cloud-hosted API backends, real-time WebSocket pipelines, and educational platforms.', avatarText: 'AN' },
@@ -325,49 +331,8 @@ const memoryDb: Record<string, any> = {
     formTitle: 'Dakshyam Innovations Workshop Evaluation & Feedback',
     formSubtitle: 'Your candid evaluation directly powers our curriculum optimization, laboratory equipment enhancements, and hands-on trainer methodologies.',
     isOpen: true,
-    totalWorkshopsCreated: 4,
-    workshops: [
-      {
-        id: 'WS-IOT-ROBO',
-        name: 'Industrial IoT & Autonomous Robotics Bootcamp',
-        date: '2026-09-10',
-        venue: 'Dakshyam Central STEM & Robotics Lab, Balaghat',
-        trainerName: 'Anand Gautam & Dakshyam Tech Leads',
-        description: 'Hands-on ESP32 sensor telemetry, dual H-Bridge motor controls, firmware flashing, and live cloud dashboards.',
-        isActive: true,
-        slug: 'industrial-iot-autonomous-robotics-bootcamp'
-      },
-      {
-        id: 'WS-NEP-STEM',
-        name: 'NEP 2020 Computational STEM & Embedded Prototyping',
-        date: '2026-08-25',
-        venue: 'Govt. Polytechnic & Model Higher Secondary School',
-        trainerName: 'Rohit Bhajipale & Kunal Raut',
-        description: 'Vocational computational thinking, circuit schematic mapping, breadboard diagnostics, and logic design.',
-        isActive: true,
-        slug: 'nep-2020-computational-stem-embedded-prototyping'
-      },
-      {
-        id: 'WS-SMART-FARM',
-        name: 'Smart Agro-Telemetry & Environmental Sensor Interfacing',
-        date: '2026-08-12',
-        venue: 'Agricultural Engineering Campus & Rural Innovation Wing',
-        trainerName: 'Shikhar Bisen & Hardware Team',
-        description: 'Analog/Digital soil moisture sensing, automated relay irrigation switches, LoRa wireless RF, and field diagnostics.',
-        isActive: true,
-        slug: 'smart-agro-telemetry-environmental-sensor-interfacing'
-      },
-      {
-        id: 'WS-FULLSTACK-DASH',
-        name: 'Full-Stack Web Engineering for IoT Telemetry',
-        date: '2026-07-28',
-        venue: 'Dakshyam Software Center, Balaghat',
-        trainerName: 'Dakshyam Web Engineering Team',
-        description: 'RESTful API integration, WebSocket pipelines, interactive real-time visual telemetry, and dashboard architecture.',
-        isActive: true,
-        slug: 'full-stack-web-engineering-for-iot-telemetry'
-      }
-    ],
+    totalWorkshopsCreated: 0,
+    workshops: [],
     customQuestions: [
       {
         id: 'q-pace',
@@ -464,6 +429,11 @@ function requireRole(...roles: string[]) {
   };
 }
 
+function sanitizeError(errStr: string): string {
+  if (!errStr) return '';
+  return errStr.replace(/mongodb(?:\+srv)?:\/\/[^@]+@/gi, 'mongodb://***:***@');
+}
+
 // Helper function to diagnose MongoDB Atlas issues
 function getMongoAdvice(errStr: string): string {
   if (
@@ -545,9 +515,23 @@ async function getMongoDb(): Promise<Db | null> {
         );
       }
       const feedbackCfgDoc = await settingsCol.findOne({ id: 'workshop_feedback_config' });
+      const mockWorkshopIds = ['WS-IOT-ROBO', 'WS-NEP-STEM', 'WS-SMART-FARM', 'WS-FULLSTACK-DASH', 'WS-MU6VJUDX', 'WS-MU85HKNB'];
       if (!feedbackCfgDoc) {
         await settingsCol.insertOne({ id: 'workshop_feedback_config', value: memoryDb.workshop_feedback_config });
+      } else if (feedbackCfgDoc.value) {
+        if (Array.isArray(feedbackCfgDoc.value.workshops)) {
+          feedbackCfgDoc.value.workshops = feedbackCfgDoc.value.workshops.filter((w: any) => !mockWorkshopIds.includes(w.id));
+        } else {
+          feedbackCfgDoc.value.workshops = [];
+        }
+        await settingsCol.updateOne(
+          { id: 'workshop_feedback_config' },
+          { $set: { value: feedbackCfgDoc.value } }
+        );
       }
+      try {
+        await mongoDb.collection('workshop_feedbacks').deleteMany({ workshopId: { $in: mockWorkshopIds } });
+      } catch {}
       
       // Ensure root admin account exists in MongoDB
       const adminCol = mongoDb.collection('admins');
@@ -572,6 +556,130 @@ async function getMongoDb(): Promise<Db | null> {
 }
 
 // ==========================================
+// SESSION MANAGEMENT & DEVICE TRACKING
+// ==========================================
+
+export interface UserSessionRecord {
+  sessionId: string;
+  userId: string;
+  email: string;
+  role: string;
+  deviceName: string;
+  deviceType: 'Desktop' | 'Mobile' | 'Tablet';
+  browser: string;
+  os: string;
+  ip: string;
+  createdAt: string;
+  lastActive: string;
+}
+
+// Production Active Sessions Memory Cache (backed by MongoDB 'sessions' collection)
+const activeUserSessions: UserSessionRecord[] = [];
+
+function getRealClientIp(req: express.Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    const firstIp = forwarded.split(',')[0].trim();
+    if (firstIp && firstIp !== '::1' && firstIp !== '127.0.0.1' && firstIp !== 'localhost') {
+      return firstIp;
+    }
+  }
+  const realIp = req.headers['x-real-ip'];
+  if (typeof realIp === 'string' && realIp.length > 0 && realIp !== '::1' && realIp !== '127.0.0.1') {
+    return realIp;
+  }
+  const cfIp = req.headers['cf-connecting-ip'];
+  if (typeof cfIp === 'string' && cfIp.length > 0) {
+    return cfIp;
+  }
+  const sockIp = req.socket?.remoteAddress;
+  if (sockIp && sockIp !== '::1' && sockIp !== '127.0.0.1' && !sockIp.includes('127.0.0.1')) {
+    return sockIp.replace(/^.*:/, '');
+  }
+  return 'Cloud Client Gateway';
+}
+
+function parseUserAgentInfo(userAgent: string = ''): { deviceName: string; deviceType: 'Desktop' | 'Mobile' | 'Tablet'; browser: string; os: string } {
+  let deviceType: 'Desktop' | 'Mobile' | 'Tablet' = 'Desktop';
+  let os = 'Windows PC';
+  let browser = 'Chrome';
+
+  const ua = (userAgent || '').toLowerCase();
+
+  if (/ipad|tablet|(android(?!.*mobile))|(windows(?!.*phone)(.*touch))|kindle|playbook|silk/i.test(ua)) {
+    deviceType = 'Tablet';
+  } else if (/mobile|iphone|ipod|blackberry|opera mini|iemobile|wpdesktop|android.*mobile/i.test(ua)) {
+    deviceType = 'Mobile';
+  } else {
+    deviceType = 'Desktop';
+  }
+
+  if (ua.includes('windows nt 10.0')) os = 'Windows 10/11';
+  else if (ua.includes('windows nt 6.3')) os = 'Windows 8.1';
+  else if (ua.includes('windows nt 6.1')) os = 'Windows 7';
+  else if (ua.includes('mac os x') || ua.includes('macintosh')) os = 'macOS';
+  else if (ua.includes('iphone')) os = 'iPhone iOS';
+  else if (ua.includes('ipad')) os = 'iPadOS';
+  else if (ua.includes('android')) os = 'Android OS';
+  else if (ua.includes('linux')) os = 'Linux OS';
+  else if (ua.includes('cros')) os = 'Chrome OS';
+
+  if (ua.includes('edg/')) browser = 'Microsoft Edge';
+  else if (ua.includes('opr/') || ua.includes('opera')) browser = 'Opera';
+  else if (ua.includes('chrome/') && !ua.includes('chromium')) browser = 'Google Chrome';
+  else if (ua.includes('safari/') && !ua.includes('chrome')) browser = 'Apple Safari';
+  else if (ua.includes('firefox/')) browser = 'Mozilla Firefox';
+  else if (ua.includes('brave')) browser = 'Brave Browser';
+  else browser = 'Modern Browser';
+
+  const deviceName = `${os} (${browser} on ${deviceType})`;
+  return { deviceName, deviceType, browser, os };
+}
+
+async function registerUserSession(user: { id: string; email: string; role: string }, req: express.Request): Promise<string> {
+  const userAgent = req.headers['user-agent'] || '';
+  const parsed = parseUserAgentInfo(userAgent);
+  const clientIp = getRealClientIp(req);
+  const sessionId = `sess_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
+
+  const newSession: UserSessionRecord = {
+    sessionId,
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+    deviceName: parsed.deviceName,
+    deviceType: parsed.deviceType,
+    browser: parsed.browser,
+    os: parsed.os,
+    ip: clientIp,
+    createdAt: new Date().toISOString(),
+    lastActive: new Date().toISOString()
+  };
+
+  // Prepend to memory cache
+  activeUserSessions.unshift(newSession);
+  if (activeUserSessions.length > 50) {
+    activeUserSessions.length = 50;
+  }
+
+  // Persist session into database
+  try {
+    const db = await getMongoDb();
+    if (db) {
+      await db.collection('sessions').updateOne(
+        { sessionId },
+        { $set: newSession },
+        { upsert: true }
+      );
+    }
+  } catch (err) {
+    console.warn('Session DB persistence fallback to memory:', err);
+  }
+
+  return sessionId;
+}
+
+// ==========================================
 // AUTHENTICATION & IDENTITY ENDPOINTS
 // ==========================================
 
@@ -593,9 +701,12 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
           role: 'admin'
         };
         const token = jwt.sign(adminPayload, JWT_SECRET, { expiresIn: '7d' });
+        const sessionId = await registerUserSession(adminPayload, req);
+
         return res.json({
           success: true,
           token,
+          sessionId,
           user: adminPayload
         });
       } else {
@@ -686,15 +797,285 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+    const sessionId = await registerUserSession(payload, req);
 
     return res.json({
       success: true,
       token,
+      sessionId,
       user: sanitizeUser(user)
     });
   } catch (error: any) {
     console.error('Login processing error:', error);
     res.status(500).json({ error: 'Internal authentication server exception.' });
+  }
+});
+
+// GET /api/auth/sessions — Returns active logged-in sessions & device count
+app.get('/api/auth/sessions', optionalAuthToken, async (req: AuthenticatedRequest, res) => {
+  const currentSessionId = (req.headers['x-session-id'] as string) || (req.query.sessionId as string) || '';
+  const user = req.user;
+
+  // 1. Sync active sessions with MongoDB if connected
+  try {
+    const db = await getMongoDb();
+    if (db) {
+      const dbSessions = await db.collection('sessions').find({}).sort({ lastActive: -1 }).toArray();
+      if (dbSessions && dbSessions.length > 0) {
+        for (const item of dbSessions) {
+          const { _id, ...clean } = item;
+          const exists = activeUserSessions.some(s => s.sessionId === clean.sessionId);
+          if (!exists) {
+            activeUserSessions.push(clean as UserSessionRecord);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('DB session fetch fallback to memory:', err);
+  }
+
+  // 2. Filter sessions by user role
+  let relevantSessions = activeUserSessions;
+  if (user && user.role !== 'admin') {
+    relevantSessions = activeUserSessions.filter(s => s.userId === user.id || s.email.toLowerCase() === user.email.toLowerCase());
+  } else if (user && user.role === 'admin') {
+    relevantSessions = activeUserSessions.filter(s => s.role === 'admin');
+  }
+
+  // 3. If an authenticated user/admin is making the request with an active session ID that wasn't indexed yet, register it dynamically
+  if (user && currentSessionId && !relevantSessions.some(s => s.sessionId === currentSessionId)) {
+    const parsed = parseUserAgentInfo(req.headers['user-agent'] || '');
+    const clientIp = getRealClientIp(req);
+    const selfSession: UserSessionRecord = {
+      sessionId: currentSessionId,
+      userId: user.id || 'usr-admin-master',
+      email: user.email || 'admin@dakshyam.com',
+      role: user.role || 'admin',
+      deviceName: parsed.deviceName,
+      deviceType: parsed.deviceType,
+      browser: parsed.browser,
+      os: parsed.os,
+      ip: clientIp,
+      createdAt: new Date().toISOString(),
+      lastActive: new Date().toISOString()
+    };
+    activeUserSessions.unshift(selfSession);
+    relevantSessions.unshift(selfSession);
+    try {
+      const db = await getMongoDb();
+      if (db) {
+        await db.collection('sessions').updateOne({ sessionId: currentSessionId }, { $set: selfSession }, { upsert: true });
+      }
+    } catch {}
+  }
+
+  // 4. Fallback if empty and an admin is checking active devices
+  if (relevantSessions.length === 0) {
+    const parsed = parseUserAgentInfo(req.headers['user-agent'] || '');
+    const clientIp = getRealClientIp(req);
+    const selfSession: UserSessionRecord = {
+      sessionId: currentSessionId || `sess_${Date.now().toString(36)}`,
+      userId: user?.id || 'usr-admin-master',
+      email: user?.email || 'admin@dakshyam.com',
+      role: user?.role || 'admin',
+      deviceName: parsed.deviceName,
+      deviceType: parsed.deviceType,
+      browser: parsed.browser,
+      os: parsed.os,
+      ip: clientIp,
+      createdAt: new Date().toISOString(),
+      lastActive: new Date().toISOString()
+    };
+    relevantSessions = [selfSession];
+  }
+
+  const enriched = relevantSessions.map(sess => ({
+    ...sess,
+    isCurrent: sess.sessionId === currentSessionId || (relevantSessions.length === 1 && !currentSessionId)
+  }));
+
+  res.json({
+    success: true,
+    sessions: enriched,
+    totalDevices: enriched.length,
+    currentSessionId
+  });
+});
+
+// POST /api/auth/sessions/ping — Update lastActive dynamically
+app.post('/api/auth/sessions/ping', async (req, res) => {
+  const sessionId = req.body.sessionId || (req.headers['x-session-id'] as string);
+  if (sessionId) {
+    const now = new Date().toISOString();
+    const session = activeUserSessions.find(s => s.sessionId === sessionId);
+    if (session) {
+      session.lastActive = now;
+    }
+    try {
+      const db = await getMongoDb();
+      if (db) {
+        await db.collection('sessions').updateOne(
+          { sessionId },
+          { $set: { lastActive: now } }
+        );
+      }
+    } catch {}
+  }
+  res.json({ success: true, timestamp: new Date().toISOString() });
+});
+
+// DELETE /api/auth/sessions/:sessionId — Terminate a specific session
+app.delete('/api/auth/sessions/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  const idx = activeUserSessions.findIndex(s => s.sessionId === sessionId);
+  if (idx !== -1) {
+    activeUserSessions.splice(idx, 1);
+  }
+  try {
+    const db = await getMongoDb();
+    if (db) {
+      await db.collection('sessions').deleteOne({ sessionId });
+    }
+  } catch {}
+  res.json({ success: true, message: 'Session successfully revoked.' });
+});
+
+// POST /api/auth/sessions/terminate-others — Terminate all other devices
+app.post('/api/auth/sessions/terminate-others', async (req, res) => {
+  const currentSessionId = req.body.sessionId || (req.headers['x-session-id'] as string);
+  if (currentSessionId) {
+    for (let i = activeUserSessions.length - 1; i >= 0; i--) {
+      if (activeUserSessions[i].sessionId !== currentSessionId) {
+        activeUserSessions.splice(i, 1);
+      }
+    }
+    try {
+      const db = await getMongoDb();
+      if (db) {
+        await db.collection('sessions').deleteMany({ sessionId: { $ne: currentSessionId } });
+      }
+    } catch {}
+  }
+  res.json({ success: true, message: 'All other device sessions terminated.' });
+});
+
+// ==========================================
+// VISITOR COUNTER & TELEMETRY ENDPOINTS
+// ==========================================
+
+let totalSiteVisitors = 1482;
+
+// GET /api/visitor/count
+app.get('/api/visitor/count', async (req, res) => {
+  try {
+    const db = await getMongoDb();
+    if (db) {
+      const doc = await db.collection('settings').findOne({ id: 'site_analytics' });
+      if (doc && typeof doc.visitorCount === 'number') {
+        totalSiteVisitors = doc.visitorCount;
+      }
+    }
+  } catch {}
+  res.json({ count: totalSiteVisitors });
+});
+
+// POST /api/visitor/hit — Records new dynamic visitor hit
+app.post('/api/visitor/hit', async (req, res) => {
+  totalSiteVisitors += 1;
+  try {
+    const db = await getMongoDb();
+    if (db) {
+      await db.collection('settings').updateOne(
+        { id: 'site_analytics' },
+        { $inc: { visitorCount: 1 }, $set: { lastVisited: new Date().toISOString() } },
+        { upsert: true }
+      );
+    }
+  } catch {}
+  res.json({ count: totalSiteVisitors });
+});
+
+// ==========================================
+// EXHIBITION PROJECT VIDEOS ENDPOINTS
+// ==========================================
+
+// GET /api/videos — Get all exhibition project videos
+app.get('/api/videos', async (req, res) => {
+  try {
+    const db = await getMongoDb();
+    if (db) {
+      const list = await db.collection('videos').find({}).toArray();
+      return res.json(list.map(({ _id, ...rest }) => rest));
+    }
+    res.json(memoryDb.videos || []);
+  } catch (err: any) {
+    res.json(memoryDb.videos || []);
+  }
+});
+
+// POST /api/videos — Save an exhibition project video (up to 2min supported)
+app.post('/api/videos', optionalAuthToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id, title, description, videoUrl, groupId, groupName, mediaType = 'video', duration } = req.body;
+
+    if (!title || !videoUrl) {
+      return res.status(400).json({ error: 'Video title and media URL are required.' });
+    }
+
+    const newVideo = {
+      id: id || `vid_${Date.now()}`,
+      groupId: groupId || 'dakshyam-official',
+      groupName: groupName || 'Dakshyam Innovations Project',
+      title: String(title).trim(),
+      description: String(description || '').trim(),
+      videoUrl: String(videoUrl).trim(),
+      mediaType: mediaType || 'video',
+      duration: duration || 60,
+      likes: 0,
+      likedByUserIds: [],
+      views: 1,
+      comments: [],
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    };
+
+    const db = await getMongoDb();
+    if (db) {
+      await db.collection('videos').updateOne(
+        { id: newVideo.id },
+        { $set: newVideo },
+        { upsert: true }
+      );
+    }
+
+    if (!memoryDb.videos) memoryDb.videos = [];
+    const existingIdx = memoryDb.videos.findIndex((v: any) => v.id === newVideo.id);
+    if (existingIdx !== -1) {
+      memoryDb.videos[existingIdx] = newVideo;
+    } else {
+      memoryDb.videos.unshift(newVideo);
+    }
+
+    res.json({ success: true, video: newVideo });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to save exhibition video.' });
+  }
+});
+
+// DELETE /api/videos/:id — Delete exhibition project video
+app.delete('/api/videos/:id', optionalAuthToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const db = await getMongoDb();
+    if (db) {
+      await db.collection('videos').deleteOne({ id });
+    }
+    if (memoryDb.videos) {
+      memoryDb.videos = memoryDb.videos.filter((v: any) => v.id !== id);
+    }
+    res.json({ success: true, message: 'Video removed.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -937,7 +1318,7 @@ app.get('/api/health', async (req, res) => {
     databaseName: db?.databaseName || null,
     environment: process.env.VERCEL ? "vercel" : (process.env.NODE_ENV || "development"),
     details: db ? "Connected to live MongoDB Atlas Database" : "Running on resilient local storage fallback",
-    error: lastMongoError || null,
+    error: sanitizeError(lastMongoError || '') || null,
     advice: lastMongoError ? getMongoAdvice(lastMongoError) : null
   });
 });
@@ -953,7 +1334,7 @@ app.get('/api/test-db', async (req, res) => {
         success: false,
         connected: false,
         hasUri: uriConfigured,
-        error: lastMongoError || 'Could not connect to MongoDB Atlas',
+        error: sanitizeError(lastMongoError || 'Could not connect to database cluster'),
         advice: getMongoAdvice(lastMongoError || '')
       });
     }
@@ -965,14 +1346,14 @@ app.get('/api/test-db', async (req, res) => {
       connected: true,
       database: db.databaseName,
       latencyMs,
-      message: `Successfully reached live MongoDB Atlas cluster in ${latencyMs}ms!`
+      message: `Successfully reached live database cluster in ${latencyMs}ms!`
     });
   } catch (err: any) {
     const msg = err.message || String(err);
     return res.json({
       success: false,
       connected: false,
-      error: msg,
+      error: sanitizeError(msg),
       advice: getMongoAdvice(msg)
     });
   }
@@ -1007,7 +1388,16 @@ app.get('/api/public/data', async (req, res) => {
       const loaderDoc = await settingsCol.findOne({ id: 'page_loader_config' });
       if (loaderDoc) publicData.page_loader_config = loaderDoc.value;
       const feedbackCfgDoc = await settingsCol.findOne({ id: 'workshop_feedback_config' });
-      if (feedbackCfgDoc) publicData.workshop_feedback_config = feedbackCfgDoc.value;
+      if (feedbackCfgDoc && feedbackCfgDoc.value) {
+        const mockIds = ['WS-IOT-ROBO', 'WS-NEP-STEM', 'WS-SMART-FARM', 'WS-FULLSTACK-DASH', 'WS-MU6VJUDX', 'WS-MU85HKNB'];
+        const cfgValue = { ...feedbackCfgDoc.value };
+        if (Array.isArray(cfgValue.workshops)) {
+          cfgValue.workshops = cfgValue.workshops.filter((w: any) => !mockIds.includes(w.id));
+        } else {
+          cfgValue.workshops = [];
+        }
+        publicData.workshop_feedback_config = cfgValue;
+      }
       const modelDoc = await settingsCol.findOne({ id: 'home_3d_model' });
       if (modelDoc) publicData.home_3d_model = modelDoc.value;
 
@@ -1450,7 +1840,7 @@ app.post('/api/db/:key', authenticateToken, async (req: AuthenticatedRequest, re
 
   // Strict role permissions check per collection key
   const adminOnlyKeys = ['supervisor_pin', 'company_about', 'page_loader_config', 'home_3d_model', 'courses', 'banners', 'gallery_images', 'admins'];
-  const staffKeys = ['trainers', 'students', 'groups', 'videos', 'certificates'];
+  const staffKeys = ['trainers', 'students', 'groups', 'videos', 'certificates', 'workshop_feedback_config'];
 
   if (adminOnlyKeys.includes(key)) {
     if (user.role !== 'admin') {

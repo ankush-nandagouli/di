@@ -2,7 +2,7 @@ import React from 'react';
 import { CompanyAbout } from '../types';
 import { 
   Building2, Compass, Eye, MapPin, 
-  Github, Linkedin, Twitter, Youtube, ExternalLink,
+  Github, Linkedin, Twitter, Youtube, Instagram, ExternalLink,
   Atom, Cpu, Wrench, Percent, Code2, Globe, Smartphone, Laptop, Sparkles, CheckCircle2
 } from 'lucide-react';
 
@@ -281,68 +281,102 @@ export default function AboutCompany({ aboutState, theme = 'dark' }: AboutCompan
       </div>
 
       {/* Social Media Link Connect Section */}
-      <div className={`p-6 rounded-2xl border text-center space-y-4 ${
-        isLight ? 'bg-blue-50/40 border-blue-900/10' : 'bg-[#0a192f]/60 border-blue-800/30'
-      }`}>
-        <h4 className={`text-2xs font-mono font-extrabold uppercase tracking-widest ${textTitle}`}>
-          Join the Dakshyam Network
-        </h4>
-        <div className="flex flex-wrap items-center justify-center gap-4">
-          
-          <a
-            href={aboutState.socialGithub}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`flex items-center gap-1.5 font-mono text-2xs uppercase tracking-wider border px-3.5 py-2 rounded-xl transition-all active:scale-95 cursor-pointer ${
-              isLight 
-                ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-400 shadow-3xs' 
-                : 'bg-black/60 border-slate-700 hover:bg-slate-900 text-slate-300'
-            }`}
-          >
-            <Github className="w-3.5 h-3.5" />
-            <span>GitHub</span>
-            <ExternalLink className="w-3 h-3 text-slate-500" />
-          </a>
+      {(() => {
+        const showGithub = !aboutState.hideGithub && Boolean(aboutState.socialGithub?.trim());
+        const showLinkedin = !aboutState.hideLinkedin && Boolean(aboutState.socialLinkedin?.trim());
+        const showTwitter = !aboutState.hideTwitter && Boolean(aboutState.socialTwitter?.trim());
+        const showYoutube = !aboutState.hideYoutube && Boolean(aboutState.socialYoutube?.trim());
+        const showInstagram = !aboutState.hideInstagram && Boolean(aboutState.socialInstagram?.trim());
+        const hasAnySocial = showGithub || showLinkedin || showTwitter || showYoutube || showInstagram;
 
-          <a
-            href={aboutState.socialLinkedin}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 font-mono text-2xs uppercase tracking-wider bg-[#0a66c2]/10 border border-[#0a66c2]/20 hover:bg-[#0a66c2] hover:text-white px-3.5 py-2 rounded-xl text-[#0a66c2] transition-all active:scale-95 cursor-pointer"
-          >
-            <Linkedin className="w-3.5 h-3.5" />
-            <span>LinkedIn</span>
-            <ExternalLink className="w-3 h-3 text-current" />
-          </a>
+        if (!hasAnySocial) return null;
 
-          <a
-            href={aboutState.socialTwitter}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`flex items-center gap-1.5 font-mono text-2xs uppercase tracking-wider border px-3.5 py-2 rounded-xl transition-all active:scale-95 cursor-pointer ${
-              isLight 
-                ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-400 shadow-3xs' 
-                : 'bg-black/60 border-slate-700 hover:bg-slate-900 text-slate-300'
-            }`}
-          >
-            <Twitter className="w-4 h-4" />
-            <span>Twitter</span>
-            <ExternalLink className="w-3 h-3 text-slate-500" />
-          </a>
+        return (
+          <div className={`p-6 rounded-2xl border text-center space-y-4 ${
+            isLight ? 'bg-blue-50/40 border-blue-900/10' : 'bg-[#0a192f]/60 border-blue-800/30'
+          }`}>
+            <h4 className={`text-2xs font-mono font-extrabold uppercase tracking-widest ${textTitle}`}>
+              Join the Dakshyam Network
+            </h4>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              
+              {showGithub && (
+                <a
+                  href={aboutState.socialGithub}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center gap-1.5 font-mono text-2xs uppercase tracking-wider border px-3.5 py-2 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                    isLight 
+                      ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-400 shadow-3xs' 
+                      : 'bg-black/60 border-slate-700 hover:bg-slate-900 text-slate-300'
+                  }`}
+                >
+                  <Github className="w-3.5 h-3.5" />
+                  <span>GitHub</span>
+                  <ExternalLink className="w-3 h-3 text-slate-500" />
+                </a>
+              )}
 
-          <a
-            href={aboutState.socialYoutube}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 font-mono text-2xs uppercase tracking-wider bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500 hover:text-white px-3.5 py-2 rounded-xl text-rose-500 transition-all active:scale-95 cursor-pointer"
-          >
-            <Youtube className="w-3.5 h-3.5" />
-            <span>YouTube</span>
-            <ExternalLink className="w-3 h-3 text-current" />
-          </a>
+              {showLinkedin && (
+                <a
+                  href={aboutState.socialLinkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 font-mono text-2xs uppercase tracking-wider bg-[#0a66c2]/10 border border-[#0a66c2]/20 hover:bg-[#0a66c2] hover:text-white px-3.5 py-2 rounded-xl text-[#0a66c2] transition-all active:scale-95 cursor-pointer"
+                >
+                  <Linkedin className="w-3.5 h-3.5" />
+                  <span>LinkedIn</span>
+                  <ExternalLink className="w-3 h-3 text-current" />
+                </a>
+              )}
 
-        </div>
-      </div>
+              {showTwitter && (
+                <a
+                  href={aboutState.socialTwitter}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center gap-1.5 font-mono text-2xs uppercase tracking-wider border px-3.5 py-2 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                    isLight 
+                      ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 hover:border-slate-400 shadow-3xs' 
+                      : 'bg-black/60 border-slate-700 hover:bg-slate-900 text-slate-300'
+                  }`}
+                >
+                  <Twitter className="w-4 h-4" />
+                  <span>Twitter</span>
+                  <ExternalLink className="w-3 h-3 text-slate-500" />
+                </a>
+              )}
+
+              {showYoutube && (
+                <a
+                  href={aboutState.socialYoutube}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 font-mono text-2xs uppercase tracking-wider bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500 hover:text-white px-3.5 py-2 rounded-xl text-rose-500 transition-all active:scale-95 cursor-pointer"
+                >
+                  <Youtube className="w-3.5 h-3.5" />
+                  <span>YouTube</span>
+                  <ExternalLink className="w-3 h-3 text-current" />
+                </a>
+              )}
+
+              {showInstagram && (
+                <a
+                  href={aboutState.socialInstagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 font-mono text-2xs uppercase tracking-wider bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-amber-500/10 border border-pink-500/30 hover:border-pink-500 hover:text-pink-400 px-3.5 py-2 rounded-xl text-pink-500 transition-all active:scale-95 cursor-pointer"
+                >
+                  <Instagram className="w-3.5 h-3.5" />
+                  <span>Instagram</span>
+                  <ExternalLink className="w-3 h-3 text-current" />
+                </a>
+              )}
+
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );
