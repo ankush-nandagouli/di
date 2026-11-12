@@ -343,9 +343,8 @@ export interface WorkshopFeedbackSubmission {
   submittedAt: string;
 }
 
-// In-App Role-Based Notifications
 export type NotificationTargetRole = 'all' | 'admin' | 'trainer' | 'student' | 'public';
-export type NotificationCategory = 'course' | 'workshop' | 'feedback' | 'security' | 'certificate' | 'system' | 'enrollment';
+export type NotificationCategory = 'course' | 'workshop' | 'feedback' | 'security' | 'certificate' | 'system' | 'enrollment' | 'contact';
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
 
 export interface AppNotification {
@@ -358,7 +357,7 @@ export interface AppNotification {
   category: NotificationCategory;
   priority: NotificationPriority;
   isRead?: boolean;
-  linkTab?: 'home' | 'services' | 'social' | 'portal' | 'about' | 'contact' | 'notfound';
+  linkTab?: 'home' | 'services' | 'social' | 'portal' | 'about' | 'contact' | 'notfound' | 'privacy' | 'terms';
   actionData?: Record<string, any>;
 }
 
@@ -382,6 +381,19 @@ export interface SupportTicket {
   updatedAt: string;
   adminResponse?: string;
   resolvedAt?: string;
+}
+
+// Contact Form Inquiries
+export interface ContactInquiry {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+  createdAt: string;
+  status: 'new' | 'read' | 'replied' | 'archived';
+  notes?: string;
 }
 
 

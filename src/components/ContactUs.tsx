@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Phone, MapPin, Send, HelpCircle, CheckCircle2, MessageSquare, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, CheckCircle2, MessageSquare, AlertTriangle } from 'lucide-react';
 import { notifySuccess, notifyError } from '../utils/toast';
 import { DakshyamDatabase } from '../utils/db';
+import { NotificationService } from '../utils/notificationService';
 
 interface ContactUsProps {
   theme: 'dark' | 'light';
@@ -19,14 +20,14 @@ export default function ContactUs({ theme }: ContactUsProps) {
     name: '',
     email: '',
     phone: '',
-    subject: 'Robotics Workshop Requisition',
+    subject: 'School/College Robotics Workshop',
     message: ''
   });
   const [formError, setFormError] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
@@ -47,18 +48,48 @@ export default function ContactUs({ theme }: ContactUsProps) {
     }
 
     setIsSending(true);
-    setTimeout(() => {
+
+    try {
+      // 1. Persist inquiry into database
+      const createdInquiry = DakshyamDatabase.createContactInquiry({
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim() || undefined,
+        subject: formData.subject,
+        message: formData.message.trim()
+      });
+
+      // 2. Dispatch high-priority real-time notification to Administrator
+      await NotificationService.dispatchNotification({
+        title: `New Contact Inquiry: ${formData.subject}`,
+        message: `From ${formData.name.trim()} (${formData.email.trim()}): "${formData.message.trim().substring(0, 90)}${formData.message.trim().length > 90 ? '...' : ''}"`,
+        targetRole: 'admin',
+        category: 'contact',
+        priority: 'high',
+        linkTab: 'portal',
+        actionData: {
+          inquiryId: createdInquiry.id,
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          subject: formData.subject
+        }
+      });
+
       setIsSending(false);
       setSubmitted(true);
-      notifySuccess('Inquiry received! A technical coordinator will reach out shortly.');
+      notifySuccess('Inquiry received! Our team will get back to you shortly.');
       setFormData({
         name: '',
         email: '',
         phone: '',
-        subject: 'Robotics Workshop Requisition',
+        subject: 'School/College Robotics Workshop',
         message: ''
       });
-    }, 800);
+    } catch (err: any) {
+      setIsSending(false);
+      console.error('Contact form submission error:', err);
+      notifyError('Failed to send message. Please try again.');
+    }
   };
 
   return (
@@ -68,7 +99,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
         <span className={`text-3xs font-mono tracking-widest uppercase font-black ${isLight ? 'text-blue-950' : 'text-sky-400'}`}>Get in touch</span>
         <h1 className={`text-2xl font-black tracking-wide uppercase ${isLight ? 'text-slate-900' : 'text-white'}`}>Contact Dakshyam Innovations</h1>
         <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-          Have queries about IoT syllabus integration, custom school STEM curriculums, robotic hardware kits or corporate workshop options? Message our cooperative cell today.
+          Have questions about robotics workshops, STEM curriculum integration, electronics hardware kits, or course admissions? Reach out to our team.
         </p>
       </div>
 
@@ -76,7 +107,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
         
         {/* CONTACT CARDS COLUMN */}
         <div className="md:col-span-1 space-y-4">
-          <h2 className={`text-2xs font-mono font-black uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Direct Terminals</h2>
+          <h2 className={`text-2xs font-mono font-black uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Contact Details</h2>
           
           <div className={`p-4 rounded-2xl border transition-all ${
             isLight ? 'bg-blue-50/40 border-blue-900/10 hover:border-blue-900/25' : 'bg-[#0a192f]/60 border-blue-800/30 hover:border-blue-500/40'
@@ -102,11 +133,11 @@ export default function ContactUs({ theme }: ContactUsProps) {
                 <Mail className="w-4 h-4" />
               </div>
               <div className="space-y-1">
-                <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Electronic Mail</h3>
+                <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Email Support</h3>
                 <a href={`mailto:${contactEmail}`} className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-sky-300'}`}>
                   {contactEmail}
                 </a>
-                <span className="text-4xs font-mono text-slate-500 block uppercase">24-hour Dispatch SLA</span>
+                <span className="text-4xs font-mono text-slate-500 block uppercase">Response within 24 hours</span>
               </div>
             </div>
           </div>
@@ -119,7 +150,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
                 <Phone className="w-4 h-4" />
               </div>
               <div className="space-y-1">
-                <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Cooperative Hotlines</h3>
+                <h3 className={`text-3xs font-mono uppercase font-black tracking-wider ${isLight ? 'text-blue-950' : 'text-sky-300'}`}>Phone Hotline</h3>
                 <a href={`tel:${contactPhone.replace(/\s+/g, '')}`} className={`text-xs font-semibold hover:underline block font-sans ${isLight ? 'text-slate-900' : 'text-sky-300'}`}>
                   {contactPhone}
                 </a>
@@ -131,14 +162,14 @@ export default function ContactUs({ theme }: ContactUsProps) {
           </div>
         </div>
 
-        {/* INTERACTIVE MESSAGE BOARD FORM */}
+        {/* INTERACTIVE MESSAGE FORM */}
         <div className="md:col-span-2">
           <div className={`p-6 rounded-3xl border ${
             isLight ? 'bg-white border-blue-900/10 shadow-xs' : 'bg-[#0a192f]/70 border-blue-800/30 shadow-sm'
           }`}>
             <div className="flex items-center gap-2 mb-4">
               <MessageSquare className={`w-4 h-4 ${isLight ? 'text-blue-950' : 'text-sky-400'}`} />
-              <h2 className={`text-xs font-mono font-black uppercase tracking-wider ${isLight ? 'text-slate-900' : 'text-white'}`}>Dispatch Requisition Node</h2>
+              <h2 className={`text-xs font-mono font-black uppercase tracking-wider ${isLight ? 'text-slate-900' : 'text-white'}`}>Send Us a Message</h2>
             </div>
 
             <AnimatePresence mode="wait">
@@ -154,7 +185,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
                   </div>
                   <h3 className={`text-lg font-black uppercase tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>Message Received!</h3>
                   <p className={`text-xs max-w-sm mx-auto leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                    Thank you for contacting Dakshyam Innovations. A technical coordinator has been assigned to your query and will reach out shortly.
+                    Thank you for reaching out. Your inquiry has been sent to our administration team, and we will get back to you shortly.
                   </p>
                   <button
                     onClick={() => setSubmitted(false)}
@@ -162,7 +193,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
                       isLight ? 'bg-blue-950 text-white hover:bg-blue-900' : 'bg-white text-[#0a192f] hover:bg-slate-100'
                     }`}
                   >
-                    Send Another Dispatch Message
+                    Send Another Message
                   </button>
                 </motion.div>
               ) : (
@@ -176,7 +207,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                      <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-slate-600 font-bold' : 'text-slate-400'}`}>
                         Your Full Name
                       </label>
                       <input
@@ -184,7 +215,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
                         required
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="e.g. Kunal Sonkar"
+                        placeholder="e.g. Rahul Sharma"
                         className={isLight 
                           ? "w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-950 focus:bg-white transition-all" 
                           : "w-full bg-[#071326] border border-blue-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-sky-400 transition-all"
@@ -193,7 +224,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                      <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-slate-600 font-bold' : 'text-slate-400'}`}>
                         Email Address
                       </label>
                       <input
@@ -201,7 +232,7 @@ export default function ContactUs({ theme }: ContactUsProps) {
                         required
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="e.g. participant@dakshyam.com"
+                        placeholder="e.g. rahul@example.com"
                         className={isLight 
                           ? "w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-950 focus:bg-white transition-all" 
                           : "w-full bg-[#071326] border border-blue-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-sky-400 transition-all"
@@ -212,14 +243,14 @@ export default function ContactUs({ theme }: ContactUsProps) {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                        WhatsApp / Contact (Optional)
+                      <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-slate-600 font-bold' : 'text-slate-400'}`}>
+                        Phone / WhatsApp (Optional)
                       </label>
                       <input
                         type="text"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="+91 WhatsApp number for callback"
+                        placeholder="+91 Phone number"
                         className={isLight 
                           ? "w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-950 focus:bg-white transition-all" 
                           : "w-full bg-[#071326] border border-blue-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-sky-400 transition-all"
@@ -228,8 +259,8 @@ export default function ContactUs({ theme }: ContactUsProps) {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                        Inquiry Categorization
+                      <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-slate-600 font-bold' : 'text-slate-400'}`}>
+                        Subject
                       </label>
                       <select
                         value={formData.subject}
@@ -239,25 +270,25 @@ export default function ContactUs({ theme }: ContactUsProps) {
                           : "w-full bg-[#071326] border border-blue-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none"
                         }
                       >
-                        <option value="Robotics Workshop Requisition">School/College Robotics Workshop</option>
-                        <option value="IoT Curriculum Integration">NEP-Aligned IoT Integration</option>
-                        <option value="Custom Hardware Kit Request">Custom Electronics Kits Order</option>
-                        <option value="Syllabus Query">Trainer/Syllabus Support</option>
-                        <option value="Uncategorized General Inquiries">General / Press & Media Cell</option>
+                        <option value="School/College Robotics Workshop">School/College Robotics Workshop</option>
+                        <option value="IoT & STEM Lab Setup">IoT & STEM Lab Setup</option>
+                        <option value="Course Admission Query">Course Admission Query</option>
+                        <option value="Hardware Kits Purchase">Custom Hardware Kits Request</option>
+                        <option value="General Inquiry">General Inquiry</option>
                       </select>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                      Inquiry Message Details
+                    <label className={`block text-4xs font-mono tracking-widest uppercase ${isLight ? 'text-slate-600 font-bold' : 'text-slate-400'}`}>
+                      Your Message
                     </label>
                     <textarea
                       required
                       rows={4}
                       value={formData.message}
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                      placeholder="Detail your request here (e.g. number of student participates, grade levels, preferred dates, etc.)..."
+                      placeholder="Please enter your query or details about your requirements..."
                       className={isLight 
                         ? "w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-950 focus:bg-white transition-all" 
                         : "w-full bg-[#071326] border border-blue-900/40 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-sky-400 transition-all resize-none"
@@ -277,10 +308,10 @@ export default function ContactUs({ theme }: ContactUsProps) {
                     }`}
                   >
                     {isSending ? (
-                      <>Processing Transmissions...</>
+                      <>Sending Message...</>
                     ) : (
                       <>
-                        <Send className="w-3.5 h-3.5" /> Submit Message Dispatch
+                        <Send className="w-3.5 h-3.5" /> Send Message
                       </>
                     )}
                   </button>

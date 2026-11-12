@@ -1,4 +1,4 @@
-import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder, CompanyService, AppLog, LogCategory, PageLoaderConfig, SupportTicket, TicketCategory, TicketPriority, TicketStatus } from '../types';
+import { StudentUser, TrainerUser, AdminUser, StudentGroup, Course, CourseApplication, Certificate, VideoPost, PromoBanner, GalleryImage, SpecialTrainingProgram, SpecialProgramEnrollment, CompanyAbout, CompanyFounder, CompanyService, AppLog, LogCategory, PageLoaderConfig, SupportTicket, TicketCategory, TicketPriority, TicketStatus, ContactInquiry } from '../types';
 
 export const DEFAULT_SERVICES: CompanyService[] = [
   {
@@ -943,6 +943,69 @@ export class DakshyamDatabase {
     const filtered = tickets.filter(t => t.id !== ticketId);
     if (filtered.length === tickets.length) return false;
     this.saveTickets(filtered);
+    return true;
+  }
+
+  // ==========================================
+  // CONTACT FORM INQUIRIES MANAGEMENT
+  // ==========================================
+  static getContactInquiries(): ContactInquiry[] {
+    return this.get<ContactInquiry[]>('contact_inquiries', []);
+  }
+
+  static saveContactInquiries(inquiries: ContactInquiry[]): void {
+    this.set('contact_inquiries', inquiries);
+    if (typeof fetch !== 'undefined') {
+      fetch('/api/contact-inquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inquiries })
+      }).catch(() => {});
+    }
+  }
+
+  static createContactInquiry(inquiryData: Omit<ContactInquiry, 'id' | 'createdAt' | 'status'>): ContactInquiry {
+    const inquiries = this.getContactInquiries();
+    const newInquiry: ContactInquiry = {
+      ...inquiryData,
+      id: `INQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      createdAt: new Date().toISOString(),
+      status: 'new'
+    };
+    inquiries.unshift(newInquiry);
+    this.saveContactInquiries(inquiries);
+
+    this.logEvent(
+      'Contact Inquiry Received',
+      `Inquiry [${newInquiry.id}] from ${newInquiry.name} (${newInquiry.email}) on "${newInquiry.subject}"`,
+      newInquiry.email,
+      'public',
+      'INFO',
+      'SYSTEM'
+    );
+
+    return newInquiry;
+  }
+
+  static updateContactInquiry(inquiryId: string, updates: Partial<ContactInquiry>): boolean {
+    const inquiries = this.getContactInquiries();
+    const index = inquiries.findIndex(i => i.id === inquiryId);
+    if (index === -1) return false;
+
+    inquiries[index] = {
+      ...inquiries[index],
+      ...updates
+    };
+
+    this.saveContactInquiries(inquiries);
+    return true;
+  }
+
+  static deleteContactInquiry(inquiryId: string): boolean {
+    const inquiries = this.getContactInquiries();
+    const filtered = inquiries.filter(i => i.id !== inquiryId);
+    if (filtered.length === inquiries.length) return false;
+    this.saveContactInquiries(filtered);
     return true;
   }
 

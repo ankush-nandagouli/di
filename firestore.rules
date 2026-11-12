@@ -116,5 +116,15 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
+
+    // Contact Us Public Inquiries: anyone can submit, only Admin can read & manage
+    match /contact_inquiries/{inquiryId} {
+      allow create: if request.resource.data.name is string
+                    && request.resource.data.email is string
+                    && request.resource.data.subject is string
+                    && request.resource.data.message is string
+                    && isDataSizeOk(request.resource.data);
+      allow read, update, delete: if isAdmin();
+    }
   }
 }

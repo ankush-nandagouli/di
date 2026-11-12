@@ -349,7 +349,9 @@ const memoryDb: Record<string, any> = {
       }
     ],
     updatedAt: new Date().toISOString()
-  }
+  },
+  support_tickets: [],
+  contact_inquiries: []
 };
 
 // --- DATA SANITIZATION HELPERS ---
@@ -2233,6 +2235,109 @@ app.delete('/api/tickets/:id', async (req, res) => {
   } catch (err: any) {
     console.error('Ticket deletion error:', err);
     res.status(500).json({ error: 'Failed to delete ticket.' });
+  }
+});
+
+// ==========================================
+// CONTACT FORM INQUIRIES ENDPOINTS
+// ==========================================
+
+// GET /api/contact-inquiries - Fetch contact inquiries
+app.get('/api/contact-inquiries', async (req, res) => {
+  try {
+    const db = await getMongoDb();
+    if (db) {
+      const inquiries = await db.collection('contact_inquiries').find({}).sort({ createdAt: -1 }).toArray();
+      return res.json({ success: true, inquiries: inquiries.map(({ _id, ...rest }) => rest) });
+    }
+    const inquiries = memoryDb.contact_inquiries || [];
+    res.json({ success: true, inquiries });
+  } catch (err: any) {
+    console.error('Inquiries fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch contact inquiries.' });
+  }
+});
+
+// POST /api/contact-inquiries - Submit or batch sync contact inquiries
+app.post('/api/contact-inquiries', async (req, res) => {
+  try {
+    const { inquiry, inquiries } = req.body;
+    const db = await getMongoDb();
+
+    if (Array.isArray(inquiries)) {
+      memoryDb.contact_inquiries = inquiries;
+      if (db) {
+        for (const item of inquiries) {
+          if (item && item.id) {
+            await db.collection('contact_inquiries').updateOne({ id: item.id }, { $set: item }, { upsert: true });
+          }
+        }
+      }
+      return res.json({ success: true, count: inquiries.length });
+    }
+
+    if (inquiry && inquiry.id) {
+      if (!Array.isArray(memoryDb.contact_inquiries)) memoryDb.contact_inquiries = [];
+      memoryDb.contact_inquiries = [inquiry, ...memoryDb.contact_inquiries.filter((i: any) => i.id !== inquiry.id)];
+      if (db) {
+        await db.collection('contact_inquiries').updateOne({ id: inquiry.id }, { $set: inquiry }, { upsert: true });
+      }
+      return res.json({ success: true, inquiry });
+    }
+
+    res.status(400).json({ error: 'Invalid inquiry payload.' });
+  } catch (err: any) {
+    console.error('Inquiry save error:', err);
+    res.status(500).json({ error: 'Failed to save contact inquiry.' });
+  }
+});
+
+// PATCH /api/contact-inquiries/:id - Update status or notes of inquiry
+app.patch('/api/contact-inquiries/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const db = await getMongoDb();
+
+    if (Array.isArray(memoryDb.contact_inquiries)) {
+      const idx = memoryDb.contact_inquiries.findIndex((i: any) => i.id === id);
+      if (idx !== -1) {
+        memoryDb.contact_inquiries[idx] = { ...memoryDb.contact_inquiries[idx], ...updates };
+      }
+    }
+
+    if (db) {
+      await db.collection('contact_inquiries').updateOne(
+        { id },
+        { $set: updates }
+      );
+    }
+
+    res.json({ success: true, id, updates });
+  } catch (err: any) {
+    console.error('Inquiry update error:', err);
+    res.status(500).json({ error: 'Failed to update contact inquiry.' });
+  }
+});
+
+// DELETE /api/contact-inquiries/:id - Delete an inquiry
+app.delete('/api/contact-inquiries/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getMongoDb();
+
+    if (Array.isArray(memoryDb.contact_inquiries)) {
+      memoryDb.contact_inquiries = memoryDb.contact_inquiries.filter((i: any) => i.id !== id);
+    }
+
+    if (db) {
+      await db.collection('contact_inquiries').deleteOne({ id });
+    }
+
+    res.json({ success: true, id });
+  } catch (err: any) {
+    console.error('Inquiry delete error:', err);
+    res.status(500).json({ error: 'Failed to delete contact inquiry.' });
   }
 });
 

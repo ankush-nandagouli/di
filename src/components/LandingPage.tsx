@@ -1199,7 +1199,7 @@ export default function LandingPage({
         <div className="relative z-10 space-y-6 text-left">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 border-slate-500/10">
             <div className="space-y-1">
-              <span className={`text-3xs font-mono tracking-widest uppercase font-black ${textGold}`}>About Cooperatives</span>
+              <span className={`text-3xs font-mono tracking-widest uppercase font-black ${textGold}`}>About Us</span>
               <h2 className={`text-lg md:text-xl font-black uppercase text-left tracking-wide ${textTitle}`}>
                 Dakshyam Innovations
               </h2>
@@ -1218,10 +1218,10 @@ export default function LandingPage({
                 Who Are We ?
               </h3>
               <p className={`text-3xs leading-relaxed ${textMuted}`}>
-                Dakshyam Innovations is an elite technical training cooperative committed to making advanced technology concepts highly tactile and intuitive. We operate at the forefront of digital inclusion by setting up bespoke **School Coding & Robotics Labs** and organizing dedicated physical workshops.
+                Dakshyam Innovations is a hands-on technical training and skill development institute committed to making advanced technology concepts intuitive and practical. We set up state-of-the-art **School Coding & Robotics Labs** and organize high-impact training workshops.
               </p>
               <p className={`text-3xs leading-relaxed ${textMuted}`}>
-                We bridge the gap between abstract textbook syntax and real-world microcontrollers. By deploying fully customized mobile kits, regional school classrooms in central India gain direct hands-on access to embedded engineering, logic controllers, and modern full-stack developer environments.
+                We bridge the gap between abstract textbook theory and real-world engineering. Through interactive modules and kits, students in central India gain direct practical experience with embedded hardware, sensor electronics, and modern software development.
               </p>
             </div>
 

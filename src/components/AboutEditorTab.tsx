@@ -33,16 +33,16 @@ export function AboutEditorTab({ onRefresh, theme }: AboutEditorTabProps) {
   const handleSavePin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!/^\d{6}$/.test(supervisorPin)) {
-      notifyError('The directorship access lock PIN must be exactly 6 numeric digits.');
+      notifyError('The supervisor security PIN must be exactly 6 numeric digits.');
       return;
     }
     try {
       DakshyamDatabase.saveSupervisorPin(supervisorPin);
-      setPinUpdateMsg('✓ 6-Digit supervisory security access PIN successfully updated! Active immediately on all entrance node links.');
-      notifySuccess('Supervisory PIN successfully updated!');
+      setPinUpdateMsg('✓ 6-Digit supervisor security PIN successfully updated! Active immediately across all login prompts.');
+      notifySuccess('Supervisor PIN successfully updated!');
       setTimeout(() => setPinUpdateMsg(''), 5000);
     } catch {
-      notifyError('Could not write updated protocol lock keys to regional database.');
+      notifyError('Could not save the updated security PIN. Please try again.');
     }
   };
 

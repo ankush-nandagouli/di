@@ -204,6 +204,23 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["formTitle", "isOpen", "updatedAt"]
+    },
+    "contact_inquiry": {
+      "title": "Contact Inquiry",
+      "description": "Inquiries submitted through the Contact Us page",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "subject", "message", "createdAt", "status"]
     }
   },
   "firestore": {
@@ -254,6 +271,10 @@
     "/workshop_feedback_configs/{configId}": {
       "schema": "workshop_feedback_config",
       "description": "Admin configuration for workshop feedback form"
+    },
+    "/contact_inquiries/{inquiryId}": {
+      "schema": "contact_inquiry",
+      "description": "Public inquiries submitted via Contact Us page"
     }
   }
 }

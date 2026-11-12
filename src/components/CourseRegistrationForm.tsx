@@ -191,7 +191,7 @@ export default function CourseRegistrationForm({
           }`}>
             <div><span className="text-slate-500">Applicant:</span> {fullName}</div>
             <div><span className="text-slate-500">Program:</span> {selectedCourse?.title} ({selectedCourse?.duration})</div>
-            <div><span className="text-slate-500">Contact Node:</span> +91 {phone}</div>
+            <div><span className="text-slate-500">Phone:</span> +91 {phone}</div>
             <div><span className="text-slate-500">Institution:</span> {institution}</div>
             <div><span className="text-slate-500">Status:</span> <span className="text-amber-400 font-bold uppercase">Pending Verification</span></div>
             {selectedCourse?.mobileHardwareIncluded && (
@@ -224,7 +224,7 @@ export default function CourseRegistrationForm({
             </div>
             <div>
               <span className={`text-[10px] font-mono uppercase font-bold tracking-widest ${isLight ? 'text-amber-800' : 'text-amber-300'}`}>
-                Candidate Verification Gate
+                Student Account Required
               </span>
               <h2 className={`text-base sm:text-lg font-black uppercase tracking-wide ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 Login or Register to Apply
@@ -386,7 +386,7 @@ export default function CourseRegistrationForm({
                 <label className={`block text-2xs font-mono tracking-widest uppercase mb-1.5 font-medium ${
                   isLight ? 'text-blue-950' : 'text-sky-400'
                 }`}>
-                  Candidate Full Name
+                  Full Name
                 </label>
                 <div className="relative">
                   <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />

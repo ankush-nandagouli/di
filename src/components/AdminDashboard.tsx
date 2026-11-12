@@ -16,6 +16,7 @@ import Home3DArtSettingsTab from './Home3DArtSettingsTab';
 import AdminMasterGuide from './AdminMasterGuide';
 import AdminAccountsManager from './AdminAccountsManager';
 import SupportTicketManager from './SupportTicketManager';
+import ContactInquiriesManager from './ContactInquiriesManager';
 import { SecurityGuard } from '../utils/security';
 import { notifyError, notifySuccess, notifyInfo, notifyWarning } from '../utils/toast';
 import WorkshopDirectoryManager from './WorkshopDirectoryManager';
@@ -45,7 +46,7 @@ export default function AdminDashboard({
 }: AdminDashboardProps) {
   const isLight = theme === 'light';
   // Navigation tabs (3D art OBJ studio & tools restored)
-  type TabType = 'analytics' | 'courses' | 'applications' | 'trainers' | 'workshops' | 'accounts' | 'tickets' | 'promotions' | 'gallery' | 'devices' | 'special_training' | 'about_editor' | 'home_3d_art' | 'logs' | 'admin_guide';
+  type TabType = 'analytics' | 'inquiries' | 'courses' | 'applications' | 'trainers' | 'workshops' | 'accounts' | 'tickets' | 'promotions' | 'gallery' | 'devices' | 'special_training' | 'about_editor' | 'home_3d_art' | 'logs' | 'admin_guide';
   const [adminTab, setAdminTab] = useState<TabType>('analytics');
 
   // Instagram Link Admin Editor Modal States
@@ -1095,6 +1096,17 @@ export default function AdminDashboard({
           }`}>
             Gallery: {galleryList.length}
           </span>
+          <button
+            onClick={() => setAdminTab('inquiries')}
+            className={`px-3 py-1 border rounded-full font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+              isLight ? 'bg-blue-50 border-blue-900/20 text-blue-950 hover:bg-blue-100' : 'bg-cyan-950/40 border-cyan-500/20 text-cyan-300 hover:bg-cyan-900/40'
+            }`}
+          >
+            📬 Inquiries: {DakshyamDatabase.getContactInquiries().length}
+            {DakshyamDatabase.getContactInquiries().filter(i => i.status === 'new').length > 0 && (
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            )}
+          </button>
           <span className={`px-3 py-1 border rounded-full font-bold ${
             isLight ? 'bg-slate-150 border-slate-250 text-slate-600' : 'bg-[#111] border-cyan-500/5 text-slate-400'
           }`}>
@@ -1270,33 +1282,46 @@ export default function AdminDashboard({
       <div className={`flex flex-wrap gap-1.5 border-b pb-0.5 font-mono text-3xs uppercase font-extrabold scrollbar-none overflow-x-auto ${
         isLight ? 'border-slate-200' : 'border-cyan-500/10'
       }`}>
-        {(['analytics', 'courses', 'applications', 'trainers', 'workshops', 'accounts', 'tickets', 'promotions', 'gallery', 'devices', 'special_training', 'about_editor', 'home_3d_art', 'logs', 'admin_guide'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setAdminTab(tab)}
-            className={`px-3.5 py-2 rounded-t-xl transition-all border-t border-x cursor-pointer shrink-0 ${
-              adminTab === tab
-                ? (isLight ? 'bg-white border-slate-250 text-amber-800 font-bold border-b-white z-10' : 'bg-[#050505]/70 border-cyan-500/15 text-[#22d3ee]')
-                : (isLight ? 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50' : 'border-transparent text-slate-450 hover:text-white')
-            }`}
-          >
-            {tab === 'analytics' && 'Analytics Deck'}
-            {tab === 'courses' && 'Publisher'}
-            {tab === 'applications' && 'Admissions'}
-            {tab === 'trainers' && 'Verify Trainers'}
-            {tab === 'workshops' && '🏢 Workshops Directory'}
-            {tab === 'accounts' && '👥 Registered Accounts'}
-            {tab === 'tickets' && '🎫 Support & Bug Tickets'}
-            {tab === 'promotions' && 'Promo Banners'}
-            {tab === 'gallery' && 'Class Gallery & Exhibition'}
-            {tab === 'devices' && `📱 Active Devices (${activeSessions.length || 1})`}
-            {tab === 'special_training' && '🎓 Special Training Forms'}
-            {tab === 'about_editor' && '✏️ About Page Editor'}
-            {tab === 'home_3d_art' && '🧊 Home 3D Art (.obj)'}
-            {tab === 'logs' && '🛡️ System Audit Logs'}
-            {tab === 'admin_guide' && '📖 Admin Master Guide'}
-          </button>
-        ))}
+        {(['analytics', 'inquiries', 'courses', 'applications', 'trainers', 'workshops', 'accounts', 'tickets', 'promotions', 'gallery', 'devices', 'special_training', 'about_editor', 'home_3d_art', 'logs', 'admin_guide'] as const).map(tab => {
+          const newInquiriesCount = DakshyamDatabase.getContactInquiries().filter(i => i.status === 'new').length;
+          return (
+            <button
+              key={tab}
+              onClick={() => setAdminTab(tab)}
+              className={`px-3.5 py-2 rounded-t-xl transition-all border-t border-x cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                adminTab === tab
+                  ? (isLight ? 'bg-white border-slate-250 text-amber-800 font-bold border-b-white z-10' : 'bg-[#050505]/70 border-cyan-500/15 text-[#22d3ee]')
+                  : (isLight ? 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50' : 'border-transparent text-slate-450 hover:text-white')
+              }`}
+            >
+              {tab === 'analytics' && 'Analytics Deck'}
+              {tab === 'inquiries' && (
+                <>
+                  <span>📬 Contact Inquiries</span>
+                  {newInquiriesCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[8px] font-black bg-amber-500 text-slate-950 font-mono">
+                      {newInquiriesCount}
+                    </span>
+                  )}
+                </>
+              )}
+              {tab === 'courses' && 'Publisher'}
+              {tab === 'applications' && 'Admissions'}
+              {tab === 'trainers' && 'Verify Trainers'}
+              {tab === 'workshops' && '🏢 Workshops Directory'}
+              {tab === 'accounts' && '👥 Registered Accounts'}
+              {tab === 'tickets' && '🎫 Support & Bug Tickets'}
+              {tab === 'promotions' && 'Promo Banners'}
+              {tab === 'gallery' && 'Class Gallery & Exhibition'}
+              {tab === 'devices' && `📱 Active Devices (${activeSessions.length || 1})`}
+              {tab === 'special_training' && '🎓 Special Training Forms'}
+              {tab === 'about_editor' && '✏️ About Page Editor'}
+              {tab === 'home_3d_art' && '🧊 Home 3D Art (.obj)'}
+              {tab === 'logs' && '🛡️ System Audit Logs'}
+              {tab === 'admin_guide' && '📖 Admin Master Guide'}
+            </button>
+          );
+        })}
       </div>
 
       {/* Panel containers */}
@@ -3526,6 +3551,16 @@ export default function AdminDashboard({
             </div>
           );
         })()}
+
+        {/* TAB: CONTACT US FORM INQUIRIES & SUBMISSIONS */}
+        {adminTab === 'inquiries' && (
+          <div className="w-full">
+            <ContactInquiriesManager
+              theme={theme}
+              onRefresh={onRefresh}
+            />
+          </div>
+        )}
 
         {/* TAB: REGISTERED ACCOUNTS REGISTRY */}
         {adminTab === 'accounts' && (
