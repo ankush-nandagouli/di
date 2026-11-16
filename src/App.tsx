@@ -5,7 +5,7 @@ import {
   LogOut, LogIn, ChevronRight, HelpCircle, Activity, Sparkles, School,
   Sun, Moon, Menu, X, Eye, EyeOff, Lock, Settings, Key, Info, Cpu, Compass,
   UserPlus, ShieldAlert, CheckCircle2, Check, ClipboardList, Home, Phone, Video, Award,
-  Building2, ArrowUp, Instagram, Linkedin, Youtube, Twitter, Smartphone, Users, Github
+  Building2, ArrowUp, Instagram, Linkedin, Youtube, Twitter, Smartphone, Users, Github, ExternalLink
 } from 'lucide-react';
 
 import ThreeBackground from './components/ThreeBackground';
@@ -2044,6 +2044,18 @@ export default function App() {
             >
               Workshops Directory
             </button>
+            <a
+              href="https://erp.dakshyaminnovations.in/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`inline-flex items-center gap-1 transition-colors cursor-pointer ${
+                isLight ? 'text-blue-800 hover:text-blue-950' : 'text-cyan-400 hover:text-cyan-300'
+              }`}
+              title="Visit Dakshyam Innovations ERP Portal"
+            >
+              <span>ERP Portal</span>
+              <ExternalLink className="w-3 h-3" aria-hidden="true" />
+            </a>
             <button
               onClick={() => {
                 DakshyamDatabase.setCookie('dakshyam_cookie_consent', '');
